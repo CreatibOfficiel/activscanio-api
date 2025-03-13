@@ -1,18 +1,18 @@
-# Choisir une image Node (support ARM pour Mac M1) 
+# Choose a Node image (ARM support for Mac M1)
 FROM node:18-alpine
 
-# Création du répertoire pour l’app
+# Create the directory for the app
 WORKDIR /app
 
-# Copier package.json et installer
+# Copy package.json and install
 COPY package*.json ./
 RUN npm install
 
-# Copier le reste des sources
+# Copy the rest of the sources
 COPY . .
 
-# Construire le projet NestJS
+# Build the NestJS project
 RUN npm run build
 
-# Lancer l’application (en mode prod par exemple)
-CMD ["npm", "run", "start:dev"]
+# Start the application in production mode
+CMD ["npm", "run", "start:prod"]
