@@ -14,7 +14,7 @@ services:
     networks:
       - activscanio-net
 
-  api:
+  activscanio-api:
     build: .
     container_name: activscanio-api
     depends_on:
