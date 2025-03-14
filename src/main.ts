@@ -1,12 +1,3 @@
-import { randomUUID } from 'crypto';
-
-// Minimal polyfill to inject randomUUID into globalThis.crypto
-if (!globalThis.crypto) {
-  (globalThis as any).crypto = {
-    randomUUID: () => randomUUID(),
-  };
-}
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 

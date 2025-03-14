@@ -1,5 +1,5 @@
 # Choose a Node image (ARM support for Mac M1)
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Create the directory for the app
 WORKDIR /app
