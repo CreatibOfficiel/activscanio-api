@@ -1,10 +1,11 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: activscanio-db-local
     # Expose le port pour accéder en local
     ports:
       - '5432:5432'
+    env_file:
+      - .env.local
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
@@ -15,9 +16,10 @@ services:
   activscanio-api:
     build:
       context: .
-    container_name: activscanio-api-local
     depends_on:
       - db
+    env_file:
+      - .env.local
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
