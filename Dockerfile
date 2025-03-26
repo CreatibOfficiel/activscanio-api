@@ -1,18 +1,43 @@
-# Choose a Node image (ARM support for Mac M1)
-FROM node:20-alpine
+# ----------- Stage 1: Dependencies -----------
+FROM node:20-alpine AS deps
 
-# Create the directory for the app
 WORKDIR /app
 
-# Copy package.json and install
-COPY package*.json ./
-RUN npm install
+# Copie uniquement les fichiers de dépendances pour tirer profit du cache
+COPY package.json package-lock.json ./
 
-# Copy the rest of the sources
+# Installe toutes les dépendances (prod + dev)
+RUN npm ci
+
+# ----------- Stage 2: Build -----------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copie les deps déjà installées
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY --from=deps /app/package-lock.json ./package-lock.json
+
+# Copie le reste du code source
 COPY . .
 
-# Build the NestJS project
+# Build NestJS (ts -> dist)
 RUN npm run build
 
-# Start the application in production mode
-CMD ["npm", "run", "start:prod"]
+# ----------- Stage 3: Production Runner -----------
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Copie uniquement les fichiers nécessaires
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json ./
+
+# Réinstalle uniquement les dépendances de production
+RUN npm ci --omit=dev
+
+EXPOSE 3000
+
+CMD ["node", "dist/main"]

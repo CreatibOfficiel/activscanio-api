@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: activscanio-db-local
+    # Expose le port pour accéder en local
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  activscanio-api:
+    build:
+      context: .
+    container_name: activscanio-api-local
+    depends_on:
+      - db
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+    ports:
+      - '3000:3000'
+
+    # En local, on peut monter le code pour du hot-reload
+    volumes:
+      - .:/app
+
+    # Et override la commande pour du dev si souhaité
+    command: npm run start:dev
+
+volumes:
+  db-data:
