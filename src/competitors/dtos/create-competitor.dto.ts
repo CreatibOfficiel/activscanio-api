@@ -10,8 +10,11 @@ export class CreateCompetitorDto {
   @IsUrl()
   profilePictureUrl: string;
 
-  @IsInt()
-  elo: number;
+  @IsNumber()
+  mu: number;
+
+  @IsNumber()
+  sigma: number;
 
   @IsInt()
   rank: number;

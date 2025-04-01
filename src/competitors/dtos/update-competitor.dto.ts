@@ -11,9 +11,6 @@ export class UpdateCompetitorDto {
   profilePictureUrl?: string;
 
   @IsOptional() @IsInt()
-  elo?: number;
-
-  @IsOptional() @IsInt()
   rank?: number;
 
   @IsOptional() @IsInt()

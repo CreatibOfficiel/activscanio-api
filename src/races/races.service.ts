@@ -7,6 +7,7 @@ import { RaceResult } from './race-result.entity';
 import { CreateRaceDto } from './dtos/create-race.dto';
 
 import { CompetitorsService } from '../competitors/competitors.service';
+import { RatingService } from 'src/rating/rating.service';
 
 // --- UTILS ---
 function getIsoDayOfWeek(date: Date): number {
@@ -49,6 +50,7 @@ export class RacesService {
     private raceRepo: Repository<RaceEvent>,
 
     private competitorsService: CompetitorsService,
+    private ratingService: RatingService,
   ) {}
 
   // CREATE a new race
@@ -70,8 +72,8 @@ export class RacesService {
 
     const savedRace = await this.raceRepo.save(race);
 
-    // Update Elo
-    await this.updateCompetitorsElo(savedRace.results, raceDate);
+    // Update competitors' TrueSkill ratings
+    await this.updateCompetitorsRating(savedRace.results);
 
     // Recompute global rank
     await this.competitorsService.recomputeGlobalRank();
@@ -160,162 +162,58 @@ export class RacesService {
     return races.slice(0, 3);
   }
 
-  private expectedScore(rating: number, opponentRating: number): number {
-    return 1 / (1 + Math.pow(10, (opponentRating - rating) / 400));
-  }
-
-  private async updateCompetitorsElo(
+  private async updateCompetitorsRating(
     raceResults: RaceResult[],
-    raceDate: Date,
   ): Promise<void> {
-    // Récupérer tous les compétiteurs concernés.
+    // 1) Get all competitor IDs from race
     const competitorIds = raceResults.map((r) => r.competitorId);
     const competitors = await Promise.all(
       competitorIds.map((id) => this.competitorsService.findOne(id))
     );
-  
-    // Récupérer les informations de la date
-    const { week: newWeek, year: newYear } = getIsoWeekAndYear(raceDate);
-    const isoDay = getIsoDayOfWeek(raceDate);
-  
-    // Construire une map des résultats pour un accès rapide.
-    const resultMap: { [playerId: string]: RaceResult } = {};
-    for (const res of raceResults) {
-      resultMap[res.competitorId] = res;
+
+    interface RatingInput {
+      id: string;
+      rating: { mu: number; sigma: number };
+      rank: number;
     }
 
-    type CompetitorEloInput = {
-      id: string;
-      rating: number;
-      rank: number;
-    };
-  
-    // Préparer les données pour le calcul round‑robin.
-    // Chaque entrée contient : id, current Elo, et le rang final (1 = meilleur)
-    const inputs: CompetitorEloInput[] = [];
+    // 2) Build the array for TrueSkill input
+    //    rank is e.g. result.rank12 among the 4 humans, or 1..4
+    const inputs: RatingInput[] = [];
     for (const comp of competitors) {
       if (!comp) continue;
-      const res = resultMap[comp.id];
-      const rank = res ? res.rank12 : 12; // valeur par défaut si pas de résultat
+      const r = raceResults.find((res) => res.competitorId === comp.id);
+
+      // if r.rank12 is 1..4 among humans
       inputs.push({
         id: comp.id,
-        rating: comp.elo,
-        rank: rank,
+        rating: { mu: comp.mu, sigma: comp.sigma },
+        rank: r ? r.rank12 : 4, // default if not found
       });
     }
-    const n = inputs.length;
-    const kFactor = 32;
-    // Initialiser l'accumulateur de changements Elo.
-    const ratingChanges: { [id: string]: number } = { };
-    for (const input of inputs) {
-      ratingChanges[input.id] = 0;
-    }
-  
-    // Comparaisons round‑robin entre toutes les paires de compétiteurs.
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const a = inputs[i];
-        const b = inputs[j];
-  
-        // Récupérer les scores de la course.
-        const resA = resultMap[a.id];
-        const resB = resultMap[b.id];
-        const scoreA = resA ? resA.score : 0;
-        const scoreB = resB ? resB.score : 0;
-  
-        // Calcul de la performance : si score total > 0, sinon égalité (0.5 chacun)
-        let performanceA: number, performanceB: number;
-        if (scoreA + scoreB > 0) {
-          performanceA = scoreA / (scoreA + scoreB);
-          performanceB = scoreB / (scoreA + scoreB);
-        } else {
-          performanceA = 0.5;
-          performanceB = 0.5;
-        }
-  
-        // Calcul de l'expected score (formule Elo classique)
-        const expectedA = this.expectedScore(a.rating, b.rating);
-        const expectedB = this.expectedScore(b.rating, a.rating);
-  
-        const deltaA = kFactor * (performanceA - expectedA);
-        const deltaB = kFactor * (performanceB - expectedB);
-  
-        ratingChanges[a.id] += deltaA;
-        ratingChanges[b.id] += deltaB;
-      }
-    }
-  
-    // Calcul de la note de base pour chaque compétiteur (moyenne des changements sur n-1 confrontations).
-    const baseNewElo: { [id: string]: number } = {};
-    for (const input of inputs) {
-      baseNewElo[input.id] = input.rating + ratingChanges[input.id] / (n - 1);
-    }
-  
-    // Mise à jour des bonus liés au résultat et à la date.
-    for (const res of raceResults) {
-      const comp = competitors.find((c) => c?.id === res.competitorId);
+
+    // 3) Call TrueSkill
+    const updated = this.ratingService.updateRatings(inputs);
+
+    // 4) Update the database
+    for (const u of updated) {
+      const comp = competitors.find((c) => c?.id === u.id);
       if (!comp) continue;
-  
-      // Mises à jour des statistiques de course.
-      comp.raceCount += 1;
-      comp.lastRaceDate = raceDate;
-      const sameDayAsPrevious = isSameDay(comp.lastRaceDay, raceDate);
-      if (!sameDayAsPrevious) {
-        comp.winStreak = 0;
-      }
-      comp.lastRaceDay = new Date(
-        raceDate.getFullYear(),
-        raceDate.getMonth(),
-        raceDate.getDate()
-      );
-      comp.avgRank12 =
-        (comp.avgRank12 * (comp.raceCount - 1) + res.rank12) / comp.raceCount;
-  
-      if (
-        comp.currentWeekYear !== newYear ||
-        comp.currentWeekNumber !== newWeek
-      ) {
-        comp.currentWeekYear = newYear;
-        comp.currentWeekNumber = newWeek;
-        comp.daysPlayedThisWeek = [];
-      }
-      if (!comp.daysPlayedThisWeek.includes(isoDay)) {
-        comp.daysPlayedThisWeek.push(isoDay);
-      }
-  
-      // Bonus fixes basés sur le résultat.
-      let bonus = 0;
-      if (res.rank12 > 4) {
-        bonus -= (res.rank12 - 4) * 5;
-      }
-      if (res.score === 60) {
-        bonus += 10;
-      }
-  
-      // Bonus liés à la date.
-      if (res.rank12 === 1 && sameDayAsPrevious) {
+
+      // store the new TS rating
+      comp.mu = u.newRating.mu;
+      comp.sigma = u.newRating.sigma;
+
+      // Keep any other logic you want: e.g. comp.raceCount++, streak, etc.
+      comp.raceCount++;
+
+      // Update win streak
+      if (comp.rank === 1) {
         comp.winStreak++;
-      } else if (res.rank12 === 1 && !sameDayAsPrevious) {
-        comp.winStreak = 1;
       } else {
         comp.winStreak = 0;
       }
-      if (comp.winStreak >= 2) {
-        bonus += 5 * (comp.winStreak - 1);
-      }
-      if (hasPlayedMondayToThursday(comp.daysPlayedThisWeek)) {
-        bonus += 10;
-      }
-  
-      // Mise à jour finale de l'Elo : base calculée + bonus.
-      comp.elo = Math.floor(baseNewElo[comp.id] + bonus);
-    }
-  
-    // Sauvegarde de tous les compétiteurs mis à jour.
-    for (const comp of competitors) {
-      if (comp) {
-        await this.competitorsService.update(comp.id, comp);
-      }
+      await this.competitorsService.update(comp.id, comp);
     }
   }
 }

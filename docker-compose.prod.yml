@@ -1,5 +1,6 @@
 services:
   db:
+    container_name: activscanio-db
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: ${DB_USER}
@@ -9,6 +10,7 @@ services:
       - db-data:/var/lib/postgresql/data
 
   activscanio-api:
+    container_name: activscanio-api
     build:
       context: .
     depends_on:

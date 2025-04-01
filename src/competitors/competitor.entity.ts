@@ -18,9 +18,21 @@ export class Competitor {
   @Column()
   profilePictureUrl: string;
 
-  @Column()
-  elo: number;
+  /**
+   * TrueSkill 'mu' value.
+   */
+  @Column('float', { default: 25 })  // typical default for TS
+  mu: number;
 
+  /**
+   * TrueSkill 'sigma' value.
+   */
+  @Column('float', { default: 8.333 }) // typical default for TS (25/3)
+  sigma: number;
+
+  /**
+   * This rank is your global rank in the leaderboard.
+   */
   @Column()
   rank: number;
 
@@ -34,30 +46,7 @@ export class Competitor {
   @Column({ type: 'timestamptz', nullable: true })
   lastRaceDate: Date | null;
 
-  // Consecutive win streak (reset daily)
+  // Consecutive win streak
   @Column({ default: 0 })
   winStreak: number;
-
-  // Days played in the current ISO week (Mon=1, Tue=2, ...). Reset when the week changes.
-  @Column({ type: 'jsonb', default: [] })
-  daysPlayedThisWeek: number[];
-
-  // ISO week number
-  @Column({ default: 0 })
-  currentWeekNumber: number;
-
-  // Year for the currentWeekNumber
-  @Column({ default: 0 })
-  currentWeekYear: number;
-
-  // Used to detect a new "calendar day" => reset streak, etc.
-  @Column({
-    type: 'date',
-    nullable: true,
-    transformer: {
-      from: (value: string | null) => (value ? new Date(value) : null),
-      to: (value: Date | null) => value,
-    }
-  })
-  lastRaceDay: Date | null;  
 }
