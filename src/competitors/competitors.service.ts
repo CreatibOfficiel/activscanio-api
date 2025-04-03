@@ -22,10 +22,6 @@ export class CompetitorsService {
 
   async create(dto: CreateCompetitorDto): Promise<Competitor> {
     const competitor = this.competitorsRepo.create(dto);
-    // Init fields
-    competitor.lastRaceDate = null;
-    competitor.winStreak = 0;
-
     return this.competitorsRepo.save(competitor);
   }
 

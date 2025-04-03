@@ -33,10 +33,10 @@ export class Competitor {
   /**
    * This rank is your global rank in the leaderboard.
    */
-  @Column()
+  @Column({ default: 0 })
   rank: number;
 
-  @Column()
+  @Column({ default: 0 })
   raceCount: number;
 
   @Column('float')

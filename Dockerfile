@@ -37,7 +37,7 @@ COPY --from=builder /app/package-lock.json ./
 
 # Reinstall only production dependencies
 RUN npm ci --omit=dev
-RUN apk add --no-cache netcat-openbsd
+RUN apk add --no-cache netcat-openbsd bash
 
 EXPOSE 3000
 
