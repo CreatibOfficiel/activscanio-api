@@ -8,6 +8,7 @@ import { CreateRaceDto } from './dtos/create-race.dto';
 
 import { CompetitorsService } from '../competitors/competitors.service';
 import { RatingService } from 'src/rating/rating.service';
+import { Rating } from 'ts-trueskill';
 
 // --- UTILS ---
 function getIsoDayOfWeek(date: Date): number {
@@ -173,22 +174,44 @@ export class RacesService {
 
     interface RatingInput {
       id: string;
-      rating: { mu: number; sigma: number };
+      rating: Rating;
       rank: number;
     }
+
+    // TODO : choose the best way to calculate the rank
+    // const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
+
+    // let rank = 1;
+    // for (const result of sortedResults) {
+    //   result.rank12 = rank;
+    //   rank++;
+    // }
+    
 
     // 2) Build the array for TrueSkill input
     //    rank is e.g. result.rank12 among the 4 humans, or 1..4
     const inputs: RatingInput[] = [];
     for (const comp of competitors) {
       if (!comp) continue;
+
       const r = raceResults.find((res) => res.competitorId === comp.id);
+
+      // TODO : choose the best way to calculate the rank
+      // convert rank12 to rank4
+      // rank4 = 1..4, where 1 is the best
+      // rank12 = 1..12, where 1 is the best
+      const rank4 = r ? Math.ceil(r.rank12 / 3) : 4; // default to 4 if not found
 
       // if r.rank12 is 1..4 among humans
       inputs.push({
         id: comp.id,
-        rating: { mu: comp.mu, sigma: comp.sigma },
-        rank: r ? r.rank12 : 4, // default if not found
+        rating: {
+          mu: comp.mu,
+          sigma: comp.sigma,
+          pi: 0,
+          tau: 0,
+        } as unknown as Rating,
+        rank: rank4,
       });
     }
 
