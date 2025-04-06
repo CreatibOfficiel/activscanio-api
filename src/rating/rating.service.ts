@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { rate, Rating } from 'ts-trueskill';
+import { rate } from 'ts-trueskill';
+import { Rating } from './rating.interface';
 
 @Injectable()
 export class RatingService {
@@ -7,7 +8,9 @@ export class RatingService {
    * Updates TrueSkill ratings for a set of players grouped by rank.
    * @param results An array of objects containing:
    *   - id: string (competitor ID)
-   *   - rating: Rating (the current TrueSkill rating with { mu, sigma })
+   *   - rating: Rating (competitor rating)
+   *     - mu: number (mean)
+   *     - sigma: number (standard deviation)
    *   - rank: number (1 = best, 2 = second, etc.)
    *
    * @returns An array of updated results containing old and new rating values.
@@ -38,10 +41,6 @@ export class RatingService {
     // Step 3: Call the 'rate' function from ts-trueskill
     const newRatingsGrouped = rate(groups);
 
-    // Number of human players
-    const numPlayers = sorted.length;
-    const dynamicWeight = Math.min(1, 0.85 + 0.15 * (numPlayers - 3));
-
     // Step 4: Build a final array of updated results
     const updatedResults: {
       id: string;
@@ -60,18 +59,6 @@ export class RatingService {
       for (let i = 0; i < groupBefore.length; i++) {
         const oldRating = groupBefore[i];
         let newRating = groupAfter[i];
-
-        // Apply the dynamic weight to the new rating
-        newRating = {
-          mu: oldRating.mu + dynamicWeight * (newRating.mu - oldRating.mu),
-          sigma:
-            oldRating.sigma +
-            dynamicWeight * (newRating.sigma - oldRating.sigma),
-            pi: oldRating.pi,
-            tau: oldRating.tau,
-            mul: oldRating.mul,
-            div: oldRating.div
-        };
 
         const playerId = sorted[indexGlobal].id;
         updatedResults.push({ id: playerId, oldRating, newRating });

@@ -8,41 +8,7 @@ import { CreateRaceDto } from './dtos/create-race.dto';
 
 import { CompetitorsService } from '../competitors/competitors.service';
 import { RatingService } from 'src/rating/rating.service';
-import { Rating } from 'ts-trueskill';
-
-// --- UTILS ---
-function getIsoDayOfWeek(date: Date): number {
-  // In JS, getDay() => 0..6 (Sun..Sat). We want 1..7 (Mon..Sun).
-  return ((date.getDay() + 6) % 7) + 1;
-}
-
-function getIsoWeekAndYear(date: Date): { week: number; year: number } {
-  // Simplistic approach. Ideally use date-fns or dayjs for accurate ISO weeks.
-  const jan1 = new Date(date.getFullYear(), 0, 1);
-  const daysOffset = Math.floor(
-    (date.getTime() - jan1.getTime()) / (24 * 3600 * 1000),
-  );
-  const week = Math.ceil((daysOffset + 1) / 7);
-  return { week, year: date.getFullYear() };
-}
-
-function isSameDay(date1: Date | string | null, date2: Date): boolean {
-  if (!date1) return false;
-  
-  const d1 = date1 instanceof Date ? date1 : new Date(date1);
-  
-  return (
-    d1.getFullYear() === date2.getFullYear() &&
-    d1.getMonth() === date2.getMonth() &&
-    d1.getDate() === date2.getDate()
-  );
-}
-
-// Checks if competitor played each day Monday->Thursday
-function hasPlayedMondayToThursday(days: number[]): boolean {
-  const setDays = new Set(days);
-  return setDays.has(1) && setDays.has(2) && setDays.has(3) && setDays.has(4);
-}
+import { Rating } from 'src/rating/rating.interface';
 
 @Injectable()
 export class RacesService {
@@ -92,7 +58,8 @@ export class RacesService {
 
   // GET /races?recent=true
   async findAll(recent?: boolean): Promise<RaceEvent[]> {
-    const qb = this.raceRepo.createQueryBuilder('r')
+    const qb = this.raceRepo
+      .createQueryBuilder('r')
       .leftJoinAndSelect('r.results', 'res')
       .orderBy('r.date', 'DESC');
 
@@ -117,12 +84,16 @@ export class RacesService {
 
     // Filter where the competitor participated
     const competitorRaces = allRaces
-      .filter((race) => race.results.some((r) => r.competitorId === competitorId))
+      .filter((race) =>
+        race.results.some((r) => r.competitorId === competitorId),
+      )
       .slice(0, 3); // last 3
 
     // Extract info
     return competitorRaces.map((race) => {
-      const compResult = race.results.find((r) => r.competitorId === competitorId);
+      const compResult = race.results.find(
+        (r) => r.competitorId === competitorId,
+      );
       return {
         raceId: race.id,
         date: race.date,
@@ -156,7 +127,9 @@ export class RacesService {
     const races = allRaces.filter((race) => {
       if (race.id === raceId) return false; // exclude same
       const raceCompetitorIds = race.results.map((r) => r.competitorId).sort();
-      return JSON.stringify(raceCompetitorIds) === JSON.stringify(refCompetitorIds);
+      return (
+        JSON.stringify(raceCompetitorIds) === JSON.stringify(refCompetitorIds)
+      );
     });
 
     // Limit 3
@@ -169,56 +142,42 @@ export class RacesService {
     // 1) Get all competitor IDs from race
     const competitorIds = raceResults.map((r) => r.competitorId);
     const competitors = await Promise.all(
-      competitorIds.map((id) => this.competitorsService.findOne(id))
+      competitorIds.map((id) => this.competitorsService.findOne(id)),
     );
 
-    interface RatingInput {
-      id: string;
-      rating: Rating;
-      rank: number;
+    // 2) Sort the results by rank12
+    const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
+
+    // 3) Assign a rank 1..N to each competitor (N is the number of humans)
+    //   1 = best rank
+    let rank = 1;
+    for (const result of sortedResults) {
+      result.rank12 = rank;
+      rank++;
     }
 
-    // TODO : choose the best way to calculate the rank
-    // const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
-
-    // let rank = 1;
-    // for (const result of sortedResults) {
-    //   result.rank12 = rank;
-    //   rank++;
-    // }
-    
-
-    // 2) Build the array for TrueSkill input
-    //    rank is e.g. result.rank12 among the 4 humans, or 1..4
-    const inputs: RatingInput[] = [];
+    // 4) Build the array for TrueSkill input
+    const inputs: { id: string; rating: Rating; rank: number }[] = [];
     for (const comp of competitors) {
       if (!comp) continue;
 
       const r = raceResults.find((res) => res.competitorId === comp.id);
+      if (!r) continue;
 
-      // TODO : choose the best way to calculate the rank
-      // convert rank12 to rank4
-      // rank4 = 1..4, where 1 is the best
-      // rank12 = 1..12, where 1 is the best
-      const rank4 = r ? Math.ceil(r.rank12 / 3) : 4; // default to 4 if not found
-
-      // if r.rank12 is 1..4 among humans
       inputs.push({
         id: comp.id,
         rating: {
           mu: comp.mu,
           sigma: comp.sigma,
-          pi: 0,
-          tau: 0,
-        } as unknown as Rating,
-        rank: rank4,
+        },
+        rank: r.rank12,
       });
     }
 
-    // 3) Call TrueSkill
+    // 5) Call TrueSkill
     const updated = this.ratingService.updateRatings(inputs);
 
-    // 4) Update the database
+    // 6) Update the database
     for (const u of updated) {
       const comp = competitors.find((c) => c?.id === u.id);
       if (!comp) continue;
