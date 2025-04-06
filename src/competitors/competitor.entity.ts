@@ -39,7 +39,7 @@ export class Competitor {
   @Column({ default: 0 })
   raceCount: number;
 
-  @Column('float')
+  @Column('float', { default: 0 })
   avgRank12: number;
 
   // Last race date (null if none)

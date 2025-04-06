@@ -144,6 +144,7 @@ export class RacesService {
     const competitors = await Promise.all(
       competitorIds.map((id) => this.competitorsService.findOne(id)),
     );
+    const initialPositions: { [competitorId: string]: number } = {};
 
     // 2) Sort the results by rank12
     const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
@@ -152,6 +153,7 @@ export class RacesService {
     //   1 = best rank
     let rank = 1;
     for (const result of sortedResults) {
+      initialPositions[result.competitorId] = result.rank12;
       result.rank12 = rank;
       rank++;
     }
@@ -182,11 +184,21 @@ export class RacesService {
       const comp = competitors.find((c) => c?.id === u.id);
       if (!comp) continue;
 
-      // store the new TS rating
+      const r = raceResults.find((res) => res.competitorId === comp.id);
+      if (!r) continue;
+
+      // Store the new TS rating
       comp.mu = u.newRating.mu;
       comp.sigma = u.newRating.sigma;
 
-      // Keep any other logic you want: e.g. comp.raceCount++, streak, etc.
+      // Get the initial position
+      const initialPos = initialPositions[comp.id];
+      if (initialPos === undefined) continue;
+
+      // Calculate average positions for this competitor
+      comp.avgRank12 = comp.avgRank12 + (initialPos - comp.avgRank12) / (comp.raceCount + 1);
+
+      // Increment raceCount
       comp.raceCount++;
 
       // Update win streak
@@ -195,6 +207,12 @@ export class RacesService {
       } else {
         comp.winStreak = 0;
       }
+
+      // Update lastRaceDate
+      comp.lastRaceDate = new Date();
+
+      // Update the competitor
+      // Note: this is a partial update, so we don't need to pass all fields
       await this.competitorsService.update(comp.id, comp);
     }
   }
