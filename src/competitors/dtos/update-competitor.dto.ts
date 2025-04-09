@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUrl, IsInt, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsUrl, IsInt, IsNumber, IsUUID } from 'class-validator';
 
 export class UpdateCompetitorDto {
   @IsOptional() @IsString()
@@ -18,4 +18,8 @@ export class UpdateCompetitorDto {
 
   @IsOptional() @IsNumber()
   avgRank12?: number;
+
+  @IsOptional() 
+  @IsUUID()
+  characterId?: string;
 }

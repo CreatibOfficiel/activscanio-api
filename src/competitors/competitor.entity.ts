@@ -1,7 +1,10 @@
+import { Character } from 'src/characters/character.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 
 @Entity('competitors')
@@ -49,4 +52,11 @@ export class Competitor {
   // Consecutive win streak
   @Column({ default: 0 })
   winStreak: number;
+
+  @Column({ nullable: true })
+  characterId: string;
+
+  @ManyToOne(() => Character, { nullable: true })
+  @JoinColumn({ name: 'characterId' })
+  character: Character;
 }
