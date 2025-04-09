@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Competitor } from 'src/competitors/competitor.entity';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from 'typeorm';
 
 @Entity('characters')
 export class Character {
@@ -13,4 +14,7 @@ export class Character {
 
   @Column({ nullable: true })
   description: string;
+
+  @OneToOne(() => Competitor, (competitor) => competitor.character)
+  competitor: Competitor;
 }

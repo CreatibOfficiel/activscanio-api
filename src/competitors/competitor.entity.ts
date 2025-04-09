@@ -3,8 +3,8 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   JoinColumn,
+  OneToOne,
 } from 'typeorm';
 
 @Entity('competitors')
@@ -56,7 +56,7 @@ export class Competitor {
   @Column({ nullable: true })
   characterId: string;
 
-  @ManyToOne(() => Character, { nullable: true })
+  @OneToOne(() => Character, { nullable: true })
   @JoinColumn({ name: 'characterId' })
   character: Character;
 }
