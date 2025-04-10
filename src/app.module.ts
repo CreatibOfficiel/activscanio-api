@@ -13,6 +13,7 @@ import { RaceAnalysisModule } from './race-analysis/race-analysis.module';
 import { UploadModule } from './upload/upload.module';
 import { OpenAIModule } from './openai/openai.module';
 import { OpenAIService } from './openai/openai.service';
+import { SeederModule } from './seeder/seeder.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { OpenAIService } from './openai/openai.service';
     UploadModule,
     OpenAIModule,
     RaceAnalysisModule,
+    SeederModule,
   ],
   controllers: [AppController],
   providers: [AppService, OpenAIService],

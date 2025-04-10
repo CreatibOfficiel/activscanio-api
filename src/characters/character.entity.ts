@@ -13,8 +13,8 @@ export class Character {
   imageUrl: string;
 
   @Column({ nullable: true })
-  description: string;
+  variant: string; // "Red", "Blue", "Green", etc.
 
-  @OneToOne(() => Competitor, (competitor) => competitor.character)
+  @OneToOne(() => Competitor, (competitor) => competitor.character, { nullable: true })
   competitor: Competitor;
 }
