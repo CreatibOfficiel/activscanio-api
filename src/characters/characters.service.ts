@@ -15,6 +15,25 @@ export class CharactersService {
     return this.charactersRepo.find();
   }
 
+  async findAllWithAssociationStatus() {
+    const characters = await this.charactersRepo
+      .createQueryBuilder('character')
+      .leftJoinAndSelect('character.competitor', 'competitor')
+      .getMany();
+
+    return characters.map((character) => ({
+      ...character,
+      isAssigned: !!character.competitor,
+      competitor: character.competitor
+        ? {
+            id: character.competitor.id,
+            firstName: character.competitor.firstName,
+            lastName: character.competitor.lastName,
+          }
+        : null,
+    }));
+  }
+
   findOne(id: string): Promise<Character | null> {
     return this.charactersRepo.findOne({ where: { id } });
   }
