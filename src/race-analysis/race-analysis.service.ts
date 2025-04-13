@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { OpenAIService } from '../openai/openai.service';
 import { CompetitorsService } from '../competitors/competitors.service';
 import { BaseCharactersService } from '../base-characters/base-characters.service';
-import { CharacterVariantsService } from '../character-variants/character-variants.service';
 import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 import { BaseCharacter } from 'src/base-characters/base-character.entity';
 
@@ -23,7 +22,6 @@ export class RaceAnalysisService {
     private openaiService: OpenAIService,
     private competitorsService: CompetitorsService,
     private baseCharactersService: BaseCharactersService,
-    private characterVariantsService: CharacterVariantsService,
   ) {}
 
   /**

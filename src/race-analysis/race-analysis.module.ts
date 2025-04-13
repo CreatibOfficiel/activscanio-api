@@ -5,6 +5,10 @@ import { CompetitorsModule } from '../competitors/competitors.module';
 import { RaceAnalysisService } from './race-analysis.service';
 import { RaceAnalysisController } from './race-analysis.controller';
 import { BaseCharactersModule } from 'src/base-characters/base-characters.module';
+import { CharacterVariantsModule } from 'src/character-variants/character-variants.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { BaseCharacter } from 'src/base-characters/base-character.entity';
+import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 
 @Module({
   imports: [
@@ -12,6 +16,8 @@ import { BaseCharactersModule } from 'src/base-characters/base-characters.module
     OpenAIModule,
     CompetitorsModule,
     BaseCharactersModule,
+    CharacterVariantsModule,
+    TypeOrmModule.forFeature([BaseCharacter, CharacterVariant]),
   ],
   controllers: [RaceAnalysisController],
   providers: [RaceAnalysisService],

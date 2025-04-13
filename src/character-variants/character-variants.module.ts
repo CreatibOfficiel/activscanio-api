@@ -8,6 +8,6 @@ import { CharacterVariant } from './character-variant.entity';
   imports: [TypeOrmModule.forFeature([CharacterVariant])],
   controllers: [CharacterVariantsController],
   providers: [CharacterVariantsService],
-  exports: [CharacterVariantsService, TypeOrmModule],
+  exports: [TypeOrmModule.forFeature([CharacterVariant])],
 })
 export class CharacterVariantsModule {}
