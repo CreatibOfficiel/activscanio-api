@@ -1,16 +1,26 @@
-import { Character } from 'src/characters/character.entity';
 import { DataSource } from 'typeorm';
+import { BaseCharacter } from 'src/base-characters/base-character.entity';
+import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 
-export async function seedCharacters(dataSource: DataSource) {
-  const characterRepo = dataSource.getRepository(Character);
+export async function seedBaseCharacters(dataSource: DataSource) {
+  const baseCharacterRepo = dataSource.getRepository(BaseCharacter);
 
-  const count = await characterRepo.count();
-  if (count > 0) {
-    console.log('🟡 Characters already exist. Skipping...');
+  // Check if we already have any BaseCharacters in the database
+  const existingCount = await baseCharacterRepo.count();
+  if (existingCount > 0) {
+    console.log('🟡 BaseCharacters already exist. Skipping...');
     return;
   }
 
-  const characters: Partial<Character>[] = [
+  /**
+   * Original single-table data converted to a plain array of objects.
+   * Each entry used to represent one "character".
+   * 
+   * - name: The base character name (e.g. "Yoshi", "Mario")
+   * - variant: The sub-variant label ("Red", "Green"), or undefined if it's a standard character
+   * - imageUrl: The path to the image of that variant
+   */
+  const charactersData = [
     // Yoshi variants
     { name: 'Yoshi', variant: 'Green', imageUrl: '/images/characters/yoshi-green.png' },
     { name: 'Yoshi', variant: 'Red', imageUrl: '/images/characters/yoshi-red.png' },
@@ -40,7 +50,7 @@ export async function seedCharacters(dataSource: DataSource) {
     { name: 'Inkling (Boy)', variant: 'Blue', imageUrl: '/images/characters/inkling-m-blue.png' },
     { name: 'Inkling (Boy)', variant: 'Cyan', imageUrl: '/images/characters/inkling-m-cyan.png' },
 
-    // Standard characters
+    // Standard characters (no variants)
     { name: 'Mario', imageUrl: '/images/characters/mario.png' },
     { name: 'Luigi', imageUrl: '/images/characters/luigi.png' },
     { name: 'Peach', imageUrl: '/images/characters/peach.png' },
@@ -74,7 +84,55 @@ export async function seedCharacters(dataSource: DataSource) {
     { name: 'Isabelle', imageUrl: '/images/characters/isabelle.png' },
   ];
 
-  await characterRepo.insert(characters);
+  /**
+   * 1) Construire une map baseName -> { name, variants[] }.
+   *    Si "variant" existe, on l'utilise comme label (ex. "Red").
+   *    Si "variant" est absent, on le considère comme un variant "standard".
+   */
+  const baseMap = new Map<
+    string,
+    {
+      name: string;
+      variants: { label: string | null; imageUrl: string }[];
+    }
+  >();
 
-  console.log('✅ Characters seeded!');
+  for (const c of charactersData) {
+    if (!baseMap.has(c.name)) {
+      baseMap.set(c.name, { name: c.name, variants: [] });
+    }
+
+    baseMap.get(c.name)!.variants.push({
+      label: c.variant ?? null,   // null si pas de variant (ou "Standard" si tu préfères)
+      imageUrl: c.imageUrl,
+    });
+  }
+
+  /**
+   * 2) Pour chaque baseName unique, on crée un BaseCharacter
+   *    et ses CharacterVariants associés.
+   */
+  for (const { name, variants } of baseMap.values()) {
+    // Créer le BaseCharacter
+    const baseCharacter = new BaseCharacter();
+    baseCharacter.name = name;
+
+    // Créer un tableau de CharacterVariant
+    const variantEntities = variants.map((v) => {
+      const variant = new CharacterVariant();
+      // On met un label "Default" quand v.label est null
+      variant.label = v.label ?? "Default";
+      variant.imageUrl = v.imageUrl;
+      variant.baseCharacter = baseCharacter;
+      return variant;
+    });
+
+    // Lier les variants au BaseCharacter
+    baseCharacter.variants = variantEntities;
+
+    // Sauvegarder (BaseCharacter + CharacterVariants)
+    await baseCharacterRepo.save(baseCharacter);
+  }
+
+  console.log('✅ BaseCharacters and their variants seeded successfully!');
 }

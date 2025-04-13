@@ -1,4 +1,4 @@
-import { Character } from 'src/characters/character.entity';
+import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -56,7 +56,10 @@ export class Competitor {
   @Column({ nullable: true })
   characterId: string;
 
-  @OneToOne(() => Character, { nullable: true })
-  @JoinColumn({ name: 'characterId' })
-  character: Character;
+  @OneToOne(
+    () => CharacterVariant,
+    (variant) => variant.competitor,
+    { nullable: true },
+  )
+  characterVariant: CharacterVariant;
 }

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
+import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 
 @Injectable()
 export class CompetitorsService {
@@ -21,8 +22,10 @@ export class CompetitorsService {
   }
 
   async create(dto: CreateCompetitorDto): Promise<Competitor> {
-    const competitor = this.competitorsRepo.create(dto);
-    return this.competitorsRepo.save(competitor);
+    // const characterVariant = await this.competitorsRepo.manager.findOne(CharacterVariant, {
+    //   where: { id: dto.characterVariantId },
+    // });
+    return this.competitorsRepo.save(dto);
   }
 
   async update(id: string, dto: UpdateCompetitorDto): Promise<Competitor> {
@@ -30,7 +33,10 @@ export class CompetitorsService {
     if (!competitor) {
       throw new NotFoundException('Competitor not found');
     }
-    Object.assign(competitor, dto);
+    // Object.assign(competitor, dto, {
+    //   characterVariant: dto.characterVariantId ? { id: dto.characterVariantId } : null,
+    // });
+
     return this.competitorsRepo.save(competitor);
   }
 

@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SeederService } from './seeder.service';
-import { Character } from 'src/characters/character.entity';
+import { BaseCharacter } from 'src/base-characters/base-character.entity';
+import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Character])],
+  imports: [TypeOrmModule.forFeature([BaseCharacter, CharacterVariant])],
   providers: [SeederService],
 })
 export class SeederModule {}

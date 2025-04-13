@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { seedCharacters } from './seeds/character.seed';
+import { seedBaseCharacters } from './seeds/character.seed';
+import { seedCompetitors } from './seeds/competitor.seed';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
@@ -16,7 +17,7 @@ export class SeederService implements OnModuleInit {
   }  
 
   async run() {
-    await seedCharacters(this.dataSource);
-    // TODO : Competitors seeding
+    await seedBaseCharacters(this.dataSource);
+    await seedCompetitors(this.dataSource);
   }
 }
