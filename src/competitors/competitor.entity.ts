@@ -61,5 +61,5 @@ export class Competitor {
     (variant) => variant.competitor,
     { nullable: true },
   )
-  characterVariant: CharacterVariant;
+  characterVariant: CharacterVariant | null;
 }
