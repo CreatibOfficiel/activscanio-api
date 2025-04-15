@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CharacterVariantsService } from './character-variants.service';
 import { CharacterVariantsController } from './character-variants.controller';
+import { CharacterVariantsService } from './character-variants.service';
 import { CharacterVariant } from './character-variant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CharacterVariant])],
+  imports: [
+    TypeOrmModule.forFeature([CharacterVariant]),
+  ],
   controllers: [CharacterVariantsController],
   providers: [CharacterVariantsService],
-  exports: [TypeOrmModule.forFeature([CharacterVariant])],
+  exports: [CharacterVariantsService],
 })
 export class CharacterVariantsModule {}

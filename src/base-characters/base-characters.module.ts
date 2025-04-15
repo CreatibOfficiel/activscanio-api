@@ -3,12 +3,11 @@ import { BaseCharactersService } from './base-characters.service';
 import { BaseCharactersController } from './base-characters.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BaseCharacter } from './base-character.entity';
-import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BaseCharacter, CharacterVariant])],
+  imports: [TypeOrmModule.forFeature([BaseCharacter])],
   controllers: [BaseCharactersController],
   providers: [BaseCharactersService],
-  exports: [BaseCharactersService, TypeOrmModule.forFeature([CharacterVariant])],
+  exports: [BaseCharactersService],
 })
 export class BaseCharactersModule {}

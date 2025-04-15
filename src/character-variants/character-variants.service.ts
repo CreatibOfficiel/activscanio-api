@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { CharacterVariant } from './character-variant.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class CharacterVariantsService {
@@ -22,7 +22,7 @@ export class CharacterVariantsService {
       relations: ['baseCharacter', 'competitor'],
     });
     if (!variant) {
-      throw new NotFoundException(`Variant with ID ${id} not found`);
+      throw new NotFoundException(`Character variant with ID ${id} not found`);
     }
     return variant;
   }

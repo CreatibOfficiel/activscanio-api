@@ -15,12 +15,7 @@ import {
     id: string;
   
     @Column()
-    label: string; 
-    // e.g., "Girl - Purple", "Boy - Blue", or just "Red", etc.
-    // Could also split this into multiple columns if you like: e.g., "gender", "color", ...
-  
-    @Column()
-    imageUrl: string;
+    label: string; // e.g. "Red", "Blue", "Green"
   
     // Many CharacterVariants belong to one BaseCharacter
     @ManyToOne(() => BaseCharacter, (base) => base.variants, {
