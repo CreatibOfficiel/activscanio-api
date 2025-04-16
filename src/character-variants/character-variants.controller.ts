@@ -18,4 +18,10 @@ export class CharacterVariantsController {
     const variant = await this.variantsService.findOne(id);
     return variant;
   }
+
+  // GET /character-variants/available
+  @Get('available')
+  async findAvailable(): Promise<CharacterVariant[]> {
+    return this.variantsService.findAvailable();
+  }
 }

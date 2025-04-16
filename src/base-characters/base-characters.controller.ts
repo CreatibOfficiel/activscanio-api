@@ -23,4 +23,10 @@ export class BaseCharactersController {
   async findVariants(@Param('id') id: string) {
     return this.baseCharactersService.findVariants(id);
   }
+
+  // GET /base-characters/available
+  @Get('available')
+  async findAvailable(): Promise<BaseCharacter[]> {
+    return this.baseCharactersService.findAllWithAvailableVariants();
+  }
 }

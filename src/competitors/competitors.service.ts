@@ -41,10 +41,13 @@ export class CompetitorsService {
 
         // If a characterVariantId is present, find the corresponding variant
         if (dto.characterVariantId) {
-          const variant = await transactionalEntityManager.findOne(CharacterVariant, {
-            where: { id: dto.characterVariantId },
-            relations: ['competitor'],
-          });
+          const variant = await transactionalEntityManager.findOne(
+            CharacterVariant,
+            {
+              where: { id: dto.characterVariantId },
+              relations: ['competitor'],
+            },
+          );
           if (!variant) {
             // If the variant doesn't exist, we throw a NotFoundException
             throw new NotFoundException('CharacterVariant not found');
@@ -75,10 +78,13 @@ export class CompetitorsService {
     return this.competitorsRepo.manager.transaction(
       async (transactionalEntityManager) => {
         // Find the existing competitor with its (potentially) linked characterVariant
-        const competitor = await transactionalEntityManager.findOne(Competitor, {
-          where: { id },
-          relations: ['characterVariant'],
-        });
+        const competitor = await transactionalEntityManager.findOne(
+          Competitor,
+          {
+            where: { id },
+            relations: ['characterVariant'],
+          },
+        );
         if (!competitor) {
           throw new NotFoundException('Competitor not found');
         }
@@ -88,10 +94,13 @@ export class CompetitorsService {
 
         if (dto.characterVariantId) {
           // If a new characterVariantId is provided, find the variant
-          const variant = await transactionalEntityManager.findOne(CharacterVariant, {
-            where: { id: dto.characterVariantId },
-            relations: ['competitor'],
-          });
+          const variant = await transactionalEntityManager.findOne(
+            CharacterVariant,
+            {
+              where: { id: dto.characterVariantId },
+              relations: ['competitor'],
+            },
+          );
           if (!variant) {
             throw new NotFoundException('CharacterVariant not found');
           }
@@ -221,5 +230,40 @@ export class CompetitorsService {
 
     // 6) Save all changes to the database
     await this.competitorsRepo.save(allCompetitors);
+  }
+
+  /**
+   * Unlinks the competitor from its current character variant.
+   * The character variant will be available again for selection.
+   */
+  async unlinkCharacterVariant(competitorId: string): Promise<Competitor> {
+    return this.competitorsRepo.manager.transaction(
+      async (transactionalEntityManager) => {
+        // Find the competitor with its character variant
+        const competitor = await transactionalEntityManager.findOne(
+          Competitor,
+          {
+            where: { id: competitorId },
+            relations: ['characterVariant'],
+          },
+        );
+
+        if (!competitor) {
+          throw new NotFoundException(
+            `Competitor with ID ${competitorId} not found`,
+          );
+        }
+
+        // If the competitor already has a character variant, unlink it
+        if (competitor.characterVariant) {
+          competitor.characterVariant = null;
+          competitor.characterId = '';
+          return transactionalEntityManager.save(competitor);
+        }
+
+        // Otherwise, simply return the competitor without changes
+        return competitor;
+      },
+    );
   }
 }

@@ -28,6 +28,21 @@ export class BaseCharactersService {
     return character;
   }
 
+  async findAllWithAvailableVariants(): Promise<BaseCharacter[]> {
+    // Retrieve all base characters with their variants
+    const baseCharacters = await this.baseCharacterRepo.find({
+      relations: ['variants', 'variants.competitor'],
+    });
+  
+    // Filter available variants for each base character
+    for (const baseChar of baseCharacters) {
+      baseChar.variants = baseChar.variants.filter(variant => !variant.competitor);
+    }
+  
+    // Return only the base characters that have at least one available variant
+    return baseCharacters.filter(baseChar => baseChar.variants.length > 0);
+  }
+
   async findVariants(baseCharacterId: string) {
     // We can simply get the BaseCharacter and return its variants
     const character = await this.findOne(baseCharacterId);

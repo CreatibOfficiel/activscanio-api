@@ -29,6 +29,12 @@ export class CompetitorsController {
     return this.racesService.getRecentRacesForCompetitor(competitorId);
   }
 
+  // POST /competitors/:id/unlink-character
+  @Post(':id/unlink-character')
+  async unlinkCharacterVariant(@Param('id') id: string) {
+    return this.competitorsService.unlinkCharacterVariant(id);
+  }
+
   // POST /competitors
   @Post()
   create(@Body() dto: CreateCompetitorDto) {
