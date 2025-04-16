@@ -257,7 +257,6 @@ export class CompetitorsService {
         // If the competitor already has a character variant, unlink it
         if (competitor.characterVariant) {
           competitor.characterVariant = null;
-          competitor.characterId = '';
           return transactionalEntityManager.save(competitor);
         }
 

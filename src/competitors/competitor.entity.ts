@@ -53,9 +53,6 @@ export class Competitor {
   @Column({ default: 0 })
   winStreak: number;
 
-  @Column({ nullable: true })
-  characterId: string;
-
   @OneToOne(
     () => CharacterVariant,
     (variant) => variant.competitor,

@@ -19,10 +19,6 @@ export class UpdateCompetitorDto {
   @IsOptional() @IsNumber()
   avgRank12?: number;
 
-  @IsOptional() 
-  @IsUUID()
-  characterId?: string;
-
   @IsOptional()
   @IsString()
   characterVariantId?: string;
