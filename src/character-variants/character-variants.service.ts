@@ -16,13 +16,6 @@ export class CharacterVariantsService {
     });
   }
 
-  async findAvailable(): Promise<CharacterVariant[]> {
-    return this.variantRepo.find({
-      where: { competitor: IsNull() },
-      relations: ['baseCharacter'],
-    });
-  }
-
   async findOne(id: string): Promise<CharacterVariant> {
     const variant = await this.variantRepo.findOne({
       where: { id },

@@ -48,4 +48,17 @@ export class BaseCharactersService {
     const character = await this.findOne(baseCharacterId);
     return character.variants;
   }
+
+  async findAvailableVariants(baseCharacterId: string) {
+    // Get the base character with its variants and their competitor
+    const baseCharacter = await this.baseCharacterRepo.findOne({
+      where: { id: baseCharacterId },
+      relations: ['variants', 'variants.competitor'],
+    });
+    if (!baseCharacter) {
+      throw new NotFoundException(`BaseCharacter with ID ${baseCharacterId} not found`);
+    }
+    // Filter the variants to only include those that are available (i.e., not linked to a competitor)
+    return baseCharacter.variants.filter(variant => !variant.competitor);
+  }
 }

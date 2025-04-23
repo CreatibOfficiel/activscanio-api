@@ -23,8 +23,12 @@ export class CompetitorsService {
   /**
    * Find a single competitor by its ID.
    */
-  findOne(id: string): Promise<Competitor | null> {
-    return this.competitorsRepo.findOne({ where: { id } });
+  async findOne(id: string): Promise<Competitor | null> {
+    const competitor = this.competitorsRepo.findOne({
+      where: { id },
+      relations: ['characterVariant'],
+    });
+    return competitor;
   }
 
   /**

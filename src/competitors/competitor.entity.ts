@@ -1,9 +1,8 @@
-import { CharacterVariant } from 'src/character-variants/character-variant.entity';
+import { CharacterVariant } from '../character-variants/character-variant.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  JoinColumn,
   OneToOne,
 } from 'typeorm';
 
