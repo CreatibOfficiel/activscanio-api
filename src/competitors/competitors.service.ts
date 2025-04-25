@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
+import { CharacterVariant } from 'src/character-variants/character-variant.entity';
 
 @Injectable()
 export class CompetitorsService {
@@ -12,109 +17,147 @@ export class CompetitorsService {
     private competitorsRepo: Repository<Competitor>,
   ) {}
 
+  /* ░░░░░░░░░░░░   READ   ░░░░░░░░░░░░ */
+
   findAll(): Promise<Competitor[]> {
-    return this.competitorsRepo.find();
+    return this.competitorsRepo.find({
+      relations: ['characterVariant', 'characterVariant.baseCharacter'],
+    });
   }
 
-  findOne(id: string): Promise<Competitor | null> {
-    return this.competitorsRepo.findOne({ where: { id } });
+  async findOne(id: string): Promise<Competitor | null> {
+    return this.competitorsRepo.findOne({
+      where: { id },
+      relations: ['characterVariant', 'characterVariant.baseCharacter'],
+    });
   }
+
+  /* ░░░░░░░░░░░░   CREATE   ░░░░░░░░░░░░ */
 
   async create(dto: CreateCompetitorDto): Promise<Competitor> {
-    const competitor = this.competitorsRepo.create(dto);
-    return this.competitorsRepo.save(competitor);
+    return this.competitorsRepo.manager.transaction(async (em) => {
+      const competitor = this.competitorsRepo.create(dto);
+      return em.save(competitor);
+    });
   }
+
+  /* ░░░░░░░░░░░░   UPDATE   ░░░░░░░░░░░░ */
 
   async update(id: string, dto: UpdateCompetitorDto): Promise<Competitor> {
-    const competitor = await this.competitorsRepo.findOne({ where: { id } });
-    if (!competitor) {
-      throw new NotFoundException('Competitor not found');
-    }
-    Object.assign(competitor, dto);
-    return this.competitorsRepo.save(competitor);
+    return this.competitorsRepo.manager.transaction(async (em) => {
+      const competitor = await em.findOne(Competitor, {
+        where: { id },
+        relations: ['characterVariant', 'characterVariant.baseCharacter'],
+      });
+      if (!competitor) throw new NotFoundException('Competitor not found');
+
+      // Séparer characterVariantId des champs « simples »
+      const { characterVariantId, ...simpleFields } = dto;
+      Object.assign(competitor, simpleFields);
+
+      // Gestion du lien au CharacterVariant, uniquement si présent dans le payload
+      if (dto.hasOwnProperty('characterVariantId')) {
+        if (characterVariantId) {
+          // On veut lier
+          const variant = await em.findOne(CharacterVariant, {
+            where: { id: characterVariantId },
+            relations: ['competitor', 'baseCharacter'],
+          });
+          if (!variant)
+            throw new NotFoundException('CharacterVariant not found');
+          if (variant.competitor && variant.competitor.id !== competitor.id) {
+            throw new BadRequestException(
+              `CharacterVariant already linked to competitor ${variant.competitor.id}`,
+            );
+          }
+          variant.competitor = competitor;
+          competitor.characterVariant = variant;
+          await em.save(variant);
+        } else {
+          // On veut délier
+          competitor.characterVariant = null;
+        }
+      }
+
+      return em.save(competitor);
+    });
   }
 
+  /* ░░░░░░░░░░░░   HELPERS link / unlink   ░░░░░░░░░░░░ */
+
+  linkCharacterVariant(competitorId: string, variantId: string) {
+    return this.update(competitorId, { characterVariantId: variantId });
+  }
+
+  unlinkCharacterVariant(competitorId: string) {
+    return this.update(competitorId, { characterVariantId: null });
+  }
+
+  /* ░░░░░░░░░░░░   RANK RECOMPUTE   ░░░░░░░░░░░░ */
+
   /**
-   * Recompute global rank for all competitors based on TrueSkill (mu, sigma).
-   * - Excludes those with zero races => rank=0
-   * - Applies an exponential inactivity penalty if >7 days inactive
-   *   but does so on a TEMPORARY skill measure, not permanently on mu/sigma
-   * - Preserves your tie-break logic (avgRank12, raceCount, special top-3 check)
+   * Recomputes the global ranks for all competitors. This method filters out competitors who have never participated
+   * (raceCount=0) or those who haven't participated in more than a week. It then calculates a "temporary skill" for
+   * the remaining competitors, sorts them according to several tie-break criteria, assigns ranks (with tie handling),
+   * and saves all changes to the database.
+   *
+   * Steps:
+   * 1) Exclude all competitors with zero races, and those whose last race date was more than seven days ago.
+   * 2) Sort the remaining competitors by:
+   *    - inactiveSkill (descending),
+   *    - avgRank12 (ascending),
+   *    - raceCount (descending),
+   *    - a special top-3 tie-break if necessary.
+   * 3) Assign ranks with tie handling.
+   * 4) Competitors with zero races keep a rank of 0.
+   * 5) Save any updated ranks to the database.
    */
   async recomputeGlobalRank(): Promise<void> {
     const now = new Date();
+    const oneWeekAgo = new Date(now.getTime());
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
     const allCompetitors = await this.competitorsRepo.find();
 
-    // 1) Compute a "temporary skill" for each competitor,
-    //    including an inactivity penalty if inactive >7 days.
-    for (const c of allCompetitors) {
-      if (c.raceCount > 0 && c.lastRaceDate) {
-        // Base TrueSkill measure:
-        const baseSkill = c.mu - 3 * c.sigma;
+    // We exclude competitors who have never participated (raceCount=0)
+    // AND those who haven't participated for more than a week
+    const withGames = allCompetitors.filter((c) => {
+      if (c.raceCount === 0) return false;
+      // Check the last race date
+      return c.lastRaceDate && c.lastRaceDate.getTime() >= oneWeekAgo.getTime();
+    });
 
-        // Days since last race
-        const diffDays = Math.floor(
-          (now.getTime() - c.lastRaceDate.getTime()) / (1000 * 3600 * 24),
-        );
-
-        if (diffDays > 7) {
-          const penaltyDays = diffDays - 7;
-          const dailyFactor = 0.98; // decays 2% per day after day 7
-          const adjustedSkill = baseSkill * Math.pow(dailyFactor, penaltyDays);
-
-          c['inactiveSkill'] = adjustedSkill;
-        } else {
-          // Less than or equal to 7 days => no penalty
-          c['inactiveSkill'] = baseSkill;
-        }
-      } else {
-        // If this competitor has never raced or lastRaceDate is null,
-        // set their "inactiveSkill" to 0.
-        c['inactiveSkill'] = 0;
-      }
-    }
-
-    // 2) Filter competitors who have played at least one race => they get a real rank.
-    const withGames = allCompetitors.filter((c) => c.raceCount > 0);
-
-    // 3) Sort using tie-break criteria:
-    //    - Compare inactiveSkill (desc)
-    //    - Compare avgRank12 (asc)
-    //    - Compare raceCount (desc)
-    //    - If still tied, apply your top-3 special check
+    // Sort the remaining competitors based on the tie-break criteria
     const sortedCompetitors = [...withGames].sort((a, b) => {
-      // Compare "inactiveSkill" desc
-      const skillA = a['inactiveSkill'];
-      const skillB = b['inactiveSkill'];
-      const skillComp = skillB - skillA;
+      // Compare inactiveSkill descending
+      const skillComp = b['inactiveSkill'] - a['inactiveSkill'];
       if (skillComp !== 0) return skillComp;
 
-      // Compare avgRank12 asc
+      // Compare avgRank12 ascending
       const avgRankComp = a.avgRank12 - b.avgRank12;
       if (avgRankComp !== 0) return avgRankComp;
 
-      // Compare raceCount desc
+      // Compare raceCount descending
       const raceCountComp = b.raceCount - a.raceCount;
       if (raceCountComp !== 0) return raceCountComp;
 
-      // Top-3 tie-break condition
+      // Special top-3 tie-break: if one is in the top 3 and the other is not
       const indexA = withGames.indexOf(a);
       const indexB = withGames.indexOf(b);
       if (indexA < 3 && indexB >= 3) return -1;
       if (indexB < 3 && indexA >= 3) return 1;
 
-      // Otherwise, they remain tied
+      // Otherwise remain tied
       return 0;
     });
 
-    // 4) Assign ranks with tie handling
+    // Assign ranks with tie handling
     let currentRank = 1;
     for (let i = 0; i < sortedCompetitors.length; i++) {
       if (i > 0) {
         const prev = sortedCompetitors[i - 1];
         const curr = sortedCompetitors[i];
-
-        // If all tie-break criteria are equal => same rank
+        // If all criteria are equal, they share the same rank
         if (
           curr['inactiveSkill'] === prev['inactiveSkill'] &&
           curr.avgRank12 === prev.avgRank12 &&
@@ -125,19 +168,20 @@ export class CompetitorsService {
           curr.rank = currentRank;
         }
       } else {
+        // The first competitor in the sorted list has rank = 1
         sortedCompetitors[i].rank = currentRank;
       }
       currentRank++;
     }
 
-    // 5) Competitors with zero races => rank=0
+    // Competitors with zero races => rank=0
     for (const c of allCompetitors) {
       if (c.raceCount === 0) {
         c.rank = 0;
       }
     }
 
-    // 6) Save all changes
+    // Save all changes to the database
     await this.competitorsRepo.save(allCompetitors);
   }
 }

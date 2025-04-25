@@ -8,8 +8,14 @@ until nc -z $DB_HOST 5432; do
 done
 echo "PostgreSQL is up - continuing"
 
-echo "Running migrations..."
-npx typeorm migration:run -d dist/data-source.js
-
-echo "Starting NestJS..."
-exec node dist/src/main.js
+if [ "$NODE_ENV" = "development" ]; then
+  echo "Running migrations in dev mode..."
+  npx typeorm-ts-node-commonjs migration:run -d data-source.ts
+  echo "Starting NestJS in dev mode..."
+  exec npm run start:dev
+else
+  echo "Running migrations in prod mode..."
+  npx typeorm migration:run -d dist/data-source.js
+  echo "Starting NestJS in prod mode..."
+  exec node dist/src/main.js
+fi

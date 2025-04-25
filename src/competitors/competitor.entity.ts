@@ -1,7 +1,9 @@
+import { CharacterVariant } from '../character-variants/character-variant.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  OneToOne,
 } from 'typeorm';
 
 @Entity('competitors')
@@ -49,4 +51,11 @@ export class Competitor {
   // Consecutive win streak
   @Column({ default: 0 })
   winStreak: number;
+
+  @OneToOne(
+    () => CharacterVariant,
+    (variant) => variant.competitor,
+    { nullable: true },
+  )
+  characterVariant: CharacterVariant | null;
 }
