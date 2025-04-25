@@ -213,7 +213,10 @@ export class RacesService {
 
       // Update the competitor
       // Note: this is a partial update, so we don't need to pass all fields
-      await this.competitorsService.update(comp.id, comp);
+      await this.competitorsService.update(comp.id, {
+        ...comp,
+        characterVariantId: comp.characterVariant ? comp.characterVariant.id : null,
+      });
     }
   }
 }

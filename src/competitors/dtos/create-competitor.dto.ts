@@ -24,8 +24,4 @@ export class CreateCompetitorDto {
 
   @IsNumber()
   avgRank12: number;
-
-  @IsOptional()
-  @IsString()
-  characterVariantId?: string;
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Competitor } from './competitor.entity';
@@ -13,172 +17,117 @@ export class CompetitorsService {
     private competitorsRepo: Repository<Competitor>,
   ) {}
 
-  /**
-   * Find all competitors.
-   */
+  /* ░░░░░░░░░░░░   READ   ░░░░░░░░░░░░ */
+
   findAll(): Promise<Competitor[]> {
-    return this.competitorsRepo.find();
-  }
-
-  /**
-   * Find a single competitor by its ID.
-   */
-  async findOne(id: string): Promise<Competitor | null> {
-    const competitor = this.competitorsRepo.findOne({
-      where: { id },
-      relations: ['characterVariant'],
+    return this.competitorsRepo.find({
+      relations: ['characterVariant', 'characterVariant.baseCharacter'],
     });
-    return competitor;
   }
 
-  /**
-   * Create a new competitor. If a characterVariantId is provided, attempt to link the character variant
-   * to this competitor. If that variant is currently linked to another competitor, we unlink it first,
-   * then attach it to the new competitor. This entire operation is wrapped in a transaction for safety.
-   */
+  async findOne(id: string): Promise<Competitor | null> {
+    return this.competitorsRepo.findOne({
+      where: { id },
+      relations: ['characterVariant', 'characterVariant.baseCharacter'],
+    });
+  }
+
+  /* ░░░░░░░░░░░░   CREATE   ░░░░░░░░░░░░ */
+
   async create(dto: CreateCompetitorDto): Promise<Competitor> {
-    // We wrap our logic in a TypeORM transaction to ensure data consistency in case something goes wrong.
-    return this.competitorsRepo.manager.transaction(
-      async (transactionalEntityManager) => {
-        // Create a new Competitor instance from the provided DTO
-        const competitor = this.competitorsRepo.create(dto);
-
-        // If a characterVariantId is present, find the corresponding variant
-        if (dto.characterVariantId) {
-          const variant = await transactionalEntityManager.findOne(
-            CharacterVariant,
-            {
-              where: { id: dto.characterVariantId },
-              relations: ['competitor'],
-            },
-          );
-          if (!variant) {
-            // If the variant doesn't exist, we throw a NotFoundException
-            throw new NotFoundException('CharacterVariant not found');
-          }
-
-          // If the variant is already linked to another competitor, we unlink it
-          if (variant.competitor) {
-            variant.competitor.characterVariant = null;
-            await transactionalEntityManager.save(variant.competitor);
-          }
-
-          // Finally, we link the variant to our new competitor
-          competitor.characterVariant = variant;
-        }
-
-        // Save the new competitor in the transaction
-        return transactionalEntityManager.save(competitor);
-      },
-    );
+    return this.competitorsRepo.manager.transaction(async (em) => {
+      const competitor = this.competitorsRepo.create(dto);
+      return em.save(competitor);
+    });
   }
 
-  /**
-   * Update an existing competitor. Optionally re-link or remove the competitor's associated character variant
-   * according to the new DTO. This also uses a transaction to handle the unlinking and re-linking safely.
-   */
+  /* ░░░░░░░░░░░░   UPDATE   ░░░░░░░░░░░░ */
+
   async update(id: string, dto: UpdateCompetitorDto): Promise<Competitor> {
-    // We wrap our logic in a TypeORM transaction to ensure data consistency
-    return this.competitorsRepo.manager.transaction(
-      async (transactionalEntityManager) => {
-        // Find the existing competitor with its (potentially) linked characterVariant
-        const competitor = await transactionalEntityManager.findOne(
-          Competitor,
-          {
-            where: { id },
-            relations: ['characterVariant'],
-          },
-        );
-        if (!competitor) {
-          throw new NotFoundException('Competitor not found');
-        }
+    return this.competitorsRepo.manager.transaction(async (em) => {
+      const competitor = await em.findOne(Competitor, {
+        where: { id },
+        relations: ['characterVariant', 'characterVariant.baseCharacter'],
+      });
+      if (!competitor) throw new NotFoundException('Competitor not found');
 
-        // Merge the DTO fields into the competitor
-        Object.assign(competitor, dto);
+      // Séparer characterVariantId des champs « simples »
+      const { characterVariantId, ...simpleFields } = dto;
+      Object.assign(competitor, simpleFields);
 
-        if (dto.characterVariantId) {
-          // If a new characterVariantId is provided, find the variant
-          const variant = await transactionalEntityManager.findOne(
-            CharacterVariant,
-            {
-              where: { id: dto.characterVariantId },
-              relations: ['competitor'],
-            },
-          );
-          if (!variant) {
+      // Gestion du lien au CharacterVariant, uniquement si présent dans le payload
+      if (dto.hasOwnProperty('characterVariantId')) {
+        if (characterVariantId) {
+          // On veut lier
+          const variant = await em.findOne(CharacterVariant, {
+            where: { id: characterVariantId },
+            relations: ['competitor', 'baseCharacter'],
+          });
+          if (!variant)
             throw new NotFoundException('CharacterVariant not found');
-          }
-
-          // If the variant is linked to another competitor, unlink it
           if (variant.competitor && variant.competitor.id !== competitor.id) {
-            variant.competitor.characterVariant = null;
-            await transactionalEntityManager.save(variant.competitor);
+            throw new BadRequestException(
+              `CharacterVariant already linked to competitor ${variant.competitor.id}`,
+            );
           }
-          // Link this variant to our updated competitor
+          variant.competitor = competitor;
           competitor.characterVariant = variant;
+          await em.save(variant);
         } else {
-          // If no characterVariantId is provided, we can remove the current characterVariant link
+          // On veut délier
           competitor.characterVariant = null;
         }
+      }
 
-        // Save the competitor in the transaction
-        return transactionalEntityManager.save(competitor);
-      },
-    );
+      return em.save(competitor);
+    });
   }
 
+  /* ░░░░░░░░░░░░   HELPERS link / unlink   ░░░░░░░░░░░░ */
+
+  linkCharacterVariant(competitorId: string, variantId: string) {
+    return this.update(competitorId, { characterVariantId: variantId });
+  }
+
+  unlinkCharacterVariant(competitorId: string) {
+    return this.update(competitorId, { characterVariantId: null });
+  }
+
+  /* ░░░░░░░░░░░░   RANK RECOMPUTE   ░░░░░░░░░░░░ */
+
   /**
-   * Recompute global ranks for all competitors. Uses a "temporary skill" computation that includes
-   * an exponential inactivity penalty if the competitor has been inactive for more than 7 days.
+   * Recomputes the global ranks for all competitors. This method filters out competitors who have never participated
+   * (raceCount=0) or those who haven't participated in more than a week. It then calculates a "temporary skill" for
+   * the remaining competitors, sorts them according to several tie-break criteria, assigns ranks (with tie handling),
+   * and saves all changes to the database.
    *
    * Steps:
-   * 1) Compute an "inactiveSkill" for each competitor: baseSkill = mu - 3*sigma, adjusted by a daily penalty after 7 days.
-   * 2) Filter out competitors who have never played (raceCount=0) so they won't appear in the sorted ranking.
-   * 3) Sort the active competitors by:
+   * 1) Exclude all competitors with zero races, and those whose last race date was more than seven days ago.
+   * 2) Sort the remaining competitors by:
    *    - inactiveSkill (descending),
    *    - avgRank12 (ascending),
    *    - raceCount (descending),
-   *    - and a special top-3 tie-break if necessary.
-   * 4) Assign ranks with allowance for ties if all tie-break criteria are equal.
-   * 5) Competitors with zero races keep a rank of 0.
-   * 6) Save any updated ranks to the database.
+   *    - a special top-3 tie-break if necessary.
+   * 3) Assign ranks with tie handling.
+   * 4) Competitors with zero races keep a rank of 0.
+   * 5) Save any updated ranks to the database.
    */
   async recomputeGlobalRank(): Promise<void> {
     const now = new Date();
+    const oneWeekAgo = new Date(now.getTime());
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
     const allCompetitors = await this.competitorsRepo.find();
 
-    // 1) Compute a "temporary skill" for each competitor,
-    //    including an inactivity penalty if inactive > 7 days.
-    for (const c of allCompetitors) {
-      if (c.raceCount > 0 && c.lastRaceDate) {
-        // Compute base TrueSkill measure (mu - 3*sigma)
-        const baseSkill = c.mu - 3 * c.sigma;
+    // We exclude competitors who have never participated (raceCount=0)
+    // AND those who haven't participated for more than a week
+    const withGames = allCompetitors.filter((c) => {
+      if (c.raceCount === 0) return false;
+      // Check the last race date
+      return c.lastRaceDate && c.lastRaceDate.getTime() >= oneWeekAgo.getTime();
+    });
 
-        // Calculate days since last race
-        const diffDays = Math.floor(
-          (now.getTime() - c.lastRaceDate.getTime()) / (1000 * 3600 * 24),
-        );
-
-        // If inactive for more than 7 days, apply a daily penalty of 2% starting day 8
-        if (diffDays > 7) {
-          const penaltyDays = diffDays - 7;
-          const dailyFactor = 0.98; // 2% decay per day
-          const adjustedSkill = baseSkill * Math.pow(dailyFactor, penaltyDays);
-          c['inactiveSkill'] = adjustedSkill;
-        } else {
-          // No penalty when diffDays <= 7
-          c['inactiveSkill'] = baseSkill;
-        }
-      } else {
-        // If this competitor has never raced (raceCount=0) or lastRaceDate is null
-        c['inactiveSkill'] = 0;
-      }
-    }
-
-    // 2) Filter out competitors who have never raced
-    const withGames = allCompetitors.filter((c) => c.raceCount > 0);
-
-    // 3) Sort using the tie-break criteria
+    // Sort the remaining competitors based on the tie-break criteria
     const sortedCompetitors = [...withGames].sort((a, b) => {
       // Compare inactiveSkill descending
       const skillComp = b['inactiveSkill'] - a['inactiveSkill'];
@@ -198,11 +147,11 @@ export class CompetitorsService {
       if (indexA < 3 && indexB >= 3) return -1;
       if (indexB < 3 && indexA >= 3) return 1;
 
-      // Otherwise, remain tied
+      // Otherwise remain tied
       return 0;
     });
 
-    // 4) Assign ranks with tie handling
+    // Assign ranks with tie handling
     let currentRank = 1;
     for (let i = 0; i < sortedCompetitors.length; i++) {
       if (i > 0) {
@@ -219,54 +168,20 @@ export class CompetitorsService {
           curr.rank = currentRank;
         }
       } else {
-        // The first competitor in the list has rank=1
+        // The first competitor in the sorted list has rank = 1
         sortedCompetitors[i].rank = currentRank;
       }
       currentRank++;
     }
 
-    // 5) Competitors with zero races => rank=0
+    // Competitors with zero races => rank=0
     for (const c of allCompetitors) {
       if (c.raceCount === 0) {
         c.rank = 0;
       }
     }
 
-    // 6) Save all changes to the database
+    // Save all changes to the database
     await this.competitorsRepo.save(allCompetitors);
-  }
-
-  /**
-   * Unlinks the competitor from its current character variant.
-   * The character variant will be available again for selection.
-   */
-  async unlinkCharacterVariant(competitorId: string): Promise<Competitor> {
-    return this.competitorsRepo.manager.transaction(
-      async (transactionalEntityManager) => {
-        // Find the competitor with its character variant
-        const competitor = await transactionalEntityManager.findOne(
-          Competitor,
-          {
-            where: { id: competitorId },
-            relations: ['characterVariant'],
-          },
-        );
-
-        if (!competitor) {
-          throw new NotFoundException(
-            `Competitor with ID ${competitorId} not found`,
-          );
-        }
-
-        // If the competitor already has a character variant, unlink it
-        if (competitor.characterVariant) {
-          competitor.characterVariant = null;
-          return transactionalEntityManager.save(competitor);
-        }
-
-        // Otherwise, simply return the competitor without changes
-        return competitor;
-      },
-    );
   }
 }

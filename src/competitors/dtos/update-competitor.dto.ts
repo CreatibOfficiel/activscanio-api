@@ -1,4 +1,12 @@
-import { IsOptional, IsString, IsUrl, IsInt, IsNumber, IsUUID } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsInt,
+  IsNumber,
+  IsUUID,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateCompetitorDto {
   @IsOptional() @IsString()
@@ -19,7 +27,11 @@ export class UpdateCompetitorDto {
   @IsOptional() @IsNumber()
   avgRank12?: number;
 
-  @IsOptional()
-  @IsString()
-  characterVariantId?: string;
+  /**
+   * id du CharacterVariant OU null pour retirer le lien.
+   * On utilise ValidateIf pour pouvoir envoyer explicitement `null`.
+   */
+  @ValidateIf((o) => 'characterVariantId' in o)
+  @IsUUID('4', { message: 'characterVariantId must be a UUID' })
+  characterVariantId: string | null;
 }

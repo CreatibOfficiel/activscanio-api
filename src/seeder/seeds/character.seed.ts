@@ -13,14 +13,12 @@ export async function seedBaseCharacters(dataSource: DataSource) {
   }
 
   /**
-   * Original single-table data converted to a plain array of objects.
-   * Each entry used to represent one "character".
-   * 
-   * - name: The base character name (e.g. "Yoshi", "Mario")
-   * - variant: The sub-variant label ("Red", "Green"), or undefined if it's a standard character
+   * Plain array listing every driver & their variant (when applicable).
+   * - name: Base driver name (e.g. "Yoshi", "Mario")
+   * - variant: Colour / sub‑variant label, or undefined if the entry is the default look.
    */
   const charactersData = [
-    // Yoshi variants
+    // Yoshi variants (9)
     { name: 'Yoshi', variant: 'Green' },
     { name: 'Yoshi', variant: 'Red' },
     { name: 'Yoshi', variant: 'Light Blue' },
@@ -31,7 +29,18 @@ export async function seedBaseCharacters(dataSource: DataSource) {
     { name: 'Yoshi', variant: 'Orange' },
     { name: 'Yoshi', variant: 'Dark Blue' },
 
-    // Shy Guy variants
+    // Birdo variants (9 – Booster Course Pass Wave 4)
+    { name: 'Birdo', variant: 'Pink' },
+    { name: 'Birdo', variant: 'Red' },
+    { name: 'Birdo', variant: 'Yellow' },
+    { name: 'Birdo', variant: 'Light Blue' },
+    { name: 'Birdo', variant: 'White' },
+    { name: 'Birdo', variant: 'Green' },
+    { name: 'Birdo', variant: 'Blue' },
+    { name: 'Birdo', variant: 'Orange' },
+    { name: 'Birdo', variant: 'Black' },
+
+    // Shy Guy variants (8)
     { name: 'Shy Guy', variant: 'Red' },
     { name: 'Shy Guy', variant: 'Blue' },
     { name: 'Shy Guy', variant: 'Green' },
@@ -41,7 +50,7 @@ export async function seedBaseCharacters(dataSource: DataSource) {
     { name: 'Shy Guy', variant: 'White' },
     { name: 'Shy Guy', variant: 'Cyan' },
 
-    // Inkling variants
+    // Inkling variants (6)
     { name: 'Inkling (Girl)', variant: 'Orange' },
     { name: 'Inkling (Girl)', variant: 'Green' },
     { name: 'Inkling (Girl)', variant: 'Pink' },
@@ -49,24 +58,53 @@ export async function seedBaseCharacters(dataSource: DataSource) {
     { name: 'Inkling (Boy)', variant: 'Blue' },
     { name: 'Inkling (Boy)', variant: 'Cyan' },
 
-    // Standard characters (no variants)
+    // Koopa Troopa variants (2)
+    { name: 'Koopa Troopa', variant: 'Green' },
+    { name: 'Koopa Troopa', variant: 'Yellow' },
+
+    // === Standard drivers (single look) ===
     { name: 'Mario' },
+    { name: 'Tanooki Mario' },
+    { name: 'Metal Mario' },
+
     { name: 'Luigi' },
+
     { name: 'Peach' },
+    { name: 'Cat Peach' },
+    { name: 'Pink Gold Peach' },
+
     { name: 'Daisy' },
     { name: 'Rosalina' },
+    { name: 'Peachette' },
+
     { name: 'Donkey Kong' },
+    { name: 'Diddy Kong' },
+    { name: 'Funky Kong' },
+
     { name: 'Wario' },
     { name: 'Waluigi' },
+
+    { name: 'Bowser' },
+    { name: 'Dry Bowser' },
+    { name: 'Bowser Jr.' },
+
+    { name: 'Dry Bones' },
+    { name: 'King Boo' },
+    { name: 'Petey Piranha' },
+    { name: 'Wiggler' },
+    { name: 'Kamek' },
+
     { name: 'Toad' },
     { name: 'Toadette' },
-    { name: 'Koopa Troopa' },
+
     { name: 'Lakitu' },
+
     { name: 'Baby Mario' },
     { name: 'Baby Luigi' },
     { name: 'Baby Peach' },
     { name: 'Baby Daisy' },
     { name: 'Baby Rosalina' },
+
     { name: 'Iggy' },
     { name: 'Lemmy' },
     { name: 'Larry' },
@@ -74,12 +112,13 @@ export async function seedBaseCharacters(dataSource: DataSource) {
     { name: 'Morton' },
     { name: 'Roy' },
     { name: 'Wendy' },
-    { name: 'Metal Mario' },
-    { name: 'Pink Gold Peach' },
+
     { name: 'Link' },
+
     { name: 'Villager (Female)' },
     { name: 'Villager (Male)' },
     { name: 'Isabelle' },
+    { name: 'Pauline' },
   ];
 
   /**
@@ -87,22 +126,14 @@ export async function seedBaseCharacters(dataSource: DataSource) {
    *    If "variant" exists, we use it as a label (e.g. "Red").
    *    If "variant" is absent, we consider it a "default" variant.
    */
-  const baseMap = new Map<
-    string,
-    {
-      name: string;
-      variants: { label: string | null }[];
-    }
-  >();
+  const baseMap = new Map<string, { name: string; variants: { label: string | null }[] }>();
 
   for (const c of charactersData) {
     if (!baseMap.has(c.name)) {
       baseMap.set(c.name, { name: c.name, variants: [] });
     }
 
-    baseMap.get(c.name)!.variants.push({
-      label: c.variant ?? null,   // null if no variant
-    });
+    baseMap.get(c.name)!.variants.push({ label: c.variant ?? null });
   }
 
   /**
@@ -118,7 +149,7 @@ export async function seedBaseCharacters(dataSource: DataSource) {
     const variantEntities = variants.map((v) => {
       const variant = new CharacterVariant();
       // Use "Default" label when v.label is null
-      variant.label = v.label ?? "Default";
+      variant.label = v.label ?? 'Default';
       variant.baseCharacter = baseCharacter;
       return variant;
     });

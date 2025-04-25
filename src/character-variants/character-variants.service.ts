@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CharacterVariant } from './character-variant.entity';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 
 @Injectable()
 export class CharacterVariantsService {
@@ -25,5 +25,17 @@ export class CharacterVariantsService {
       throw new NotFoundException(`Character variant with ID ${id} not found`);
     }
     return variant;
+  }
+
+  async findByCompetitorIds(competitorIds: string[]): Promise<CharacterVariant[]> {
+    if (!competitorIds.length) return [];
+    return this.variantRepo.find({
+      where: {
+        competitor: {
+          id: In(competitorIds),
+        },
+      },
+      relations: ['competitor', 'baseCharacter', 'baseCharacter.variants'],
+    });
   }
 }

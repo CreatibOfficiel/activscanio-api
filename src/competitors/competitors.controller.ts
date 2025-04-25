@@ -1,8 +1,17 @@
-import { Controller, Get, Post, Body, Param, Put, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Post,
+  Delete,
+  Body,
+  Param,
+} from '@nestjs/common';
 import { CompetitorsService } from './competitors.service';
-import { CreateCompetitorDto } from './dtos/create-competitor.dto';
-import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
 import { RacesService } from 'src/races/races.service';
+import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
+import { LinkCharacterDto } from './dtos/link-character.dto';
+import { sanitizeCompetitor } from './utils/sanitize-competitor';
 
 @Controller('competitors')
 export class CompetitorsController {
@@ -11,45 +20,54 @@ export class CompetitorsController {
     private racesService: RacesService,
   ) {}
 
-  // GET /competitors
+  /* ───────── LISTE & DÉTAIL ───────── */
+
+  /* --- GET all --- */
   @Get()
-  findAll() {
-    return this.competitorsService.findAll();
+  async findAll() {
+    const list = await this.competitorsService.findAll();
+    return list.map(sanitizeCompetitor);          // ← plus de boucle
   }
 
-  // GET /competitors/:id
+  /* --- GET one --- */
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.competitorsService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    const comp = await this.competitorsService.findOne(id);
+    return comp ? sanitizeCompetitor(comp) : null;
   }
 
-  // GET /competitors/:competitorId/recent-races
-  @Get(':competitorId/recent-races')
-  getRecentRacesForCompetitor(@Param('competitorId') competitorId: string) {
-    return this.racesService.getRecentRacesForCompetitor(competitorId);
-  }
-
-  // POST /competitors/:id/unlink-character
-  @Post(':id/unlink-character')
-  async unlinkCharacterVariant(@Param('id') id: string) {
-    return this.competitorsService.unlinkCharacterVariant(id);
-  }
-
-  // POST /competitors
-  @Post()
-  create(@Body() dto: CreateCompetitorDto) {
-    return this.competitorsService.create(dto);
-  }
-
-  // PUT /competitors/:id
+  /* --- PUT / POST / DELETE qui renvoient un competitor --- */
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateCompetitorDto) {
-    return this.competitorsService.update(id, dto);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCompetitorDto,
+  ) {
+    const updated = await this.competitorsService.update(id, dto);
+    return sanitizeCompetitor(updated);
   }
 
-  // PATCH /competitors/:id
-  @Patch(':id')
-  partialUpdate(@Param('id') id: string, @Body() dto: UpdateCompetitorDto) {
-    return this.competitorsService.update(id, dto);
+  @Post(':id/character-variant')
+  async linkVariant(
+    @Param('id') id: string,
+    @Body() dto: LinkCharacterDto,
+  ) {
+    const updated = await this.competitorsService.linkCharacterVariant(
+      id,
+      dto.characterVariantId,
+    );
+    return sanitizeCompetitor(updated);
+  }
+
+  @Delete(':id/character-variant')
+  async unlinkVariant(@Param('id') id: string) {
+    const updated = await this.competitorsService.unlinkCharacterVariant(id);
+    return sanitizeCompetitor(updated);
+  }
+
+  /* ───────── RÉCENTES COURSES ───────── */
+
+  @Get(':competitorId/recent-races')
+  getRecentRaces(@Param('competitorId') competitorId: string) {
+    return this.racesService.getRecentRacesForCompetitor(competitorId);
   }
 }
