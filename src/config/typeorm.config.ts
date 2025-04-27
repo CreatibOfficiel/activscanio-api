@@ -13,7 +13,8 @@ export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
     password: config.get<string>('DB_PASS'),
     database: config.get<string>('DB_NAME'),
     entities: [join(__dirname, '..', '**', '*.entity.{ts,js}')],
-    migrations: [join(__dirname, '..', 'migrations', '*.{ts,js}')],
+    migrations: [join(__dirname, 'src', 'migrations', '*.{js}')],
     synchronize: false,
+    migrationsRun: true,
   }),
 };
