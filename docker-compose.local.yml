@@ -25,6 +25,7 @@ services:
       DB_PASS: ${DB_PASS}
       DB_NAME: ${DB_NAME}
       NODE_ENV: development
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
       - '3000:3000'
 

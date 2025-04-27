@@ -21,6 +21,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       DB_NAME: ${DB_NAME}
+      NODE_ENV: production
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
       - '3000:3000'
     command: npm run start:prod
