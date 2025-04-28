@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import * as fs from 'fs';
 
 export interface ImageAnalysisRow {
   character: string; // doit correspondre EXACTEMENT à la whitelist
@@ -16,20 +15,20 @@ export class OpenAIService {
   constructor(private readonly config: ConfigService) {
     this.openai = new OpenAI({
       apiKey: this.config.get<string>('OPENAI_API_KEY'),
+      timeout: 120_000,
+      maxRetries: 3,
     });
   }
 
   async analyzeRaceImage(
-    imagePath: string,
+    base64: string,
     whitelist: string[], // noms autorisés, ortho exacte
   ): Promise<ImageAnalysisRow[]> {
-    const base64 = fs.readFileSync(imagePath).toString('base64');
-
     const prompt = buildPrompt(whitelist);
 
     const resp = await this.openai.chat.completions.create({
       model: 'gpt-4o',
-      max_tokens: 600,
+      max_tokens: 4096,
       temperature: 0,
       messages: [
         {

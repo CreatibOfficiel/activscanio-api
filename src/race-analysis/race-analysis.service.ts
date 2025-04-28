@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OpenAIService } from 'src/openai/openai.service';
-import { BaseCharactersService } from 'src/base-characters/base-characters.service';
 import { CharacterVariantsService } from 'src/character-variants/character-variants.service';
 
 export interface RaceCompetitorResult {
@@ -17,7 +16,7 @@ export class RaceAnalysisService {
   ) {}
 
   async analyzeRaceImage(
-    filePath: string,
+    base64: string,
     competitorIds: string[],
   ): Promise<RaceCompetitorResult[]> {
     /* 0 – Récupérer les variants liés aux competitors demandés */
@@ -45,9 +44,9 @@ export class RaceAnalysisService {
     const whitelist = [...nameToVariant.keys()];
 
     /* 2 – Appeler OpenAI */
-    const aiRows = await this.openai.analyzeRaceImage(filePath, whitelist);
+    const aiRows = await this.openai.analyzeRaceImage(base64, whitelist);
 
-    /* 3 – Conversion directe sans Levenshtein */
+    /* 3 – Conversion directe */
     const results: RaceCompetitorResult[] = [];
 
     for (const row of aiRows) {

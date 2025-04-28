@@ -10,6 +10,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RaceAnalysisService } from './race-analysis.service';
 import { UploadService } from 'src/upload/upload.service';
+import * as fs from 'fs';
 
 @Controller('race-analysis')
 export class RaceAnalysisController {
@@ -37,8 +38,9 @@ export class RaceAnalysisController {
 
     const filePath = this.uploadService.getFilePath(file.filename);
     try {
+      const base64 = fs.readFileSync(filePath).toString('base64');
       const list = await this.raceAnalysisService.analyzeRaceImage(
-        filePath,
+        base64,
         competitorIds,
       );
       this.uploadService.removeFile(file.filename);
