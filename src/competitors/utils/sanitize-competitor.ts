@@ -10,6 +10,7 @@ export const sanitizeCompetitor = (c: Competitor) => ({
   rank: c.rank,
   raceCount: c.raceCount,
   avgRank12: c.avgRank12,
+  lastRaceDate: c.lastRaceDate,
 
   characterVariant: c.characterVariant
     ? {

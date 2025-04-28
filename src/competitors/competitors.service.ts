@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
@@ -117,71 +117,68 @@ export class CompetitorsService {
     const oneWeekAgo = new Date(now.getTime());
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
+    // Retrieve all competitors
     const allCompetitors = await this.competitorsRepo.find();
 
-    // We exclude competitors who have never participated (raceCount=0)
-    // AND those who haven't participated for more than a week
-    const withGames = allCompetitors.filter((c) => {
-      if (c.raceCount === 0) return false;
-      // Check the last race date
-      return c.lastRaceDate && c.lastRaceDate.getTime() >= oneWeekAgo.getTime();
-    });
+    // Filter those with at least one race and a race in the last 7 days
+    const withGames = allCompetitors.filter(
+      (c) =>
+        c.raceCount > 0 &&
+        c.lastRaceDate != null &&
+        c.lastRaceDate.getTime() >= oneWeekAgo.getTime(),
+    );
 
-    // Sort the remaining competitors based on the tie-break criteria
+    // Sort by avgRank12 (asc), raceCount (desc), then top-3 tie-break
     const sortedCompetitors = [...withGames].sort((a, b) => {
-      // Compare inactiveSkill descending
-      const skillComp = b['inactiveSkill'] - a['inactiveSkill'];
-      if (skillComp !== 0) return skillComp;
-
-      // Compare avgRank12 ascending
+      // 1) best avgRank12
       const avgRankComp = a.avgRank12 - b.avgRank12;
       if (avgRankComp !== 0) return avgRankComp;
 
-      // Compare raceCount descending
+      // 2) highest number of races
       const raceCountComp = b.raceCount - a.raceCount;
       if (raceCountComp !== 0) return raceCountComp;
 
-      // Special top-3 tie-break: if one is in the top 3 and the other is not
-      const indexA = withGames.indexOf(a);
-      const indexB = withGames.indexOf(b);
-      if (indexA < 3 && indexB >= 3) return -1;
-      if (indexB < 3 && indexA >= 3) return 1;
+      // 3) priority to the top 3 of the initial list
+      const idxA = withGames.indexOf(a);
+      const idxB = withGames.indexOf(b);
+      if (idxA < 3 && idxB >= 3) return -1;
+      if (idxB < 3 && idxA >= 3) return 1;
 
-      // Otherwise remain tied
-      return 0;
+      return 0; // remain tied
     });
 
     // Assign ranks with tie handling
     let currentRank = 1;
     for (let i = 0; i < sortedCompetitors.length; i++) {
+      const curr = sortedCompetitors[i];
+
       if (i > 0) {
         const prev = sortedCompetitors[i - 1];
-        const curr = sortedCompetitors[i];
-        // If all criteria are equal, they share the same rank
-        if (
-          curr['inactiveSkill'] === prev['inactiveSkill'] &&
-          curr.avgRank12 === prev.avgRank12 &&
-          curr.raceCount === prev.raceCount
-        ) {
+        const sameAvgRank = curr.avgRank12 === prev.avgRank12;
+        const sameRaceCount = curr.raceCount === prev.raceCount;
+
+        if (sameAvgRank && sameRaceCount) {
+          // same rank as previous
           curr.rank = prev.rank;
         } else {
           curr.rank = currentRank;
         }
       } else {
-        // The first competitor in the sorted list has rank = 1
-        sortedCompetitors[i].rank = currentRank;
+        // first in the ranking
+        curr.rank = currentRank;
       }
+
       currentRank++;
     }
 
-    // Competitors with zero races => rank=0
+    // Those who have never raced remain rank = 0
     for (const c of allCompetitors) {
       if (c.raceCount === 0) {
         c.rank = 0;
       }
     }
 
-    // Save all changes to the database
+    // Save updates
     await this.competitorsRepo.save(allCompetitors);
   }
 }

@@ -26,7 +26,7 @@ export class CompetitorsController {
   @Get()
   async findAll() {
     const list = await this.competitorsService.findAll();
-    return list.map(sanitizeCompetitor);          // ← plus de boucle
+    return list.map(sanitizeCompetitor);
   }
 
   /* --- GET one --- */
