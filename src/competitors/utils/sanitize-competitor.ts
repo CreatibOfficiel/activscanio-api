@@ -11,6 +11,8 @@ export const sanitizeCompetitor = (c: Competitor) => ({
   rank: c.rank,
   raceCount: c.raceCount,
   avgRank12: c.avgRank12,
+  conservativeScore: c.rating - 2 * c.rd,
+  provisional: c.raceCount < 5 || c.rd > 150,
 
   characterVariant: c.characterVariant
     ? {
