@@ -30,6 +30,13 @@ export class CompetitorsController {
     return list.map(sanitizeCompetitor);          // ← plus de boucle
   }
 
+  /* --- GET rankings --- */
+  @Get('rankings')
+  async getRankings() {
+    const rankings = await this.competitorsService.getRankings();
+    return rankings.map(sanitizeCompetitor);
+  }
+
   /* --- GET one --- */
   @Get(':id')
   async findOne(@Param('id') id: string) {

@@ -7,8 +7,12 @@ import { RaceResult } from './race-result.entity';
 import { CreateRaceDto } from './dtos/create-race.dto';
 
 import { CompetitorsService } from '../competitors/competitors.service';
-import { RatingService } from 'src/rating/rating.service';
-import { Rating } from 'src/rating/rating.interface';
+
+interface Opponent {
+  rating: number;
+  rd: number;
+  id: string;
+}
 
 @Injectable()
 export class RacesService {
@@ -17,7 +21,6 @@ export class RacesService {
     private raceRepo: Repository<RaceEvent>,
 
     private competitorsService: CompetitorsService,
-    private ratingService: RatingService,
   ) {}
 
   // CREATE a new race
@@ -39,11 +42,8 @@ export class RacesService {
 
     const savedRace = await this.raceRepo.save(race);
 
-    // Update competitors' TrueSkill ratings
+    // Update competitors' Glicko-2 ratings
     await this.updateCompetitorsRating(savedRace.results);
-
-    // Recompute global rank
-    await this.competitorsService.recomputeGlobalRank();
 
     return savedRace;
   }
@@ -144,78 +144,70 @@ export class RacesService {
     const competitors = await Promise.all(
       competitorIds.map((id) => this.competitorsService.findOne(id)),
     );
-    const initialPositions: { [competitorId: string]: number } = {};
 
     // 2) Sort the results by rank12
     const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
 
-    // 3) Assign a rank 1..N to each competitor (N is the number of humans)
-    //   1 = best rank
-    let rank = 1;
-    for (const result of sortedResults) {
-      initialPositions[result.competitorId] = result.rank12;
-      result.rank12 = rank;
-      rank++;
-    }
+    // 3) For each competitor, calculate their score against others
+    for (const competitor of competitors) {
+      if (!competitor) continue;
 
-    // 4) Build the array for TrueSkill input
-    const inputs: { id: string; rating: Rating; rank: number }[] = [];
-    for (const comp of competitors) {
-      if (!comp) continue;
+      const competitorResult = raceResults.find(
+        (r) => r.competitorId === competitor.id,
+      );
+      if (!competitorResult) continue;
 
-      const r = raceResults.find((res) => res.competitorId === comp.id);
-      if (!r) continue;
+      // Calculate scores against other competitors
+      const opponents: Opponent[] = [];
+      const scores: number[] = [];
 
-      inputs.push({
-        id: comp.id,
-        rating: {
-          mu: comp.mu,
-          sigma: comp.sigma,
-        },
-        rank: r.rank12,
-      });
-    }
+      for (const otherResult of sortedResults) {
+        if (otherResult.competitorId === competitor.id) continue;
 
-    // 5) Call TrueSkill
-    const updated = this.ratingService.updateRatings(inputs);
+        const otherCompetitor = competitors.find(
+          (c) => c?.id === otherResult.competitorId,
+        );
+        if (!otherCompetitor) continue;
 
-    // 6) Update the database
-    for (const u of updated) {
-      const comp = competitors.find((c) => c?.id === u.id);
-      if (!comp) continue;
+        opponents.push({
+          rating: otherCompetitor.rating,
+          rd: otherCompetitor.rd,
+          id: otherCompetitor.id,
+        });
 
-      const r = raceResults.find((res) => res.competitorId === comp.id);
-      if (!r) continue;
+        // Score is 1 if better rank, 0 if worse rank, 0.5 if same rank
+        const score = competitorResult.rank12 < otherResult.rank12
+          ? 1
+          : competitorResult.rank12 > otherResult.rank12
+          ? 0
+          : 0.5;
 
-      // Store the new TS rating
-      comp.mu = u.newRating.mu;
-      comp.sigma = u.newRating.sigma;
-
-      // Get the initial position
-      const initialPos = initialPositions[comp.id];
-      if (initialPos === undefined) continue;
-
-      // Calculate average positions for this competitor
-      comp.avgRank12 = comp.avgRank12 + (initialPos - comp.avgRank12) / (comp.raceCount + 1);
-
-      // Increment raceCount
-      comp.raceCount++;
-
-      // Update win streak
-      if (comp.rank === 1) {
-        comp.winStreak++;
-      } else {
-        comp.winStreak = 0;
+        scores.push(score);
       }
 
-      // Update lastRaceDate
-      comp.lastRaceDate = new Date();
+      // Update the competitor's rating
+      await this.competitorsService.updateRatings(competitor.id, opponents.map((o, i) => ({
+        id: o.id,
+        score: scores[i],
+      })));
+
+      // Update other stats
+      const initialPos = competitorResult.rank12;
+      competitor.avgRank12 = competitor.avgRank12 + (initialPos - competitor.avgRank12) / (competitor.raceCount + 1);
+      competitor.raceCount++;
+      competitor.lastRaceDate = new Date();
+
+      // Update win streak
+      if (competitorResult.rank12 === 1) {
+        competitor.winStreak++;
+      } else {
+        competitor.winStreak = 0;
+      }
 
       // Update the competitor
-      // Note: this is a partial update, so we don't need to pass all fields
-      await this.competitorsService.update(comp.id, {
-        ...comp,
-        characterVariantId: comp.characterVariant ? comp.characterVariant.id : null,
+      await this.competitorsService.update(competitor.id, {
+        ...competitor,
+        characterVariantId: competitor.characterVariant ? competitor.characterVariant.id : null,
       });
     }
   }

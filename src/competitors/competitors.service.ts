@@ -4,17 +4,19 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository, In } from 'typeorm';
 import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
 import { CharacterVariant } from 'src/character-variants/character-variant.entity';
+import { Glicko2Service } from './glicko2.service';
 
 @Injectable()
 export class CompetitorsService {
   constructor(
     @InjectRepository(Competitor)
     private competitorsRepo: Repository<Competitor>,
+    private glicko2Service: Glicko2Service,
   ) {}
 
   /* ░░░░░░░░░░░░   READ   ░░░░░░░░░░░░ */
@@ -30,6 +32,11 @@ export class CompetitorsService {
       where: { id },
       relations: ['characterVariant', 'characterVariant.baseCharacter'],
     });
+  }
+
+  async getRankings(): Promise<Array<Competitor & { rank: number }>> {
+    const competitors = await this.findAll();
+    return this.glicko2Service.calculateRankings(competitors);
   }
 
   /* ░░░░░░░░░░░░   CREATE   ░░░░░░░░░░░░ */
@@ -79,6 +86,36 @@ export class CompetitorsService {
         }
       }
 
+      return em.save(competitor);
+    });
+  }
+
+  async updateRatings(
+    competitorId: string,
+    opponents: { id: string; score: number }[],
+  ): Promise<Competitor> {
+    return this.competitorsRepo.manager.transaction(async (em) => {
+      const competitor = await em.findOne(Competitor, {
+        where: { id: competitorId },
+      });
+      if (!competitor) throw new NotFoundException('Competitor not found');
+
+      const opponentIds = opponents.map(o => o.id);
+      const opponentEntities = await em.find(Competitor, {
+        where: { id: In(opponentIds) },
+      });
+
+      if (opponentEntities.length !== opponents.length) {
+        throw new BadRequestException('Some opponents were not found');
+      }
+
+      const newRating = this.glicko2Service.calculateNewRating(
+        competitor,
+        opponentEntities,
+        opponents.map(o => o.score),
+      );
+
+      Object.assign(competitor, newRating);
       return em.save(competitor);
     });
   }
