@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository, In } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
@@ -34,11 +34,6 @@ export class CompetitorsService {
     });
   }
 
-  async getRankings(): Promise<Array<Competitor & { rank: number }>> {
-    const competitors = await this.findAll();
-    return this.glicko2Service.calculateRankings(competitors);
-  }
-
   /* ░░░░░░░░░░░░   CREATE   ░░░░░░░░░░░░ */
 
   async create(dto: CreateCompetitorDto): Promise<Competitor> {
@@ -58,14 +53,14 @@ export class CompetitorsService {
       });
       if (!competitor) throw new NotFoundException('Competitor not found');
 
-      // Séparer characterVariantId des champs « simples »
+      // Separate characterVariantId from simple fields
       const { characterVariantId, ...simpleFields } = dto;
       Object.assign(competitor, simpleFields);
 
-      // Gestion du lien au CharacterVariant, uniquement si présent dans le payload
+      // Handle characterVariantId, only if present in the payload
       if (dto.hasOwnProperty('characterVariantId')) {
         if (characterVariantId) {
-          // On veut lier
+          // We want to link
           const variant = await em.findOne(CharacterVariant, {
             where: { id: characterVariantId },
             relations: ['competitor', 'baseCharacter'],
@@ -81,7 +76,7 @@ export class CompetitorsService {
           competitor.characterVariant = variant;
           await em.save(variant);
         } else {
-          // On veut délier
+          // We want to unlink
           competitor.characterVariant = null;
         }
       }
@@ -200,25 +195,17 @@ export class CompetitorsService {
           curr.avgRank12 === prev.avgRank12 &&
           curr.raceCount === prev.raceCount
         ) {
-          curr.rank = prev.rank;
+          sortedCompetitors[i].rank = prev.rank;
         } else {
-          curr.rank = currentRank;
+          sortedCompetitors[i].rank = currentRank;
         }
       } else {
-        // The first competitor in the sorted list has rank = 1
         sortedCompetitors[i].rank = currentRank;
       }
       currentRank++;
     }
 
-    // Competitors with zero races => rank=0
-    for (const c of allCompetitors) {
-      if (c.raceCount === 0) {
-        c.rank = 0;
-      }
-    }
-
-    // Save all changes to the database
-    await this.competitorsRepo.save(allCompetitors);
+    // Save all updated ranks
+    await this.competitorsRepo.save(sortedCompetitors);
   }
 }
