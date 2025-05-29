@@ -8,9 +8,9 @@ export const sanitizeCompetitor = (c: Competitor) => ({
   rating: c.rating,
   rd: c.rd,
   vol: c.vol,
-  rank: c.rank,
   raceCount: c.raceCount,
   avgRank12: c.avgRank12,
+  lastRaceDate: c.lastRaceDate,
   conservativeScore: c.rating - 2 * c.rd,
   provisional: c.raceCount < 5 || c.rd > 150,
 

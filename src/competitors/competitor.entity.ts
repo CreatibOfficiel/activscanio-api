@@ -41,12 +41,6 @@ export class Competitor {
   @Column('float', { default: 0.06 })
   vol: number;
 
-  /**
-   * This rank is your global rank in the leaderboard.
-   */
-  @Column({ default: 0 })
-  rank: number;
-
   @Column({ default: 0 })
   raceCount: number;
 

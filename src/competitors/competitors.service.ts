@@ -89,30 +89,44 @@ export class CompetitorsService {
     competitorId: string,
     opponents: { id: string; score: number }[],
   ): Promise<Competitor> {
-    return this.competitorsRepo.manager.transaction(async (em) => {
-      const competitor = await em.findOne(Competitor, {
-        where: { id: competitorId },
-      });
-      if (!competitor) throw new NotFoundException('Competitor not found');
-
-      const opponentIds = opponents.map(o => o.id);
-      const opponentEntities = await em.find(Competitor, {
-        where: { id: In(opponentIds) },
-      });
-
-      if (opponentEntities.length !== opponents.length) {
-        throw new BadRequestException('Some opponents were not found');
+    try {
+      if (!competitorId || !opponents || !Array.isArray(opponents)) {
+        throw new BadRequestException('Invalid parameters');
       }
 
-      const newRating = this.glicko2Service.calculateNewRating(
-        competitor,
-        opponentEntities,
-        opponents.map(o => o.score),
-      );
+      return await this.competitorsRepo.manager.transaction(async (em) => {
+        const competitor = await em.findOne(Competitor, {
+          where: { id: competitorId },
+        });
+        if (!competitor) throw new NotFoundException('Competitor not found');
 
-      Object.assign(competitor, newRating);
-      return em.save(competitor);
-    });
+        const opponentIds = opponents.map(o => o.id);
+        const opponentEntities = await em.find(Competitor, {
+          where: { id: In(opponentIds) },
+        });
+
+        if (opponentEntities.length !== opponents.length) {
+          throw new BadRequestException('Some opponents were not found');
+        }
+
+        try {
+          const newRating = this.glicko2Service.calculateNewRating(
+            competitor,
+            opponentEntities,
+            opponents.map(o => o.score),
+          );
+
+          Object.assign(competitor, newRating);
+          return await em.save(competitor);
+        } catch (error) {
+          console.error('Error calculating new rating:', error);
+          throw new BadRequestException('Error calculating new rating: ' + error.message);
+        }
+      });
+    } catch (error) {
+      console.error('Error in updateRatings:', error);
+      throw error;
+    }
   }
 
   /* ░░░░░░░░░░░░   HELPERS link / unlink   ░░░░░░░░░░░░ */
@@ -123,89 +137,5 @@ export class CompetitorsService {
 
   unlinkCharacterVariant(competitorId: string) {
     return this.update(competitorId, { characterVariantId: null });
-  }
-
-  /* ░░░░░░░░░░░░   RANK RECOMPUTE   ░░░░░░░░░░░░ */
-
-  /**
-   * Recomputes the global ranks for all competitors. This method filters out competitors who have never participated
-   * (raceCount=0) or those who haven't participated in more than a week. It then calculates a "temporary skill" for
-   * the remaining competitors, sorts them according to several tie-break criteria, assigns ranks (with tie handling),
-   * and saves all changes to the database.
-   *
-   * Steps:
-   * 1) Exclude all competitors with zero races, and those whose last race date was more than seven days ago.
-   * 2) Sort the remaining competitors by:
-   *    - inactiveSkill (descending),
-   *    - avgRank12 (ascending),
-   *    - raceCount (descending),
-   *    - a special top-3 tie-break if necessary.
-   * 3) Assign ranks with tie handling.
-   * 4) Competitors with zero races keep a rank of 0.
-   * 5) Save any updated ranks to the database.
-   */
-  async recomputeGlobalRank(): Promise<void> {
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime());
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-    const allCompetitors = await this.competitorsRepo.find();
-
-    // We exclude competitors who have never participated (raceCount=0)
-    // AND those who haven't participated for more than a week
-    const withGames = allCompetitors.filter((c) => {
-      if (c.raceCount === 0) return false;
-      // Check the last race date
-      return c.lastRaceDate && c.lastRaceDate.getTime() >= oneWeekAgo.getTime();
-    });
-
-    // Sort the remaining competitors based on the tie-break criteria
-    const sortedCompetitors = [...withGames].sort((a, b) => {
-      // Compare inactiveSkill descending
-      const skillComp = b['inactiveSkill'] - a['inactiveSkill'];
-      if (skillComp !== 0) return skillComp;
-
-      // Compare avgRank12 ascending
-      const avgRankComp = a.avgRank12 - b.avgRank12;
-      if (avgRankComp !== 0) return avgRankComp;
-
-      // Compare raceCount descending
-      const raceCountComp = b.raceCount - a.raceCount;
-      if (raceCountComp !== 0) return raceCountComp;
-
-      // Special top-3 tie-break: if one is in the top 3 and the other is not
-      const indexA = withGames.indexOf(a);
-      const indexB = withGames.indexOf(b);
-      if (indexA < 3 && indexB >= 3) return -1;
-      if (indexB < 3 && indexA >= 3) return 1;
-
-      // Otherwise remain tied
-      return 0;
-    });
-
-    // Assign ranks with tie handling
-    let currentRank = 1;
-    for (let i = 0; i < sortedCompetitors.length; i++) {
-      if (i > 0) {
-        const prev = sortedCompetitors[i - 1];
-        const curr = sortedCompetitors[i];
-        // If all criteria are equal, they share the same rank
-        if (
-          curr['inactiveSkill'] === prev['inactiveSkill'] &&
-          curr.avgRank12 === prev.avgRank12 &&
-          curr.raceCount === prev.raceCount
-        ) {
-          sortedCompetitors[i].rank = prev.rank;
-        } else {
-          sortedCompetitors[i].rank = currentRank;
-        }
-      } else {
-        sortedCompetitors[i].rank = currentRank;
-      }
-      currentRank++;
-    }
-
-    // Save all updated ranks
-    await this.competitorsRepo.save(sortedCompetitors);
   }
 }

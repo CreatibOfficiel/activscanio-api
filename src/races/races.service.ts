@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -25,35 +25,51 @@ export class RacesService {
 
   // CREATE a new race
   async createRace(dto: CreateRaceDto): Promise<RaceEvent> {
-    const raceDate = new Date(dto.date);
+    try {
+      const raceDate = new Date(dto.date);
 
-    const race = new RaceEvent();
-    race.date = raceDate;
+      const race = new RaceEvent();
+      race.date = raceDate;
 
-    const results = dto.results.map((r) => {
-      const rr = new RaceResult();
-      rr.competitorId = r.competitorId;
-      rr.rank12 = r.rank12;
-      rr.score = r.score;
-      return rr;
-    });
+      const results = dto.results.map((r) => {
+        const rr = new RaceResult();
+        rr.competitorId = r.competitorId;
+        rr.rank12 = r.rank12;
+        rr.score = r.score;
+        return rr;
+      });
 
-    race.results = results;
+      race.results = results;
 
-    const savedRace = await this.raceRepo.save(race);
+      const savedRace = await this.raceRepo.save(race);
 
-    // Update competitors' Glicko-2 ratings
-    await this.updateCompetitorsRating(savedRace.results);
+      // Update competitors' Glicko-2 ratings
+      try {
+        await this.updateCompetitorsRating(savedRace.results);
+      } catch (error) {
+        console.error('Error updating competitor ratings:', error);
+        // We still return the race even if rating update fails
+      }
 
-    return savedRace;
+      return savedRace;
+    } catch (error) {
+      console.error('Error creating race:', error);
+      throw new BadRequestException('Error creating race: ' + error.message);
+    }
   }
 
   // GET /races/:raceId
-  async findOne(raceId: string): Promise<RaceEvent | null> {
-    return this.raceRepo.findOne({
+  async findOne(raceId: string): Promise<RaceEvent> {
+    const race = await this.raceRepo.findOne({
       where: { id: raceId },
       relations: ['results'],
     });
+
+    if (!race) {
+      throw new NotFoundException(`Race with ID ${raceId} not found`);
+    }
+
+    return race;
   }
 
   // GET /races?recent=true
@@ -111,7 +127,7 @@ export class RacesService {
       relations: ['results'],
     });
     if (!refRace) {
-      throw new Error('Race not found');
+      throw new NotFoundException(`Race with ID ${raceId} not found`);
     }
 
     // Extract competitor IDs
@@ -139,76 +155,86 @@ export class RacesService {
   private async updateCompetitorsRating(
     raceResults: RaceResult[],
   ): Promise<void> {
-    // 1) Get all competitor IDs from race
-    const competitorIds = raceResults.map((r) => r.competitorId);
-    const competitors = await Promise.all(
-      competitorIds.map((id) => this.competitorsService.findOne(id)),
-    );
-
-    // 2) Sort the results by rank12
-    const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
-
-    // 3) For each competitor, calculate their score against others
-    for (const competitor of competitors) {
-      if (!competitor) continue;
-
-      const competitorResult = raceResults.find(
-        (r) => r.competitorId === competitor.id,
+    try {
+      // 1) Get all competitor IDs from race
+      const competitorIds = raceResults.map((r) => r.competitorId);
+      const competitors = await Promise.all(
+        competitorIds.map((id) => this.competitorsService.findOne(id)),
       );
-      if (!competitorResult) continue;
 
-      // Calculate scores against other competitors
-      const opponents: Opponent[] = [];
-      const scores: number[] = [];
+      // 2) Sort the results by rank12
+      const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
 
-      for (const otherResult of sortedResults) {
-        if (otherResult.competitorId === competitor.id) continue;
+      // 3) For each competitor, calculate their score against others
+      for (const competitor of competitors) {
+        if (!competitor) continue;
 
-        const otherCompetitor = competitors.find(
-          (c) => c?.id === otherResult.competitorId,
+        const competitorResult = raceResults.find(
+          (r) => r.competitorId === competitor.id,
         );
-        if (!otherCompetitor) continue;
+        if (!competitorResult) continue;
 
-        opponents.push({
-          rating: otherCompetitor.rating,
-          rd: otherCompetitor.rd,
-          id: otherCompetitor.id,
-        });
+        // Calculate scores against other competitors
+        const opponents: Opponent[] = [];
+        const scores: number[] = [];
 
-        // Score is 1 if better rank, 0 if worse rank, 0.5 if same rank
-        const score = competitorResult.rank12 < otherResult.rank12
-          ? 1
-          : competitorResult.rank12 > otherResult.rank12
-          ? 0
-          : 0.5;
+        for (const otherResult of sortedResults) {
+          if (otherResult.competitorId === competitor.id) continue;
 
-        scores.push(score);
+          const otherCompetitor = competitors.find(
+            (c) => c?.id === otherResult.competitorId,
+          );
+          if (!otherCompetitor) continue;
+
+          opponents.push({
+            rating: otherCompetitor.rating,
+            rd: otherCompetitor.rd,
+            id: otherCompetitor.id,
+          });
+
+          // Score is 1 if better rank, 0 if worse rank, 0.5 if same rank
+          const score = competitorResult.rank12 < otherResult.rank12
+            ? 1
+            : competitorResult.rank12 > otherResult.rank12
+            ? 0
+            : 0.5;
+
+          scores.push(score);
+        }
+
+        try {
+          // Update the competitor's rating
+          await this.competitorsService.updateRatings(competitor.id, opponents.map((o, i) => ({
+            id: o.id,
+            score: scores[i],
+          })));
+
+          // Update other stats
+          const initialPos = competitorResult.rank12;
+          competitor.avgRank12 = competitor.avgRank12 + (initialPos - competitor.avgRank12) / (competitor.raceCount + 1);
+          competitor.raceCount++;
+          competitor.lastRaceDate = new Date();
+
+          // Update win streak
+          if (competitorResult.rank12 === 1) {
+            competitor.winStreak++;
+          } else {
+            competitor.winStreak = 0;
+          }
+
+          // Update the competitor
+          await this.competitorsService.update(competitor.id, {
+            ...competitor,
+            characterVariantId: competitor.characterVariant ? competitor.characterVariant.id : null,
+          });
+        } catch (error) {
+          console.error(`Error updating competitor ${competitor.id}:`, error);
+          // Continue with other competitors even if one fails
+        }
       }
-
-      // Update the competitor's rating
-      await this.competitorsService.updateRatings(competitor.id, opponents.map((o, i) => ({
-        id: o.id,
-        score: scores[i],
-      })));
-
-      // Update other stats
-      const initialPos = competitorResult.rank12;
-      competitor.avgRank12 = competitor.avgRank12 + (initialPos - competitor.avgRank12) / (competitor.raceCount + 1);
-      competitor.raceCount++;
-      competitor.lastRaceDate = new Date();
-
-      // Update win streak
-      if (competitorResult.rank12 === 1) {
-        competitor.winStreak++;
-      } else {
-        competitor.winStreak = 0;
-      }
-
-      // Update the competitor
-      await this.competitorsService.update(competitor.id, {
-        ...competitor,
-        characterVariantId: competitor.characterVariant ? competitor.characterVariant.id : null,
-      });
+    } catch (error) {
+      console.error('Error in updateCompetitorsRating:', error);
+      throw new BadRequestException('Error updating competitor ratings: ' + error.message);
     }
   }
 }
