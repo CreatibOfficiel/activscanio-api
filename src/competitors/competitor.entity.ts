@@ -21,22 +21,25 @@ export class Competitor {
   profilePictureUrl: string;
 
   /**
-   * TrueSkill 'mu' value.
+   * Glicko-2 rating value.
+   * Default: 1500 (typical starting rating)
    */
-  @Column('float', { default: 25 })  // typical default for TS
-  mu: number;
+  @Column('float', { default: 1500 })
+  rating: number;
 
   /**
-   * TrueSkill 'sigma' value.
+   * Glicko-2 rating deviation (RD).
+   * Default: 350 (typical starting RD)
    */
-  @Column('float', { default: 8.333 }) // typical default for TS (25/3)
-  sigma: number;
+  @Column('float', { default: 350 })
+  rd: number;
 
   /**
-   * This rank is your global rank in the leaderboard.
+   * Glicko-2 volatility.
+   * Default: 0.06 (typical starting volatility)
    */
-  @Column({ default: 0 })
-  rank: number;
+  @Column('float', { default: 0.06 })
+  vol: number;
 
   @Column({ default: 0 })
   raceCount: number;

@@ -12,6 +12,7 @@ import { RacesService } from 'src/races/races.service';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
 import { LinkCharacterDto } from './dtos/link-character.dto';
 import { sanitizeCompetitor } from './utils/sanitize-competitor';
+import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 
 @Controller('competitors')
 export class CompetitorsController {
@@ -34,6 +35,13 @@ export class CompetitorsController {
   async findOne(@Param('id') id: string) {
     const comp = await this.competitorsService.findOne(id);
     return comp ? sanitizeCompetitor(comp) : null;
+  }
+
+  /* --- POST --- */
+  @Post()
+  async create(@Body() dto: CreateCompetitorDto) {
+    const created = await this.competitorsService.create(dto);
+    return sanitizeCompetitor(created);
   }
 
   /* --- PUT / POST / DELETE qui renvoient un competitor --- */

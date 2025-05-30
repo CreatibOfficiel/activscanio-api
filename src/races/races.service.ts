@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -7,8 +7,12 @@ import { RaceResult } from './race-result.entity';
 import { CreateRaceDto } from './dtos/create-race.dto';
 
 import { CompetitorsService } from '../competitors/competitors.service';
-import { RatingService } from 'src/rating/rating.service';
-import { Rating } from 'src/rating/rating.interface';
+
+interface Opponent {
+  rating: number;
+  rd: number;
+  id: string;
+}
 
 @Injectable()
 export class RacesService {
@@ -17,43 +21,55 @@ export class RacesService {
     private raceRepo: Repository<RaceEvent>,
 
     private competitorsService: CompetitorsService,
-    private ratingService: RatingService,
   ) {}
 
   // CREATE a new race
   async createRace(dto: CreateRaceDto): Promise<RaceEvent> {
-    const raceDate = new Date(dto.date);
+    try {
+      const raceDate = new Date(dto.date);
 
-    const race = new RaceEvent();
-    race.date = raceDate;
+      const race = new RaceEvent();
+      race.date = raceDate;
 
-    const results = dto.results.map((r) => {
-      const rr = new RaceResult();
-      rr.competitorId = r.competitorId;
-      rr.rank12 = r.rank12;
-      rr.score = r.score;
-      return rr;
-    });
+      const results = dto.results.map((r) => {
+        const rr = new RaceResult();
+        rr.competitorId = r.competitorId;
+        rr.rank12 = r.rank12;
+        rr.score = r.score;
+        return rr;
+      });
 
-    race.results = results;
+      race.results = results;
 
-    const savedRace = await this.raceRepo.save(race);
+      const savedRace = await this.raceRepo.save(race);
 
-    // Update competitors' TrueSkill ratings
-    await this.updateCompetitorsRating(savedRace.results);
+      // Update competitors' Glicko-2 ratings
+      try {
+        await this.updateCompetitorsRating(savedRace.results);
+      } catch (error) {
+        console.error('Error updating competitor ratings:', error);
+        // We still return the race even if rating update fails
+      }
 
-    // Recompute global rank
-    await this.competitorsService.recomputeGlobalRank();
-
-    return savedRace;
+      return savedRace;
+    } catch (error) {
+      console.error('Error creating race:', error);
+      throw new BadRequestException('Error creating race: ' + error.message);
+    }
   }
 
   // GET /races/:raceId
-  async findOne(raceId: string): Promise<RaceEvent | null> {
-    return this.raceRepo.findOne({
+  async findOne(raceId: string): Promise<RaceEvent> {
+    const race = await this.raceRepo.findOne({
       where: { id: raceId },
       relations: ['results'],
     });
+
+    if (!race) {
+      throw new NotFoundException(`Race with ID ${raceId} not found`);
+    }
+
+    return race;
   }
 
   // GET /races?recent=true
@@ -111,7 +127,7 @@ export class RacesService {
       relations: ['results'],
     });
     if (!refRace) {
-      throw new Error('Race not found');
+      throw new NotFoundException(`Race with ID ${raceId} not found`);
     }
 
     // Extract competitor IDs
@@ -139,84 +155,86 @@ export class RacesService {
   private async updateCompetitorsRating(
     raceResults: RaceResult[],
   ): Promise<void> {
-    // 1) Get all competitor IDs from race
-    const competitorIds = raceResults.map((r) => r.competitorId);
-    const competitors = await Promise.all(
-      competitorIds.map((id) => this.competitorsService.findOne(id)),
-    );
-    const initialPositions: { [competitorId: string]: number } = {};
+    try {
+      // 1) Get all competitor IDs from race
+      const competitorIds = raceResults.map((r) => r.competitorId);
+      const competitors = await Promise.all(
+        competitorIds.map((id) => this.competitorsService.findOne(id)),
+      );
 
-    // 2) Sort the results by rank12
-    const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
+      // 2) Sort the results by rank12
+      const sortedResults = [...raceResults].sort((a, b) => a.rank12 - b.rank12);
 
-    // 3) Assign a rank 1..N to each competitor (N is the number of humans)
-    //   1 = best rank
-    let rank = 1;
-    for (const result of sortedResults) {
-      initialPositions[result.competitorId] = result.rank12;
-      result.rank12 = rank;
-      rank++;
-    }
+      // 3) For each competitor, calculate their score against others
+      for (const competitor of competitors) {
+        if (!competitor) continue;
 
-    // 4) Build the array for TrueSkill input
-    const inputs: { id: string; rating: Rating; rank: number }[] = [];
-    for (const comp of competitors) {
-      if (!comp) continue;
+        const competitorResult = raceResults.find(
+          (r) => r.competitorId === competitor.id,
+        );
+        if (!competitorResult) continue;
 
-      const r = raceResults.find((res) => res.competitorId === comp.id);
-      if (!r) continue;
+        // Calculate scores against other competitors
+        const opponents: Opponent[] = [];
+        const scores: number[] = [];
 
-      inputs.push({
-        id: comp.id,
-        rating: {
-          mu: comp.mu,
-          sigma: comp.sigma,
-        },
-        rank: r.rank12,
-      });
-    }
+        for (const otherResult of sortedResults) {
+          if (otherResult.competitorId === competitor.id) continue;
 
-    // 5) Call TrueSkill
-    const updated = this.ratingService.updateRatings(inputs);
+          const otherCompetitor = competitors.find(
+            (c) => c?.id === otherResult.competitorId,
+          );
+          if (!otherCompetitor) continue;
 
-    // 6) Update the database
-    for (const u of updated) {
-      const comp = competitors.find((c) => c?.id === u.id);
-      if (!comp) continue;
+          opponents.push({
+            rating: otherCompetitor.rating,
+            rd: otherCompetitor.rd,
+            id: otherCompetitor.id,
+          });
 
-      const r = raceResults.find((res) => res.competitorId === comp.id);
-      if (!r) continue;
+          // Score is 1 if better rank, 0 if worse rank, 0.5 if same rank
+          const score = competitorResult.rank12 < otherResult.rank12
+            ? 1
+            : competitorResult.rank12 > otherResult.rank12
+            ? 0
+            : 0.5;
 
-      // Store the new TS rating
-      comp.mu = u.newRating.mu;
-      comp.sigma = u.newRating.sigma;
+          scores.push(score);
+        }
 
-      // Get the initial position
-      const initialPos = initialPositions[comp.id];
-      if (initialPos === undefined) continue;
+        try {
+          // Update the competitor's rating
+          await this.competitorsService.updateRatings(competitor.id, opponents.map((o, i) => ({
+            id: o.id,
+            score: scores[i],
+          })));
 
-      // Calculate average positions for this competitor
-      comp.avgRank12 = comp.avgRank12 + (initialPos - comp.avgRank12) / (comp.raceCount + 1);
+          // Update other stats
+          const initialPos = competitorResult.rank12;
+          competitor.avgRank12 = competitor.avgRank12 + (initialPos - competitor.avgRank12) / (competitor.raceCount + 1);
+          competitor.raceCount++;
+          competitor.lastRaceDate = new Date();
 
-      // Increment raceCount
-      comp.raceCount++;
+          // Update win streak
+          if (competitorResult.rank12 === 1) {
+            competitor.winStreak++;
+          } else {
+            competitor.winStreak = 0;
+          }
 
-      // Update win streak
-      if (comp.rank === 1) {
-        comp.winStreak++;
-      } else {
-        comp.winStreak = 0;
+          // Update the competitor
+          await this.competitorsService.update(competitor.id, {
+            ...competitor,
+            characterVariantId: competitor.characterVariant ? competitor.characterVariant.id : null,
+          });
+        } catch (error) {
+          console.error(`Error updating competitor ${competitor.id}:`, error);
+          // Continue with other competitors even if one fails
+        }
       }
-
-      // Update lastRaceDate
-      comp.lastRaceDate = new Date();
-
-      // Update the competitor
-      // Note: this is a partial update, so we don't need to pass all fields
-      await this.competitorsService.update(comp.id, {
-        ...comp,
-        characterVariantId: comp.characterVariant ? comp.characterVariant.id : null,
-      });
+    } catch (error) {
+      console.error('Error in updateCompetitorsRating:', error);
+      throw new BadRequestException('Error updating competitor ratings: ' + error.message);
     }
   }
 }

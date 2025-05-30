@@ -15,5 +15,6 @@ export const typeOrmAsyncConfig: TypeOrmModuleAsyncOptions = {
     entities: [join(__dirname, '..', '**', '*.entity.{ts,js}')],
     migrations: [join(__dirname, 'src', 'migrations', '*.{js}')],
     synchronize: false,
+    migrationsRun: true,
   }),
 };

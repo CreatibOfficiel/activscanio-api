@@ -5,12 +5,14 @@ export const sanitizeCompetitor = (c: Competitor) => ({
   firstName: c.firstName,
   lastName: c.lastName,
   profilePictureUrl: c.profilePictureUrl,
-  mu: c.mu,
-  sigma: c.sigma,
-  rank: c.rank,
+  rating: c.rating,
+  rd: c.rd,
+  vol: c.vol,
   raceCount: c.raceCount,
   avgRank12: c.avgRank12,
   lastRaceDate: c.lastRaceDate,
+  conservativeScore: c.rating - 2 * c.rd,
+  provisional: c.raceCount < 5 || c.rd > 150,
 
   characterVariant: c.characterVariant
     ? {
