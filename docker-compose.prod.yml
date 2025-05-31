@@ -11,8 +11,7 @@ services:
 
   activscanio-api:
     container_name: activscanio-api
-    build:
-      context: .
+    image: activscanio-api:latest
     depends_on:
       - db
     environment:
