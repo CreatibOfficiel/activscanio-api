@@ -8,15 +8,16 @@ import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
 import { CharacterVariant } from 'src/character-variants/character-variant.entity';
-import { Glicko2Service } from './glicko2.service';
+import { Glicko2, Player } from 'glicko2';
 import { In, Repository } from 'typeorm';
+import { RaceResult } from '../races/race-result.entity';
+import { sanitizeCompetitor } from './utils/sanitize-competitor';
 
 @Injectable()
 export class CompetitorsService {
   constructor(
     @InjectRepository(Competitor)
     private competitorsRepo: Repository<Competitor>,
-    private glicko2Service: Glicko2Service,
   ) {}
 
   /* ░░░░░░░░░░░░   READ   ░░░░░░░░░░░░ */
@@ -85,48 +86,56 @@ export class CompetitorsService {
     });
   }
 
-  async updateRatings(
-    competitorId: string,
-    opponents: { id: string; score: number }[],
-  ): Promise<Competitor> {
-    try {
-      if (!competitorId || !opponents || !Array.isArray(opponents)) {
-        throw new BadRequestException('Invalid parameters');
+  async updateRatingsForRace(raceResults: RaceResult[]) {
+    // Get competitors
+    const ids = raceResults.map(r => r.competitorId);
+    const competitors = await this.competitorsRepo.findBy({ id: In(ids) });
+
+    // Initialize Glicko-2
+    const g2 = new Glicko2({ tau: 0.5, rating: 1500, rd: 350, vol: 0.06 });
+
+    // Create players
+    const players = new Map<string, Player>();
+    competitors.forEach(c =>
+      players.set(c.id, g2.makePlayer(c.rating, c.rd, c.vol)),
+    );
+
+    // Create all pairs (scores 1 / 0 / 0.5)
+    const ranked = raceResults
+      .map(r => ({ ...r, player: players.get(r.competitorId)! }))
+      .sort((a, b) => a.rank12 - b.rank12);
+
+    const matches: [Player, Player, number][] = [];
+    for (let i = 0; i < ranked.length; i++) {
+      for (let j = i + 1; j < ranked.length; j++) {
+        const score = ranked[i].rank12 === ranked[j].rank12 ? 0.5 : 1;
+        matches.push([ranked[i].player, ranked[j].player, score]);
       }
-
-      return await this.competitorsRepo.manager.transaction(async (em) => {
-        const competitor = await em.findOne(Competitor, {
-          where: { id: competitorId },
-        });
-        if (!competitor) throw new NotFoundException('Competitor not found');
-
-        const opponentIds = opponents.map(o => o.id);
-        const opponentEntities = await em.find(Competitor, {
-          where: { id: In(opponentIds) },
-        });
-
-        if (opponentEntities.length !== opponents.length) {
-          throw new BadRequestException('Some opponents were not found');
-        }
-
-        try {
-          const newRating = this.glicko2Service.calculateNewRating(
-            competitor,
-            opponentEntities,
-            opponents.map(o => o.score),
-          );
-
-          Object.assign(competitor, newRating);
-          return await em.save(competitor);
-        } catch (error) {
-          console.error('Error calculating new rating:', error);
-          throw new BadRequestException('Error calculating new rating: ' + error.message);
-        }
-      });
-    } catch (error) {
-      console.error('Error in updateRatings:', error);
-      throw error;
     }
+
+    // Update ratings
+    g2.updateRatings(matches);
+
+    // Persist in a transaction
+    await this.competitorsRepo.manager.transaction(async em => {
+      for (const c of competitors) {
+        const p = players.get(c.id)!;
+        Object.assign(c, {
+          rating: p.getRating(),
+          rd: p.getRd(),
+          vol: p.getVol(),
+          conservativeScore: p.getRating() - 2 * p.getRd(),
+          raceCount: c.raceCount + 1,
+          lastRaceDate: new Date(),
+          avgRank12:
+            c.avgRank12 + (ranked.find(r => r.competitorId === c.id)!.rank12 - c.avgRank12) / (c.raceCount + 1),
+        });
+        await em.save(c);
+      }
+    });
+
+    // Return sanitized competitors
+    return competitors.map(sanitizeCompetitor);
   }
 
   /* ░░░░░░░░░░░░   HELPERS link / unlink   ░░░░░░░░░░░░ */
