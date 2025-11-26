@@ -70,6 +70,9 @@ export class BettingWeek {
   @Column({ type: 'timestamptz', nullable: true })
   finalizedAt: Date;
 
+  @Column({ nullable: true })
+  seasonArchiveId: string;
+
   @OneToMany(() => Bet, (bet) => bet.bettingWeek)
   bets: Bet[];
 

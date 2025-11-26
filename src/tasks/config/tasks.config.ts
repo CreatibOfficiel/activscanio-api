@@ -50,16 +50,28 @@ export const BETTING_CRON_SCHEDULES = {
   RECALCULATE_RANKINGS: '0 58 23 * * 0',
 
   /**
-   * Reset monthly stats (ELO + race counts)
-   * 1st of every month at 00:00 UTC
+   * Archive previous season (BEFORE reset)
+   * 1st of every month at 00:01 UTC
    */
-  RESET_MONTHLY_STATS: '0 0 0 1 * *',
+  ARCHIVE_SEASON: '0 1 0 1 * *',
 
   /**
-   * Archive monthly stats (save snapshot before reset)
-   * 1st of every month at 00:05 UTC (after reset)
+   * Archive monthly stats (save ELO snapshot BEFORE reset)
+   * 1st of every month at 00:02 UTC
    */
-  ARCHIVE_MONTHLY_STATS: '0 5 0 1 * *',
+  ARCHIVE_MONTHLY_STATS: '0 2 0 1 * *',
+
+  /**
+   * Reset boost availability for all users
+   * 1st of every month at 00:03 UTC
+   */
+  RESET_BOOST_AVAILABILITY: '0 3 0 1 * *',
+
+  /**
+   * Reset monthly stats (ELO + race counts)
+   * 1st of every month at 00:05 UTC (AFTER archiving)
+   */
+  RESET_MONTHLY_STATS: '0 5 0 1 * *',
 };
 
 /**
@@ -76,6 +88,8 @@ export const TASK_EXECUTION_CONFIG = {
     closeWeek: true,
     finalizeWeek: true,
     recalculateRankings: true,
+    archiveSeason: true,
+    resetBoostAvailability: true,
     resetMonthlyStats: true,
     archiveMonthlyStats: true,
   },
@@ -104,8 +118,10 @@ export const TASK_DESCRIPTIONS = {
   closeWeek: 'Close betting week (Sunday 23:50)',
   finalizeWeek: 'Finalize betting week and calculate points (Sunday 23:55)',
   recalculateRankings: 'Recalculate monthly rankings (Sunday 23:58)',
-  resetMonthlyStats: 'Reset monthly ELO and race counts (1st 00:00)',
-  archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:05)',
+  archiveSeason: 'Archive previous season (1st 00:01)',
+  resetBoostAvailability: 'Reset boost availability for all users (1st 00:02)',
+  resetMonthlyStats: 'Reset monthly ELO and race counts (1st 00:05)',
+  archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:10)',
 };
 
 /**

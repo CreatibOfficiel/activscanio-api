@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { typeOrmAsyncConfig } from './config/typeorm.config';
 
 import { AppController } from './app.controller';
@@ -20,6 +22,8 @@ import { CharacterVariantsModule } from './character-variants/character-variants
 import { UsersModule } from './users/users.module';
 import { BettingModule } from './betting/betting.module';
 import { TasksModule } from './tasks/tasks.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
+import { SeasonsModule } from './seasons/seasons.module';
 
 @Module({
   imports: [
@@ -29,6 +33,13 @@ import { TasksModule } from './tasks/tasks.module';
     TypeOrmModule.forRootAsync(typeOrmAsyncConfig),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
+    // Rate limiting: 100 requests per minute per IP
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds
+        limit: 100, // 100 requests
+      },
+    ]),
     CompetitorsModule,
     RacesModule,
     RatingModule,
@@ -41,8 +52,18 @@ import { TasksModule } from './tasks/tasks.module';
     UsersModule,
     BettingModule,
     TasksModule,
+    OnboardingModule,
+    SeasonsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, OpenAIService],
+  providers: [
+    AppService,
+    OpenAIService,
+    // Apply rate limiting globally
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

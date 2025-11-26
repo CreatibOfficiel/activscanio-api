@@ -3,14 +3,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TasksService } from './tasks.service';
 import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
+import { User } from '../users/user.entity';
 import { BettingModule } from '../betting/betting.module';
 import { CompetitorsModule } from '../competitors/competitors.module';
+import { SeasonsModule } from '../seasons/seasons.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Competitor, CompetitorMonthlyStats]),
+    TypeOrmModule.forFeature([Competitor, CompetitorMonthlyStats, User]),
     BettingModule,
     CompetitorsModule,
+    SeasonsModule,
   ],
   providers: [TasksService],
   exports: [TasksService],

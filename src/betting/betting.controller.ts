@@ -6,7 +6,16 @@ import {
   Param,
   Query,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { BettingService } from './betting.service';
 import { PlaceBetDto } from './dto/place-bet.dto';
 import { CreateBettingWeekDto } from './dto/create-betting-week.dto';
@@ -14,17 +23,41 @@ import { QueryBettingDto } from './dto/query-betting.dto';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { UsersService } from '../users/users.service';
+import { OddsCalculatorService } from './services/odds-calculator.service';
+import { RankingsService } from './services/rankings.service';
 
+@ApiTags('betting')
+@ApiBearerAuth()
 @Controller('betting')
 @UseGuards(ClerkGuard)
 export class BettingController {
-  constructor(private readonly bettingService: BettingService) {}
+  constructor(
+    private readonly bettingService: BettingService,
+    private readonly usersService: UsersService,
+    private readonly oddsCalculatorService: OddsCalculatorService,
+    private readonly rankingsService: RankingsService,
+  ) {}
+
+  /**
+   * Helper method to get userId from clerkId
+   */
+  private async getUserIdFromClerkId(clerkId: string): Promise<string> {
+    const user = await this.usersService.findByClerkId(clerkId);
+    if (!user) {
+      throw new NotFoundException(`User with clerkId ${clerkId} not found`);
+    }
+    return user.id;
+  }
 
   /**
    * Get current open week
    */
   @Public()
   @Get('current-week')
+  @ApiOperation({ summary: 'Get the current open betting week' })
+  @ApiResponse({ status: 200, description: 'Current open week details' })
+  @ApiResponse({ status: 404, description: 'No open week found' })
   async getCurrentWeek() {
     return await this.bettingService.getCurrentWeek();
   }
@@ -34,6 +67,10 @@ export class BettingController {
    */
   @Public()
   @Get('weeks')
+  @ApiOperation({ summary: 'Get all betting weeks with optional filters' })
+  @ApiQuery({ name: 'month', required: false, description: 'Filter by month (1-12)', example: '1' })
+  @ApiQuery({ name: 'year', required: false, description: 'Filter by year', example: '2024' })
+  @ApiResponse({ status: 200, description: 'List of betting weeks' })
   async getWeeks(@Query() query: QueryBettingDto) {
     return await this.bettingService.getWeeks(query.month, query.year);
   }
@@ -43,6 +80,10 @@ export class BettingController {
    */
   @Public()
   @Get('weeks/:weekId')
+  @ApiOperation({ summary: 'Get a specific betting week by ID' })
+  @ApiParam({ name: 'weekId', description: 'Betting week UUID' })
+  @ApiResponse({ status: 200, description: 'Betting week details' })
+  @ApiResponse({ status: 404, description: 'Week not found' })
   async getWeek(@Param('weekId') weekId: string) {
     return await this.bettingService.getWeekById(weekId);
   }
@@ -52,25 +93,35 @@ export class BettingController {
    */
   @Public()
   @Get('weeks/:weekId/odds')
+  @ApiOperation({ summary: 'Get current betting odds for a week' })
+  @ApiParam({ name: 'weekId', description: 'Betting week UUID' })
+  @ApiResponse({ status: 200, description: 'Current odds for all competitors' })
+  @ApiResponse({ status: 404, description: 'Week not found' })
   async getOdds(@Param('weekId') weekId: string) {
     return await this.bettingService.getCurrentOdds(weekId);
   }
 
   /**
-   * Get eligible competitors for a week (has at least 1 race)
-   * This will be implemented in OddsCalculatorService
+   * Get eligible competitors for a week (has at least MIN_RACES_THIS_WEEK races)
    */
   @Public()
   @Get('weeks/:weekId/eligible-competitors')
+  @ApiOperation({ summary: 'Get eligible competitors for a week' })
+  @ApiParam({ name: 'weekId', description: 'Betting week UUID' })
+  @ApiResponse({ status: 200, description: 'List of eligible competitors with stats' })
+  @ApiResponse({ status: 404, description: 'Betting week not found' })
   async getEligibleCompetitors(@Param('weekId') weekId: string) {
-    // TODO: Implement in OddsCalculatorService
-    return { message: 'Not implemented yet' };
+    return await this.oddsCalculatorService.getEligibleCompetitors(weekId);
   }
 
   /**
    * Create a new betting week (admin only for now)
    */
   @Post('weeks')
+  @ApiOperation({ summary: 'Create a new betting week (admin only)' })
+  @ApiResponse({ status: 201, description: 'Betting week created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid request data' })
+  @ApiResponse({ status: 409, description: 'Betting week already exists' })
   async createWeek(@Body() createWeekDto: CreateBettingWeekDto) {
     return await this.bettingService.createWeek(createWeekDto);
   }
@@ -79,28 +130,48 @@ export class BettingController {
    * Place a bet
    */
   @Post('bets')
+  @ApiOperation({ summary: 'Place a bet on competitors for the current week' })
+  @ApiResponse({ status: 201, description: 'Bet placed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid bet data or week is closed' })
+  @ApiResponse({ status: 404, description: 'User or week not found' })
+  @ApiResponse({ status: 409, description: 'User already bet for this week' })
   async placeBet(
     @CurrentUser('clerkId') clerkId: string,
     @Body() placeBetDto: PlaceBetDto,
   ) {
-    // TODO: Get userId from clerkId via UsersService
-    // For now, using clerkId as userId (will fix after integration)
-    return await this.bettingService.placeBet(clerkId, placeBetDto);
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    return await this.bettingService.placeBet(userId, placeBetDto);
   }
 
   /**
    * Get my bets
    */
   @Get('bets/my-bets')
+  @ApiOperation({ summary: 'Get all my bets or filter by week' })
+  @ApiQuery({ name: 'weekId', required: false, description: 'Filter by betting week UUID' })
+  @ApiResponse({ status: 200, description: 'User bets' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   async getMyBets(
     @CurrentUser('clerkId') clerkId: string,
     @Query('weekId') weekId?: string,
   ) {
-    // TODO: Get userId from clerkId
+    const userId = await this.getUserIdFromClerkId(clerkId);
     if (weekId) {
-      return await this.bettingService.getUserBet(clerkId, weekId);
+      return await this.bettingService.getUserBet(userId, weekId);
     }
-    return await this.bettingService.getUserBets(clerkId);
+    return await this.bettingService.getUserBets(userId);
+  }
+
+  /**
+   * Check if user can use boost this month
+   */
+  @Get('boost-availability')
+  @ApiOperation({ summary: 'Check if user can use boost multiplier this month' })
+  @ApiResponse({ status: 200, description: 'Boost availability status' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getBoostAvailability(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    return await this.bettingService.getBoostAvailability(userId);
   }
 
   /**
@@ -108,6 +179,10 @@ export class BettingController {
    */
   @Public()
   @Get('weeks/:weekId/results')
+  @ApiOperation({ summary: 'Get betting results for a finalized week' })
+  @ApiParam({ name: 'weekId', description: 'Betting week UUID' })
+  @ApiResponse({ status: 200, description: 'Week results with all bets and points' })
+  @ApiResponse({ status: 404, description: 'Week not found' })
   async getResults(@Param('weekId') weekId: string) {
     const bets = await this.bettingService.getWeekBets(weekId);
     const week = await this.bettingService.getWeekById(weekId);
@@ -125,12 +200,14 @@ export class BettingController {
 
   /**
    * Get monthly rankings
-   * This will be implemented in a separate RankingsService
    */
   @Public()
   @Get('rankings/monthly')
+  @ApiOperation({ summary: 'Get monthly rankings for bettors' })
+  @ApiQuery({ name: 'month', required: false, description: 'Filter by month (1-12)', example: '1' })
+  @ApiQuery({ name: 'year', required: false, description: 'Filter by year', example: '2024' })
+  @ApiResponse({ status: 200, description: 'Monthly rankings with stats' })
   async getMonthlyRankings(@Query() query: QueryBettingDto) {
-    // TODO: Implement in RankingsService
-    return { message: 'Not implemented yet' };
+    return await this.rankingsService.getMonthlyRankings(query.month, query.year);
   }
 }

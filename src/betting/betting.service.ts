@@ -12,6 +12,7 @@ import { BetPick, BetPosition } from './entities/bet-pick.entity';
 import { CreateBettingWeekDto } from './dto/create-betting-week.dto';
 import { PlaceBetDto } from './dto/place-bet.dto';
 import { CompetitorOdds } from './entities/competitor-odds.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class BettingService {
@@ -24,6 +25,8 @@ export class BettingService {
     private readonly betPickRepository: Repository<BetPick>,
     @InjectRepository(CompetitorOdds)
     private readonly competitorOddsRepository: Repository<CompetitorOdds>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   /**
@@ -158,6 +161,27 @@ export class BettingService {
       throw new BadRequestException('You can only boost one competitor');
     }
 
+    // Check monthly boost limit
+    if (boostCount === 1) {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      const currentMonth = new Date().getMonth() + 1; // getMonth() returns 0-11, we need 1-12
+      const currentYear = new Date().getFullYear();
+
+      if (
+        user.lastBoostUsedMonth === currentMonth &&
+        user.lastBoostUsedYear === currentYear
+      ) {
+        throw new BadRequestException(
+          'You have already used your monthly boost. Boost resets at the start of each month.',
+        );
+      }
+    }
+
     // Get current odds for each competitor
     const oddsPromises = competitorIds.map((competitorId) =>
       this.competitorOddsRepository
@@ -209,6 +233,14 @@ export class BettingService {
 
     await this.betPickRepository.save(picks);
 
+    // Update boost usage if boost was applied
+    if (boostCount === 1) {
+      await this.userRepository.update(userId, {
+        lastBoostUsedMonth: new Date().getMonth() + 1,
+        lastBoostUsedYear: new Date().getFullYear(),
+      });
+    }
+
     // Reload bet with picks
     const reloadedBet = await this.betRepository.findOne({
       where: { id: bet.id },
@@ -251,5 +283,44 @@ export class BettingService {
       relations: ['user', 'picks', 'picks.competitor'],
       order: { placedAt: 'ASC' },
     });
+  }
+
+  /**
+   * Check if user can use boost this month
+   */
+  async getBoostAvailability(userId: string): Promise<{
+    canUseBoost: boolean;
+    lastUsed: { month: number; year: number } | null;
+    resetsOn: Date;
+  }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+
+    const canUseBoost = !(
+      user.lastBoostUsedMonth === currentMonth &&
+      user.lastBoostUsedYear === currentYear
+    );
+
+    const lastUsed = user.lastBoostUsedMonth
+      ? {
+          month: user.lastBoostUsedMonth,
+          year: user.lastBoostUsedYear!,
+        }
+      : null;
+
+    // Calculate first day of next month
+    const resetsOn = new Date(currentYear, currentMonth, 1); // Month is 0-indexed in Date constructor
+
+    return {
+      canUseBoost,
+      lastUsed,
+      resetsOn,
+    };
   }
 }

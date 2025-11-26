@@ -398,4 +398,85 @@ export class OddsCalculatorService {
       metadata: entity.metadata,
     }));
   }
+
+  /**
+   * Get eligible competitors for a betting week
+   *
+   * Returns competitors who have at least MIN_RACES_THIS_WEEK races
+   * in the specified betting week.
+   *
+   * @param weekId - Betting week UUID
+   * @returns List of eligible competitors with their stats
+   */
+  async getEligibleCompetitors(weekId: string): Promise<{
+    weekId: string;
+    eligibleCount: number;
+    totalCount: number;
+    minRacesRequired: number;
+    competitors: Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      rating: number;
+      rd: number;
+      racesThisWeek: number;
+    }>;
+  }> {
+    // Fetch betting week
+    const week = await this.bettingWeekRepository.findOne({
+      where: { id: weekId },
+    });
+
+    if (!week) {
+      throw new Error(`Betting week ${weekId} not found`);
+    }
+
+    // Get all competitors
+    const allCompetitors = await this.competitorRepository.find();
+
+    // Check eligibility for each competitor
+    const competitorsWithRaceCount = await Promise.all(
+      allCompetitors.map(async (competitor) => {
+        const racesThisWeek = await this.raceResultRepository
+          .createQueryBuilder('result')
+          .innerJoin('result.race', 'race')
+          .where('result.competitorId = :competitorId', {
+            competitorId: competitor.id,
+          })
+          .andWhere('race.date >= :startDate', { startDate: week.startDate })
+          .andWhere('race.date <= :endDate', { endDate: week.endDate })
+          .getCount();
+
+        return {
+          competitor,
+          racesThisWeek,
+          isEligible: racesThisWeek >= ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK,
+        };
+      }),
+    );
+
+    // Filter eligible competitors
+    const eligibleCompetitors = competitorsWithRaceCount
+      .filter((c) => c.isEligible)
+      .map((c) => ({
+        id: c.competitor.id,
+        firstName: c.competitor.firstName,
+        lastName: c.competitor.lastName,
+        rating: c.competitor.rating,
+        rd: c.competitor.rd,
+        racesThisWeek: c.racesThisWeek,
+      }));
+
+    this.logger.log(
+      `Found ${eligibleCompetitors.length}/${allCompetitors.length} eligible competitors for week ${weekId}`,
+    );
+
+    return {
+      weekId,
+      eligibleCount: eligibleCompetitors.length,
+      totalCount: allCompetitors.length,
+      minRacesRequired: ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK,
+      competitors: eligibleCompetitors,
+    };
+  }
 }

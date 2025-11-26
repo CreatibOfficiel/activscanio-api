@@ -1,0 +1,206 @@
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+  Logger,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { User, UserRole } from '../users/user.entity';
+import { Competitor } from '../competitors/competitor.entity';
+import { CharacterVariant } from '../character-variants/character-variant.entity';
+import { SearchCompetitorDto } from './dto/search-competitor.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
+
+@Injectable()
+export class OnboardingService {
+  private readonly logger = new Logger(OnboardingService.name);
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Competitor)
+    private readonly competitorRepository: Repository<Competitor>,
+    @InjectRepository(CharacterVariant)
+    private readonly characterVariantRepository: Repository<CharacterVariant>,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  /**
+   * Search competitors by name (firstName or lastName)
+   */
+  async searchCompetitors(query: string): Promise<Competitor[]> {
+    return await this.competitorRepository
+      .createQueryBuilder('c')
+      .where(
+        'LOWER(c.firstName || \' \' || c.lastName) LIKE LOWER(:query)',
+        { query: `%${query}%` },
+      )
+      .orWhere('LOWER(c.firstName) LIKE LOWER(:query)', {
+        query: `%${query}%`,
+      })
+      .orWhere('LOWER(c.lastName) LIKE LOWER(:query)', { query: `%${query}%` })
+      .leftJoinAndSelect('c.characterVariant', 'variant')
+      .leftJoinAndSelect('variant.baseCharacter', 'base')
+      .limit(10)
+      .getMany();
+  }
+
+  /**
+   * Complete onboarding for a user
+   * 1. Create or link competitor
+   * 2. Link character variant to competitor
+   * 3. Update user role and onboarding flag
+   * Uses transaction for atomicity
+   */
+  async completeOnboarding(
+    userId: string,
+    dto: CompleteOnboardingDto,
+  ): Promise<User> {
+    this.logger.log(`Starting onboarding for user ${userId}`);
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const user = await queryRunner.manager.findOne(User, {
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.hasCompletedOnboarding) {
+        throw new BadRequestException('User has already completed onboarding');
+      }
+
+      let competitorId: string;
+
+      // Option 1: Link to existing competitor
+      if (dto.existingCompetitorId) {
+        const competitor = await queryRunner.manager.findOne(Competitor, {
+          where: { id: dto.existingCompetitorId },
+        });
+
+        if (!competitor) {
+          throw new NotFoundException(
+            `Competitor with ID ${dto.existingCompetitorId} not found`,
+          );
+        }
+
+        // Check if competitor is already linked to another user
+        const existingUser = await queryRunner.manager.findOne(User, {
+          where: { competitorId: dto.existingCompetitorId },
+        });
+
+        if (existingUser && existingUser.id !== userId) {
+          throw new ConflictException(
+            `Competitor "${competitor.firstName} ${competitor.lastName}" is already linked to another user`,
+          );
+        }
+
+        competitorId = dto.existingCompetitorId;
+        this.logger.log(`Linking user to existing competitor ${competitorId}`);
+      }
+      // Option 2: Create new competitor
+      else if (dto.newCompetitor) {
+        // Validate name input
+        const firstName = dto.newCompetitor.firstName.trim();
+        const lastName = dto.newCompetitor.lastName.trim();
+
+        if (!firstName || !lastName) {
+          throw new BadRequestException(
+            'First name and last name cannot be empty',
+          );
+        }
+
+        const newCompetitor = queryRunner.manager.create(Competitor, {
+          firstName,
+          lastName,
+          profilePictureUrl: dto.newCompetitor.profilePictureUrl,
+        });
+
+        const savedCompetitor = await queryRunner.manager.save(newCompetitor);
+        competitorId = savedCompetitor.id;
+        this.logger.log(
+          `Created new competitor ${competitorId}: ${firstName} ${lastName}`,
+        );
+      } else {
+        throw new BadRequestException(
+          'Must provide either existingCompetitorId or newCompetitor',
+        );
+      }
+
+      // Verify character variant exists and is not already linked
+      const characterVariant = await queryRunner.manager.findOne(
+        CharacterVariant,
+        {
+          where: { id: dto.characterVariantId },
+          relations: ['competitor', 'baseCharacter'],
+        },
+      );
+
+      if (!characterVariant) {
+        throw new NotFoundException(
+          `Character variant with ID ${dto.characterVariantId} not found`,
+        );
+      }
+
+      // Check if character variant is already linked to another competitor
+      if (
+        characterVariant.competitor &&
+        characterVariant.competitor.id !== competitorId
+      ) {
+        throw new ConflictException(
+          `Character variant "${characterVariant.baseCharacter.name} - ${characterVariant.label}" is already linked to another competitor`,
+        );
+      }
+
+      // Link character variant to competitor
+      await queryRunner.manager.update(Competitor, competitorId, {
+        characterVariant: characterVariant,
+      });
+
+      // Update user
+      user.competitorId = competitorId;
+      user.role = UserRole.BOTH; // User is now both bettor and competitor
+      user.hasCompletedOnboarding = true;
+
+      const updatedUser = await queryRunner.manager.save(user);
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Onboarding completed successfully for user ${userId} -> competitor ${competitorId}`,
+      );
+
+      return updatedUser;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(
+        `Onboarding failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Skip onboarding (mark as completed without linking)
+   */
+  async skipOnboarding(userId: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    user.hasCompletedOnboarding = true;
+    return await this.userRepository.save(user);
+  }
+}

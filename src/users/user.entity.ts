@@ -50,6 +50,15 @@ export class User {
   @Column({ nullable: true })
   competitorId: string;
 
+  @Column({ type: 'int', nullable: true })
+  lastBoostUsedMonth: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  lastBoostUsedYear: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  hasCompletedOnboarding: boolean;
+
   @OneToOne(() => Competitor, { nullable: true, eager: false })
   @JoinColumn({ name: 'competitorId' })
   competitor: Competitor;

@@ -30,6 +30,8 @@ import { CompetitorsService } from '../competitors/competitors.service';
 import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
+import { User } from '../users/user.entity';
+import { SeasonsService } from '../seasons/seasons.service';
 import {
   BETTING_CRON_SCHEDULES,
   TASK_EXECUTION_CONFIG,
@@ -45,10 +47,13 @@ export class TasksService {
     private readonly weekManagerService: WeekManagerService,
     private readonly bettingFinalizerService: BettingFinalizerService,
     private readonly competitorsService: CompetitorsService,
+    private readonly seasonsService: SeasonsService,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
     @InjectRepository(CompetitorMonthlyStats)
     private readonly competitorMonthlyStatsRepository: Repository<CompetitorMonthlyStats>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   /* ==================== WEEKLY TASKS ==================== */
@@ -246,8 +251,78 @@ export class TasksService {
   /* ==================== MONTHLY TASKS ==================== */
 
   /**
+   * Archive previous season
+   * Runs on 1st of every month at 00:01 UTC (BEFORE reset)
+   */
+  @Cron(BETTING_CRON_SCHEDULES.ARCHIVE_SEASON, {
+    name: 'archive-season',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleArchiveSeason(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.archiveSeason) {
+      this.logger.warn('Task "archive-season" is disabled');
+      return;
+    }
+
+    this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.archiveSeason}`);
+
+    try {
+      const now = new Date();
+      const previousMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+      const year =
+        now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+
+      await this.seasonsService.archiveSeason(previousMonth, year);
+      this.logger.log(
+        `✅ Season ${previousMonth}/${year} archived successfully`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to archive season: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * Reset boost availability for all users
+   * Runs on 1st of every month at 00:02 UTC
+   */
+  @Cron(BETTING_CRON_SCHEDULES.RESET_BOOST_AVAILABILITY, {
+    name: 'reset-boost-availability',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleResetBoostAvailability(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.resetBoostAvailability) {
+      this.logger.warn('Task "reset-boost-availability" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.resetBoostAvailability}`,
+    );
+
+    try {
+      await this.userRepository.update(
+        {},
+        {
+          lastBoostUsedMonth: null,
+          lastBoostUsedYear: null,
+        },
+      );
+
+      this.logger.log('✅ Boost availability reset for all users');
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to reset boost availability: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
    * Reset monthly stats (ELO + race counts)
-   * Runs on 1st of every month at 00:00 UTC
+   * Runs on 1st of every month at 00:05 UTC (AFTER archiving)
    */
   @Cron(BETTING_CRON_SCHEDULES.RESET_MONTHLY_STATS, {
     name: 'reset-monthly-stats',

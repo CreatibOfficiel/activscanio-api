@@ -11,6 +11,7 @@ import { CompetitorMonthlyStats } from './entities/competitor-monthly-stats.enti
 import { OddsCalculatorService } from './services/odds-calculator.service';
 import { WeekManagerService } from './services/week-manager.service';
 import { BettingFinalizerService } from './services/betting-finalizer.service';
+import { RankingsService } from './services/rankings.service';
 import { RaceCreatedListener } from './listeners/race-created.listener';
 import { BettingWeekRepository } from './repositories/betting-week.repository';
 import { BetRepository } from './repositories/bet.repository';
@@ -21,6 +22,8 @@ import { CompetitorMonthlyStatsRepository } from './repositories/competitor-mont
 import { Competitor } from '../competitors/competitor.entity';
 import { RaceEvent } from '../races/race-event.entity';
 import { RaceResult } from '../races/race-result.entity';
+import { User } from '../users/user.entity';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -34,7 +37,9 @@ import { RaceResult } from '../races/race-result.entity';
       Competitor,
       RaceEvent,
       RaceResult,
+      User,
     ]),
+    UsersModule,
   ],
   controllers: [BettingController],
   providers: [
@@ -42,6 +47,7 @@ import { RaceResult } from '../races/race-result.entity';
     OddsCalculatorService,
     WeekManagerService,
     BettingFinalizerService,
+    RankingsService,
     RaceCreatedListener,
     BettingWeekRepository,
     BetRepository,
@@ -55,6 +61,7 @@ import { RaceResult } from '../races/race-result.entity';
     OddsCalculatorService,
     WeekManagerService,
     BettingFinalizerService,
+    RankingsService,
     BettingWeekRepository,
     BetRepository,
     BetPickRepository,
