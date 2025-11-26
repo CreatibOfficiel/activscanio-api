@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Query, Param, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Query, Param, Body, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { RacesService } from './races.service';
 import { CreateRaceDto } from './dtos/create-race.dto';
 
 @Controller('races')
 export class RacesController {
+  private readonly logger = new Logger(RacesController.name);
+
   constructor(private racesService: RacesService) {}
 
   // POST /races
@@ -13,7 +15,7 @@ export class RacesController {
       const race = await this.racesService.createRace(dto);
       return race;
     } catch (error) {
-      console.error('Error creating race:', error);
+      this.logger.error('Error creating race:', error.stack);
       throw new HttpException(
         error.message || 'Error creating race',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -28,7 +30,7 @@ export class RacesController {
       const isRecent = recent === 'true';
       return await this.racesService.findAll(isRecent);
     } catch (error) {
-      console.error('Error finding races:', error);
+      this.logger.error('Error finding races:', error.stack);
       throw new HttpException(
         error.message || 'Error finding races',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -42,7 +44,7 @@ export class RacesController {
     try {
       return await this.racesService.findSimilarRaces(raceId);
     } catch (error) {
-      console.error('Error finding similar races:', error);
+      this.logger.error('Error finding similar races:', error.stack);
       throw new HttpException(
         error.message || 'Error finding similar races',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
@@ -56,7 +58,7 @@ export class RacesController {
     try {
       return await this.racesService.findOne(raceId);
     } catch (error) {
-      console.error('Error finding race:', error);
+      this.logger.error('Error finding race:', error.stack);
       throw new HttpException(
         error.message || 'Error finding race',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,

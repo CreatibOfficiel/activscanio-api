@@ -1,0 +1,255 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { BettingWeek, BettingWeekStatus } from './entities/betting-week.entity';
+import { Bet } from './entities/bet.entity';
+import { BetPick, BetPosition } from './entities/bet-pick.entity';
+import { CreateBettingWeekDto } from './dto/create-betting-week.dto';
+import { PlaceBetDto } from './dto/place-bet.dto';
+import { CompetitorOdds } from './entities/competitor-odds.entity';
+
+@Injectable()
+export class BettingService {
+  constructor(
+    @InjectRepository(BettingWeek)
+    private readonly bettingWeekRepository: Repository<BettingWeek>,
+    @InjectRepository(Bet)
+    private readonly betRepository: Repository<Bet>,
+    @InjectRepository(BetPick)
+    private readonly betPickRepository: Repository<BetPick>,
+    @InjectRepository(CompetitorOdds)
+    private readonly competitorOddsRepository: Repository<CompetitorOdds>,
+  ) {}
+
+  /**
+   * Get current week (status = open)
+   */
+  async getCurrentWeek(): Promise<BettingWeek | null> {
+    const now = new Date();
+
+    return await this.bettingWeekRepository.findOne({
+      where: {
+        status: BettingWeekStatus.OPEN,
+        startDate: LessThanOrEqual(now),
+        endDate: MoreThanOrEqual(now),
+      },
+      relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
+    });
+  }
+
+  /**
+   * Create a new betting week
+   */
+  async createWeek(
+    createWeekDto: CreateBettingWeekDto,
+  ): Promise<BettingWeek> {
+    // Check if week already exists
+    const existing = await this.bettingWeekRepository.findOne({
+      where: {
+        year: createWeekDto.year,
+        weekNumber: createWeekDto.weekNumber,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Betting week ${createWeekDto.year}-W${createWeekDto.weekNumber} already exists`,
+      );
+    }
+
+    const week = this.bettingWeekRepository.create(createWeekDto);
+    return await this.bettingWeekRepository.save(week);
+  }
+
+  /**
+   * Get all weeks (optionally filter by month/year)
+   */
+  async getWeeks(month?: number, year?: number): Promise<BettingWeek[]> {
+    const where: any = {};
+
+    if (month) where.month = month;
+    if (year) where.year = year;
+
+    return await this.bettingWeekRepository.find({
+      where,
+      relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
+      order: { year: 'DESC', weekNumber: 'DESC' },
+    });
+  }
+
+  /**
+   * Get week by ID
+   */
+  async getWeekById(weekId: string): Promise<BettingWeek> {
+    const week = await this.bettingWeekRepository.findOne({
+      where: { id: weekId },
+      relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
+    });
+
+    if (!week) {
+      throw new NotFoundException(`Betting week with ID ${weekId} not found`);
+    }
+
+    return week;
+  }
+
+  /**
+   * Get current odds for a week
+   */
+  async getCurrentOdds(weekId: string): Promise<CompetitorOdds[]> {
+    const week = await this.getWeekById(weekId);
+
+    // Get latest odds for each competitor in this week
+    const odds = await this.competitorOddsRepository
+      .createQueryBuilder('odds')
+      .where('odds.bettingWeekId = :weekId', { weekId })
+      .distinctOn(['odds.competitorId'])
+      .orderBy('odds.competitorId')
+      .addOrderBy('odds.calculatedAt', 'DESC')
+      .leftJoinAndSelect('odds.competitor', 'competitor')
+      .getMany();
+
+    return odds;
+  }
+
+  /**
+   * Place a bet
+   */
+  async placeBet(userId: string, placeBetDto: PlaceBetDto): Promise<Bet> {
+    const week = await this.getWeekById(placeBetDto.bettingWeekId);
+
+    // Check if week is open
+    if (week.status !== BettingWeekStatus.OPEN) {
+      throw new BadRequestException('This betting week is closed');
+    }
+
+    // Check if user already placed a bet this week
+    const existingBet = await this.betRepository.findOne({
+      where: {
+        userId,
+        bettingWeekId: placeBetDto.bettingWeekId,
+      },
+    });
+
+    if (existingBet) {
+      throw new ConflictException('You already placed a bet for this week');
+    }
+
+    // Validate picks
+    if (placeBetDto.picks.length !== 3) {
+      throw new BadRequestException('You must select exactly 3 competitors');
+    }
+
+    // Check for duplicate competitors
+    const competitorIds = placeBetDto.picks.map((p) => p.competitorId);
+    const uniqueIds = new Set(competitorIds);
+    if (uniqueIds.size !== 3) {
+      throw new BadRequestException('You cannot select the same competitor twice');
+    }
+
+    // Check boost - only one competitor can have boost
+    const boostCount = placeBetDto.picks.filter((p) => p.hasBoost).length;
+    if (boostCount > 1) {
+      throw new BadRequestException('You can only boost one competitor');
+    }
+
+    // Get current odds for each competitor
+    const oddsPromises = competitorIds.map((competitorId) =>
+      this.competitorOddsRepository
+        .createQueryBuilder('odds')
+        .where('odds.competitorId = :competitorId', { competitorId })
+        .andWhere('odds.bettingWeekId = :weekId', {
+          weekId: placeBetDto.bettingWeekId,
+        })
+        .orderBy('odds.calculatedAt', 'DESC')
+        .getOne(),
+    );
+
+    const oddsArray = await Promise.all(oddsPromises);
+
+    // Check if all competitors have odds
+    if (oddsArray.some((odd) => !odd)) {
+      throw new BadRequestException(
+        'Some competitors do not have odds for this week',
+      );
+    }
+
+    // Create bet
+    const bet = this.betRepository.create({
+      userId,
+      bettingWeekId: placeBetDto.bettingWeekId,
+      placedAt: new Date(),
+    });
+
+    await this.betRepository.save(bet);
+
+    // Create bet picks
+    const positions: BetPosition[] = [
+      BetPosition.FIRST,
+      BetPosition.SECOND,
+      BetPosition.THIRD,
+    ];
+
+    const picks = placeBetDto.picks.map((pickDto, index) => {
+      const odd = oddsArray[index];
+
+      return this.betPickRepository.create({
+        betId: bet.id,
+        competitorId: pickDto.competitorId,
+        position: positions[index],
+        oddAtBet: odd!.odd, // Already checked that odd exists above
+        hasBoost: pickDto.hasBoost || false,
+      });
+    });
+
+    await this.betPickRepository.save(picks);
+
+    // Reload bet with picks
+    const reloadedBet = await this.betRepository.findOne({
+      where: { id: bet.id },
+      relations: ['picks', 'picks.competitor', 'bettingWeek'],
+    });
+
+    return reloadedBet!; // Bet was just created, must exist
+  }
+
+  /**
+   * Get user's bet for a specific week
+   */
+  async getUserBet(userId: string, weekId: string): Promise<Bet | null> {
+    return await this.betRepository.findOne({
+      where: {
+        userId,
+        bettingWeekId: weekId,
+      },
+      relations: ['picks', 'picks.competitor', 'bettingWeek'],
+    });
+  }
+
+  /**
+   * Get all user's bets
+   */
+  async getUserBets(userId: string): Promise<Bet[]> {
+    return await this.betRepository.find({
+      where: { userId },
+      relations: ['picks', 'picks.competitor', 'bettingWeek'],
+      order: { placedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Get all bets for a week
+   */
+  async getWeekBets(weekId: string): Promise<Bet[]> {
+    return await this.betRepository.find({
+      where: { bettingWeekId: weekId },
+      relations: ['user', 'picks', 'picks.competitor'],
+      order: { placedAt: 'ASC' },
+    });
+  }
+}

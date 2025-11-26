@@ -55,6 +55,14 @@ export class Competitor {
   @Column({ default: 0 })
   winStreak: number;
 
+  // Current month race count (reset monthly)
+  @Column({ default: 0 })
+  currentMonthRaceCount: number;
+
+  // Active this week flag (reset every Monday)
+  @Column({ default: false })
+  isActiveThisWeek: boolean;
+
   @OneToOne(
     () => CharacterVariant,
     (variant) => variant.competitor,

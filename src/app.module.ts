@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { typeOrmAsyncConfig } from './config/typeorm.config';
 
 import { AppController } from './app.controller';
@@ -15,6 +17,9 @@ import { OpenAIService } from './openai/openai.service';
 import { SeederModule } from './seeder/seeder.module';
 import { BaseCharactersModule } from './base-characters/base-characters.module';
 import { CharacterVariantsModule } from './character-variants/character-variants.module';
+import { UsersModule } from './users/users.module';
+import { BettingModule } from './betting/betting.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -22,6 +27,8 @@ import { CharacterVariantsModule } from './character-variants/character-variants
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync(typeOrmAsyncConfig),
+    ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     CompetitorsModule,
     RacesModule,
     RatingModule,
@@ -31,6 +38,9 @@ import { CharacterVariantsModule } from './character-variants/character-variants
     SeederModule,
     BaseCharactersModule,
     CharacterVariantsModule,
+    UsersModule,
+    BettingModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [AppService, OpenAIService],

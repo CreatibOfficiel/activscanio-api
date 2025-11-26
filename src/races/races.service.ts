@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { RaceEvent } from './race-event.entity';
 import { RaceResult } from './race-result.entity';
 import { CreateRaceDto } from './dtos/create-race.dto';
+import { RaceCreatedEvent } from './events';
+import { RaceEventRepository } from './repositories/race-event.repository';
+import {
+  RaceEventNotFoundException,
+  InvalidRaceDataException,
+} from '../common/exceptions';
 
 import { CompetitorsService } from '../competitors/competitors.service';
 
@@ -16,11 +21,12 @@ interface Opponent {
 
 @Injectable()
 export class RacesService {
-  constructor(
-    @InjectRepository(RaceEvent)
-    private raceRepo: Repository<RaceEvent>,
+  private readonly logger = new Logger(RacesService.name);
 
+  constructor(
+    private raceEventRepository: RaceEventRepository,
     private competitorsService: CompetitorsService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   // CREATE a new race
@@ -30,6 +36,10 @@ export class RacesService {
 
       const race = new RaceEvent();
       race.date = raceDate;
+
+      // Set month and year for filtering
+      race.month = raceDate.getMonth() + 1; // getMonth() returns 0-11
+      race.year = raceDate.getFullYear();
 
       const results = dto.results.map((r) => {
         const rr = new RaceResult();
@@ -41,32 +51,39 @@ export class RacesService {
 
       race.results = results;
 
-      const savedRace = await this.raceRepo.save(race);
+      const savedRace = await this.raceEventRepository.save(race);
 
       // Update competitors' Glicko-2 ratings
       try {
         await this.updateCompetitorsRating(savedRace.results);
       } catch (error) {
-        console.error('Error updating competitor ratings:', error);
+        this.logger.error('Error updating competitor ratings:', error.stack);
         // We still return the race even if rating update fails
       }
 
+      // Mark competitors as active this week
+      await this.markCompetitorsActive(savedRace.results);
+
+      // Emit race.created event for other modules to react
+      this.eventEmitter.emit(
+        'race.created',
+        new RaceCreatedEvent(savedRace, savedRace.bettingWeekId),
+      );
+      this.logger.log(`Race created event emitted for race ${savedRace.id}`);
+
       return savedRace;
     } catch (error) {
-      console.error('Error creating race:', error);
-      throw new BadRequestException('Error creating race: ' + error.message);
+      this.logger.error('Error creating race:', error.stack);
+      throw new InvalidRaceDataException(error.message);
     }
   }
 
   // GET /races/:raceId
   async findOne(raceId: string): Promise<RaceEvent> {
-    const race = await this.raceRepo.findOne({
-      where: { id: raceId },
-      relations: ['results'],
-    });
+    const race = await this.raceEventRepository.findOneWithResults(raceId);
 
     if (!race) {
-      throw new NotFoundException(`Race with ID ${raceId} not found`);
+      throw new RaceEventNotFoundException(raceId);
     }
 
     return race;
@@ -74,39 +91,20 @@ export class RacesService {
 
   // GET /races?recent=true
   async findAll(recent?: boolean): Promise<RaceEvent[]> {
-    const qb = this.raceRepo
-      .createQueryBuilder('r')
-      .leftJoinAndSelect('r.results', 'res')
-      .orderBy('r.date', 'DESC');
-
     if (recent) {
-      // For example: last 7 days, limit 20
-      const now = new Date();
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-      qb.where('r.date >= :minDate', { minDate: sevenDaysAgo });
-      qb.limit(20);
+      return this.raceEventRepository.findRecent(20, 7);
     }
 
-    return qb.getMany();
+    return this.raceEventRepository.findAllWithResults();
   }
 
   // GET /competitors/:competitorId/recent-races (via CompetitorsController)
   async getRecentRacesForCompetitor(competitorId: string): Promise<any[]> {
-    // Retrieve all races with results
-    const allRaces = await this.raceRepo.find({
-      relations: ['results'],
-      order: { date: 'DESC' },
-    });
-
-    // Filter where the competitor participated
-    const competitorRaces = allRaces
-      .filter((race) =>
-        race.results.some((r) => r.competitorId === competitorId),
-      )
-      .slice(0, 3); // last 3
+    // Use repository method to get races for competitor
+    const races = await this.raceEventRepository.findForCompetitor(competitorId, 3);
 
     // Extract info
-    return competitorRaces.map((race) => {
+    return races.map((race) => {
       const compResult = race.results.find(
         (r) => r.competitorId === competitorId,
       );
@@ -121,35 +119,7 @@ export class RacesService {
 
   // GET /races/:raceId/similar
   async findSimilarRaces(raceId: string): Promise<RaceEvent[]> {
-    // Reference race
-    const refRace = await this.raceRepo.findOne({
-      where: { id: raceId },
-      relations: ['results'],
-    });
-    if (!refRace) {
-      throw new NotFoundException(`Race with ID ${raceId} not found`);
-    }
-
-    // Extract competitor IDs
-    const refCompetitorIds = refRace.results.map((r) => r.competitorId).sort();
-
-    // Retrieve all
-    const allRaces = await this.raceRepo.find({
-      relations: ['results'],
-      order: { date: 'DESC' },
-    });
-
-    // Filter those with the same exact 4 competitor IDs
-    const races = allRaces.filter((race) => {
-      if (race.id === raceId) return false; // exclude same
-      const raceCompetitorIds = race.results.map((r) => r.competitorId).sort();
-      return (
-        JSON.stringify(raceCompetitorIds) === JSON.stringify(refCompetitorIds)
-      );
-    });
-
-    // Limit 3
-    return races.slice(0, 3);
+    return this.raceEventRepository.findSimilar(raceId, 3);
   }
 
   private async updateCompetitorsRating(
@@ -158,8 +128,29 @@ export class RacesService {
     try {
       await this.competitorsService.updateRatingsForRace(raceResults);
     } catch (error) {
-      console.error('Error in updateCompetitorsRating:', error);
-      throw new BadRequestException('Error updating competitor ratings: ' + error.message);
+      this.logger.error('Error in updateCompetitorsRating:', error.stack);
+      throw new InvalidRaceDataException(
+        `Error updating competitor ratings: ${error.message}`,
+      );
     }
   }
+
+  /**
+   * Mark competitors as active this week (for betting eligibility)
+   */
+  private async markCompetitorsActive(raceResults: RaceResult[]): Promise<void> {
+    try {
+      const competitorIds = [...new Set(raceResults.map((r) => r.competitorId))];
+
+      for (const competitorId of competitorIds) {
+        await this.competitorsService.markAsActiveThisWeek(competitorId);
+      }
+
+      this.logger.log(`Marked ${competitorIds.length} competitors as active this week`);
+    } catch (error) {
+      this.logger.error('Error marking competitors as active:', error.message);
+      // Don't throw - this is not critical
+    }
+  }
+
 }

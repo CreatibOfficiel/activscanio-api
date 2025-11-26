@@ -1,18 +1,20 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { seedBaseCharacters } from './seeds/character.seed';
 import { seedCompetitors } from './seeds/competitor.seed';
 
 @Injectable()
 export class SeederService implements OnModuleInit {
+  private readonly logger = new Logger(SeederService.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
   async onModuleInit() {
     if (process.env.SEED === 'true') {
-      console.log('🌱 Running seeders...');
+      this.logger.log('🌱 Running seeders...');
       await this.run();
     } else {
-      console.log('🚫 SEED DISABLED');
+      this.logger.log('🚫 SEED DISABLED');
     }
   }  
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
@@ -10,6 +10,7 @@ export interface ImageAnalysisRow {
 
 @Injectable()
 export class OpenAIService {
+  private readonly logger = new Logger(OpenAIService.name);
   private openai: OpenAI;
 
   constructor(private readonly config: ConfigService) {
@@ -45,7 +46,7 @@ export class OpenAIService {
     });
 
     const txt = resp.choices?.[0]?.message?.content ?? '';
-    console.log('OpenAI response:', txt);
+    this.logger.log('OpenAI response:', txt);
     const json = txt.match(/\[[\s\S]*]/);
     if (!json) throw new Error('JSON absent de la réponse OpenAI');
 

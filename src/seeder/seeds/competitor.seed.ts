@@ -1,5 +1,8 @@
 import { Competitor } from 'src/competitors/competitor.entity';
 import { DataSource } from 'typeorm';
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('CompetitorSeed');
 
 export async function seedCompetitors(dataSource: DataSource) {
     const competitorRepository = dataSource.getRepository(Competitor);
@@ -7,7 +10,7 @@ export async function seedCompetitors(dataSource: DataSource) {
     // Check if we already have any Competitors in the database
     const existingCount = await competitorRepository.count();
     if (existingCount > 0) {
-        console.log('🟡 Competitor already exist. Skipping...');
+        logger.log('🟡 Competitor already exist. Skipping...');
         return;
     }
 
@@ -212,5 +215,5 @@ export async function seedCompetitors(dataSource: DataSource) {
       },
     ]);
 
-    console.log('✅ Competitors seeded successfully!');
+    logger.log('✅ Competitors seeded successfully!');
 }

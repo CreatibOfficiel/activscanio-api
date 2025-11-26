@@ -1,6 +1,9 @@
 import { DataSource } from 'typeorm';
 import { BaseCharacter } from 'src/base-characters/base-character.entity';
 import { CharacterVariant } from 'src/character-variants/character-variant.entity';
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('CharacterSeed');
 
 export async function seedBaseCharacters(dataSource: DataSource) {
   const baseCharacterRepo = dataSource.getRepository(BaseCharacter);
@@ -8,7 +11,7 @@ export async function seedBaseCharacters(dataSource: DataSource) {
   // Check if we already have any BaseCharacters in the database
   const existingCount = await baseCharacterRepo.count();
   if (existingCount > 0) {
-    console.log('🟡 BaseCharacters already exist. Skipping...');
+    logger.log('🟡 BaseCharacters already exist. Skipping...');
     return;
   }
 
@@ -161,5 +164,5 @@ export async function seedBaseCharacters(dataSource: DataSource) {
     await baseCharacterRepo.save(baseCharacter);
   }
 
-  console.log('✅ BaseCharacters and their variants seeded successfully!');
+  logger.log('✅ BaseCharacters and their variants seeded successfully!');
 }
