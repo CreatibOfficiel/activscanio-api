@@ -13,6 +13,8 @@ import { CreateBettingWeekDto } from './dto/create-betting-week.dto';
 import { PlaceBetDto } from './dto/place-bet.dto';
 import { CompetitorOdds } from './entities/competitor-odds.entity';
 import { User } from '../users/user.entity';
+import { UserAchievement } from '../achievements/entities/user-achievement.entity';
+import { Achievement } from '../achievements/entities/achievement.entity';
 
 @Injectable()
 export class BettingService {
@@ -27,6 +29,10 @@ export class BettingService {
     private readonly competitorOddsRepository: Repository<CompetitorOdds>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserAchievement)
+    private readonly userAchievementRepository: Repository<UserAchievement>,
+    @InjectRepository(Achievement)
+    private readonly achievementRepository: Repository<Achievement>,
   ) {}
 
   /**
@@ -267,11 +273,51 @@ export class BettingService {
    * Get all user's bets
    */
   async getUserBets(userId: string): Promise<Bet[]> {
-    return await this.betRepository.find({
+    const bets = await this.betRepository.find({
       where: { userId },
       relations: ['picks', 'picks.competitor', 'bettingWeek'],
       order: { placedAt: 'DESC' },
     });
+
+    // For each finalized bet, fetch achievements unlocked around the betting week's finalization time
+    const betsWithAchievements = await Promise.all(
+      bets.map(async (bet) => {
+        if (!bet.isFinalized || !bet.bettingWeek.finalizedAt) {
+          return { ...bet, achievementsUnlocked: [] };
+        }
+
+        // Query achievements unlocked within 1 hour after the betting week was finalized
+        const finalizedAt = bet.bettingWeek.finalizedAt;
+        const timeWindowEnd = new Date(finalizedAt.getTime() + 60 * 60 * 1000); // +1 hour
+
+        const achievements = await this.userAchievementRepository.find({
+          where: {
+            userId,
+            unlockedAt: Between(finalizedAt, timeWindowEnd),
+          },
+          relations: ['achievement'],
+          order: { unlockedAt: 'ASC' },
+        });
+
+        // Map to the expected format
+        const achievementsUnlocked = achievements.map((ua) => ({
+          id: ua.achievement.id,
+          key: ua.achievement.key,
+          name: ua.achievement.name,
+          description: ua.achievement.description,
+          category: ua.achievement.category,
+          rarity: ua.achievement.rarity,
+          icon: ua.achievement.icon,
+          xpReward: ua.achievement.xpReward,
+          unlocksTitle: ua.achievement.unlocksTitle,
+          unlockedAt: ua.unlockedAt,
+        }));
+
+        return { ...bet, achievementsUnlocked };
+      }),
+    );
+
+    return betsWithAchievements as Bet[];
   }
 
   /**

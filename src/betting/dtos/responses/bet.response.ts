@@ -30,6 +30,20 @@ export class BetResponse {
   picks: BetPickResponse[];
 
   @Expose()
+  achievementsUnlocked?: Array<{
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    category: string;
+    rarity: string;
+    icon: string;
+    xpReward: number;
+    unlocksTitle: string | null;
+    unlockedAt: Date;
+  }>;
+
+  @Expose()
   @Type(() => Date)
   createdAt: Date;
 }

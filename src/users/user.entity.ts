@@ -59,6 +59,24 @@ export class User {
   @Column({ type: 'boolean', default: false })
   hasCompletedOnboarding: boolean;
 
+  // Gamification fields
+  @Column({ type: 'int', default: 0 })
+  @Index()
+  xp: number;
+
+  @Column({ type: 'int', default: 1 })
+  @Index()
+  level: number;
+
+  @Column({ nullable: true })
+  currentTitle: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  achievementCount: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lastAchievementUnlockedAt: Date | null;
+
   @OneToOne(() => Competitor, { nullable: true, eager: false })
   @JoinColumn({ name: 'competitorId' })
   competitor: Competitor;

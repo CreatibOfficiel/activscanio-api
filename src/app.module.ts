@@ -24,6 +24,7 @@ import { BettingModule } from './betting/betting.module';
 import { TasksModule } from './tasks/tasks.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { SeasonsModule } from './seasons/seasons.module';
+import { AchievementsModule } from './achievements/achievements.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { SeasonsModule } from './seasons/seasons.module';
     TasksModule,
     OnboardingModule,
     SeasonsModule,
+    AchievementsModule,
   ],
   controllers: [AppController],
   providers: [

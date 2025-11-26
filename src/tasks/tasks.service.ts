@@ -32,6 +32,7 @@ import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-s
 import { BettingWeek } from '../betting/entities/betting-week.entity';
 import { User } from '../users/user.entity';
 import { SeasonsService } from '../seasons/seasons.service';
+import { StreakTrackerService } from '../achievements/services/streak-tracker.service';
 import {
   BETTING_CRON_SCHEDULES,
   TASK_EXECUTION_CONFIG,
@@ -48,6 +49,7 @@ export class TasksService {
     private readonly bettingFinalizerService: BettingFinalizerService,
     private readonly competitorsService: CompetitorsService,
     private readonly seasonsService: SeasonsService,
+    private readonly streakTrackerService: StreakTrackerService,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
     @InjectRepository(CompetitorMonthlyStats)
@@ -286,7 +288,7 @@ export class TasksService {
 
   /**
    * Reset boost availability for all users
-   * Runs on 1st of every month at 00:02 UTC
+   * Runs on 1st of every month at 00:03 UTC
    */
   @Cron(BETTING_CRON_SCHEDULES.RESET_BOOST_AVAILABILITY, {
     name: 'reset-boost-availability',
@@ -317,6 +319,38 @@ export class TasksService {
         `❌ Failed to reset boost availability: ${error.message}`,
         error.stack,
       );
+    }
+  }
+
+  /**
+   * Reset monthly streaks for all users
+   * Runs on 1st of every month at 00:04 UTC
+   */
+  @Cron(BETTING_CRON_SCHEDULES.RESET_MONTHLY_STREAKS, {
+    name: 'reset-monthly-streaks',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleResetMonthlyStreaks(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.resetMonthlyStreaks) {
+      this.logger.warn('Task "reset-monthly-streaks" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.resetMonthlyStreaks}`,
+    );
+
+    try {
+      const affectedUsers = await this.streakTrackerService.resetMonthlyStreaks();
+      this.logger.log(
+        `✅ Monthly streaks reset successfully for ${affectedUsers} users`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to reset monthly streaks: ${error.message}`,
+        error.stack,
+      );
+      await this.retryTask(() => this.streakTrackerService.resetMonthlyStreaks());
     }
   }
 

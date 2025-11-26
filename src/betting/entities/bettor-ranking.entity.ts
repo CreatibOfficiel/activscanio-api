@@ -47,6 +47,17 @@ export class BettorRanking {
   @Column({ type: 'int', nullable: true })
   rank: number;
 
+  // Streak tracking fields
+  @Column({ type: 'int', default: 0 })
+  @Index()
+  weeklyParticipationStreak: number;
+
+  @Column({ type: 'int', default: 0 })
+  perfectBetStreak: number;
+
+  @Column({ type: 'int', default: 0 })
+  consecutivePerfectBets: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

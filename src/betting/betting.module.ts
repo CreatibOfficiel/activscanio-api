@@ -23,7 +23,10 @@ import { Competitor } from '../competitors/competitor.entity';
 import { RaceEvent } from '../races/race-event.entity';
 import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
+import { UserAchievement } from '../achievements/entities/user-achievement.entity';
+import { Achievement } from '../achievements/entities/achievement.entity';
 import { UsersModule } from '../users/users.module';
+import { AchievementsModule } from '../achievements/achievements.module';
 
 @Module({
   imports: [
@@ -38,8 +41,11 @@ import { UsersModule } from '../users/users.module';
       RaceEvent,
       RaceResult,
       User,
+      UserAchievement,
+      Achievement,
     ]),
     UsersModule,
+    AchievementsModule,
   ],
   controllers: [BettingController],
   providers: [

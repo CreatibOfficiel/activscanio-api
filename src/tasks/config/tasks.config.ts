@@ -68,6 +68,12 @@ export const BETTING_CRON_SCHEDULES = {
   RESET_BOOST_AVAILABILITY: '0 3 0 1 * *',
 
   /**
+   * Reset monthly streaks for all users
+   * 1st of every month at 00:04 UTC
+   */
+  RESET_MONTHLY_STREAKS: '0 4 0 1 * *',
+
+  /**
    * Reset monthly stats (ELO + race counts)
    * 1st of every month at 00:05 UTC (AFTER archiving)
    */
@@ -90,6 +96,7 @@ export const TASK_EXECUTION_CONFIG = {
     recalculateRankings: true,
     archiveSeason: true,
     resetBoostAvailability: true,
+    resetMonthlyStreaks: true,
     resetMonthlyStats: true,
     archiveMonthlyStats: true,
   },
@@ -119,9 +126,10 @@ export const TASK_DESCRIPTIONS = {
   finalizeWeek: 'Finalize betting week and calculate points (Sunday 23:55)',
   recalculateRankings: 'Recalculate monthly rankings (Sunday 23:58)',
   archiveSeason: 'Archive previous season (1st 00:01)',
-  resetBoostAvailability: 'Reset boost availability for all users (1st 00:02)',
+  resetBoostAvailability: 'Reset boost availability for all users (1st 00:03)',
+  resetMonthlyStreaks: 'Reset monthly streaks for all users (1st 00:04)',
   resetMonthlyStats: 'Reset monthly ELO and race counts (1st 00:05)',
-  archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:10)',
+  archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:02)',
 };
 
 /**

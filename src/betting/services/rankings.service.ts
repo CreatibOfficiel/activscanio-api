@@ -39,12 +39,15 @@ export class RankingsService {
       perfectBets: number;
       boostsUsed: number;
       winRate: number;
+      currentMonthlyStreak: number;
     }>;
   }> {
     // Build query
     const queryBuilder = this.bettorRankingRepository
       .createQueryBuilder('ranking')
-      .leftJoinAndSelect('ranking.user', 'user');
+      .leftJoinAndSelect('ranking.user', 'user')
+      .leftJoin('user_streaks', 'streak', 'streak.userId = ranking.userId')
+      .addSelect(['streak.currentMonthlyStreak']);
 
     // Apply filters
     if (month !== undefined) {
@@ -76,6 +79,7 @@ export class RankingsService {
       perfectBets: r.perfectBets,
       boostsUsed: r.boostsUsed,
       winRate: r.betsPlaced > 0 ? (r.betsWon / r.betsPlaced) * 100 : 0,
+      currentMonthlyStreak: (r as any).streak_currentMonthlyStreak || 0,
     }));
 
     this.logger.log(
@@ -109,6 +113,7 @@ export class RankingsService {
       perfectBets: number;
       boostsUsed: number;
       winRate: number;
+      currentMonthlyStreak: number;
     }>;
   }> {
     const now = new Date();

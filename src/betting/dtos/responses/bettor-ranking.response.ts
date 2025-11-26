@@ -27,6 +27,9 @@ export class BettorRankingResponse {
   betsPlaced: number;
 
   @Expose()
+  currentMonthlyStreak: number;
+
+  @Expose()
   @Type(() => Date)
   createdAt: Date;
 

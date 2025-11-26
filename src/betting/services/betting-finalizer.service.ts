@@ -25,6 +25,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BettingWeek, BettingWeekStatus } from '../entities/betting-week.entity';
 import { Bet } from '../entities/bet.entity';
 import { BetPick } from '../entities/bet-pick.entity';
@@ -33,6 +34,8 @@ import {
   DEFAULT_SCORING_PARAMS,
   SCORING_LOGGER_CONFIG,
 } from '../config/betting-scoring.config';
+import { StreakTrackerService } from '../../achievements/services/streak-tracker.service';
+import { XPLevelService, XPSource } from '../../achievements/services/xp-level.service';
 
 /**
  * Podium result for a week
@@ -97,6 +100,9 @@ export class BettingFinalizerService {
     private readonly betPickRepository: Repository<BetPick>,
     @InjectRepository(BettorRanking)
     private readonly bettorRankingRepository: Repository<BettorRanking>,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly streakTrackerService: StreakTrackerService,
+    private readonly xpLevelService: XPLevelService,
   ) {}
 
   /**
@@ -229,6 +235,52 @@ export class BettingFinalizerService {
 
       // Update bet record
       await this.updateBetRecord(bet, calculation);
+
+      // Update streak for this user
+      try {
+        await this.streakTrackerService.updateStreak(bet.userId, bet.bettingWeekId);
+      } catch (error) {
+        this.logger.error(`Failed to update streak for user ${bet.userId}: ${error.message}`);
+      }
+
+      // Calculate stats for events and XP
+      const correctPicksCount = calculation.picks.filter((p) => p.isCorrect).length;
+      const hasBoost = calculation.picks.some((p) => p.hasBoost);
+      const highestOdd = Math.max(...calculation.picks.map((p) => p.oddAtBet));
+
+      // Award XP for betting actions
+      try {
+        // Base XP for placing bet
+        await this.xpLevelService.awardXP(bet.userId, XPSource.BET_PLACED);
+
+        // XP for correct picks
+        for (let i = 0; i < correctPicksCount; i++) {
+          await this.xpLevelService.awardXP(bet.userId, XPSource.CORRECT_PICK);
+        }
+
+        // XP for perfect podium
+        if (calculation.isPerfectPodium) {
+          await this.xpLevelService.awardXP(bet.userId, XPSource.PERFECT_PODIUM);
+        }
+
+        // XP for weekly participation
+        await this.xpLevelService.awardXP(bet.userId, XPSource.WEEKLY_PARTICIPATION);
+      } catch (error) {
+        this.logger.error(`Failed to award XP for user ${bet.userId}: ${error.message}`);
+      }
+
+      // Emit event for achievement calculation
+      this.eventEmitter.emit('bet.finalized', {
+        userId: bet.userId,
+        betId: bet.id,
+        weekId: bet.bettingWeekId,
+        pointsEarned: calculation.finalPoints,
+        isPerfectPodium: calculation.isPerfectPodium,
+        correctPicks: correctPicksCount,
+        totalPicks: calculation.picks.length,
+        hasBoost,
+        highestOdd,
+      });
 
       if (SCORING_LOGGER_CONFIG.logFinalPoints) {
         this.logger.log(

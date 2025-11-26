@@ -7,6 +7,7 @@ import { User } from '../users/user.entity';
 import { BettingModule } from '../betting/betting.module';
 import { CompetitorsModule } from '../competitors/competitors.module';
 import { SeasonsModule } from '../seasons/seasons.module';
+import { AchievementsModule } from '../achievements/achievements.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { SeasonsModule } from '../seasons/seasons.module';
     BettingModule,
     CompetitorsModule,
     SeasonsModule,
+    AchievementsModule,
   ],
   providers: [TasksService],
   exports: [TasksService],
