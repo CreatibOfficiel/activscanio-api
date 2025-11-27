@@ -1,8 +1,20 @@
 #!/bin/sh
 set -e
 
+# Extract DB host from DATABASE_URL or use DB_HOST fallback
+if [ -n "$DATABASE_URL" ]; then
+  # Extract host from DATABASE_URL (format: postgresql://user:pass@host:port/db)
+  DB_HOST_EXTRACTED=$(echo $DATABASE_URL | sed -E 's|.*@([^:/]+).*|\1|')
+  DB_PORT_EXTRACTED=$(echo $DATABASE_URL | sed -E 's|.*:([0-9]+)/.*|\1|')
+  echo "Extracted from DATABASE_URL: $DB_HOST_EXTRACTED:$DB_PORT_EXTRACTED"
+else
+  DB_HOST_EXTRACTED=$DB_HOST
+  DB_PORT_EXTRACTED=${DB_PORT:-5432}
+  echo "Using DB_HOST: $DB_HOST_EXTRACTED:$DB_PORT_EXTRACTED"
+fi
+
 echo "Waiting for PostgreSQL to be ready..."
-until nc -z $DB_HOST 5432; do
+until nc -z $DB_HOST_EXTRACTED $DB_PORT_EXTRACTED; do
   echo "PostgreSQL is unavailable - sleeping"
   sleep 2
 done
