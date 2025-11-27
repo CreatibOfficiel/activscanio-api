@@ -68,8 +68,9 @@ export class User {
   @Index()
   level: number;
 
-  @Column({ nullable: true })
-  currentTitle: string | null;
+  // TEMPORARILY DISABLED - Causing TypeORM "Object type" error on Railway
+  // @Column({ nullable: true })
+  // currentTitle: string | null;
 
   @Column({ type: 'int', default: 0 })
   achievementCount: number;
