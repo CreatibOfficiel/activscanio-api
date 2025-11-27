@@ -4,6 +4,9 @@ import { join } from 'path';
 
 dotenv.config();
 
+// Detect if we're in production (compiled) or development
+const isProd = __dirname.includes('dist');
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST === 'db' ? 'localhost' : process.env.DB_HOST, // Use localhost for migration generation
@@ -11,7 +14,11 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  entities: [join(__dirname, '**', '*.entity.{js,ts}')],
-  migrations: [join(__dirname, 'src', 'migrations', '*.js')],
+  entities: isProd
+    ? [join(__dirname, '**', '*.entity.js')]
+    : [join(__dirname, 'src', '**', '*.entity.ts')],
+  migrations: isProd
+    ? [join(__dirname, 'migrations', '*.js')]
+    : [join(__dirname, 'src', 'migrations', '*.js')],
   synchronize: false,
 });
