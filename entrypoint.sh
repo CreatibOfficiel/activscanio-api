@@ -14,8 +14,35 @@ if [ "$NODE_ENV" = "development" ]; then
   echo "Starting NestJS in dev mode..."
   exec npm run start:dev
 else
-  echo "Running migrations in prod mode…"
+  echo "=========================================="
+  echo "🔍 DEBUG: Production Environment"
+  echo "=========================================="
+  echo "📁 Current directory: $(pwd)"
+  echo "📂 Directory contents:"
+  ls -la
+  echo ""
+  echo "📦 Dist directory structure:"
+  ls -la dist/
+  echo ""
+  echo "📁 Migrations directory:"
+  ls -la dist/src/migrations/ 2>/dev/null || echo "❌ dist/src/migrations/ not found!"
+  echo ""
+  echo "📄 data-source.prod.js content:"
+  cat data-source.prod.js | grep -A 3 "migrations:"
+  echo ""
+  echo "🔌 Database connection:"
+  echo "  DB_HOST: $DB_HOST"
+  echo "  DB_PORT: $DB_PORT"
+  echo "  DB_NAME: $DB_NAME"
+  echo "=========================================="
+  echo "🚀 Running migrations in prod mode..."
+  echo "=========================================="
+
   npx typeorm migration:run -d data-source.prod.js
+
+  echo "=========================================="
+  echo "✅ Migrations completed"
+  echo "=========================================="
   echo "Starting NestJS in prod mode..."
   exec node dist/src/main.js
 fi
