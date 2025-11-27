@@ -81,7 +81,7 @@ export class Achievement {
   @Column({ type: 'int', default: 0 })
   xpReward: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   unlocksTitle: string | null;
 
   @Column({ type: 'jsonb' })
