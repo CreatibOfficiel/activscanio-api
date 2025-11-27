@@ -15,10 +15,10 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   entities: isProd
-    ? [join(__dirname, '**', '*.entity.js')]
+    ? [join(__dirname, 'src', '**', '*.entity.js')]
     : [join(__dirname, 'src', '**', '*.entity.ts')],
   migrations: isProd
-    ? [join(__dirname, 'migrations', '*.js')]
+    ? [join(__dirname, 'src', 'migrations', '*.js')]
     : [join(__dirname, 'src', 'migrations', '*.js')],
   synchronize: false,
 });
