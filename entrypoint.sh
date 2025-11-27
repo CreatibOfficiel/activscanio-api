@@ -15,7 +15,7 @@ if [ "$NODE_ENV" = "development" ]; then
   exec npm run start:dev
 else
   echo "Running migrations in prod mode…"
-  npx typeorm migration:run -d dist/data-source.js
+  npx typeorm migration:run -d data-source.prod.js
   echo "Starting NestJS in prod mode..."
   exec node dist/src/main.js
 fi

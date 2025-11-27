@@ -34,6 +34,7 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
+COPY data-source.prod.js ./
 
 # Reinstall only production dependencies
 RUN npm ci --omit=dev
