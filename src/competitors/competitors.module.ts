@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Competitor } from './competitor.entity';
@@ -11,7 +11,7 @@ import { RatingModule } from 'src/rating/rating.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Competitor]),
-    RacesModule,
+    forwardRef(() => RacesModule),
     RatingModule,
   ],
   controllers: [CompetitorsController],
