@@ -1,6 +1,5 @@
 // data-source.prod.js - Configuration TypeORM STATIQUE pour production
 const { DataSource } = require('typeorm');
-const { join } = require('path');
 
 // Charger dotenv pour les variables d'environnement
 require('dotenv').config();
