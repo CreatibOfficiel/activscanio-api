@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddGamificationSystem1732640000000 implements MigrationInterface {
-    name = 'AddGamificationSystem1732640000000'
+export class AddGamificationSystem1764269630000 implements MigrationInterface {
+    name = 'AddGamificationSystem1764269630000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // ====================
