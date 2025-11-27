@@ -14,10 +14,10 @@ const AppDataSource = new DataSource({
   database: process.env.DB_NAME,
 
   // IMPORTANT : Chemins ABSOLUS en production
-  // __dirname ici sera /app après Docker build
-  // Force .js extension to avoid TypeScript file loading
-  entities: [join(__dirname, 'dist', 'src', '**', '*.entity.js')],
-  migrations: [join(__dirname, 'dist', 'src', 'migrations', '*.js')],
+  // Dans Docker, les fichiers sont dans /app/dist/src/
+  // Le pattern glob doit être une string, pas un join()
+  entities: ['dist/src/**/*.entity.js'],
+  migrations: ['dist/src/migrations/*.js'],
 
   synchronize: false,
   logging: ['error', 'warn', 'migration'],
