@@ -68,7 +68,7 @@ export class User {
   @Index()
   level: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   currentTitle: string | null;
 
   @Column({ type: 'int', default: 0 })
