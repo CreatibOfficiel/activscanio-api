@@ -6,9 +6,9 @@ services:
     ports:
       - '5433:5432'
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: activscanio
     volumes:
       - db-data:/var/lib/postgresql/data
 
@@ -19,11 +19,8 @@ services:
     depends_on:
       - db
     environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
-      DB_NAME: ${DB_NAME}
+      # Inside Docker, use the service name 'db' as hostname
+      DATABASE_URL: postgresql://postgres:secret@db:5432/activscanio
       NODE_ENV: development
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       SEED: ${SEED}
