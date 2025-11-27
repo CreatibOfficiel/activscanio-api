@@ -38,10 +38,21 @@ else
   echo "🚀 Running migrations in prod mode..."
   echo "=========================================="
 
-  npx typeorm migration:run -d data-source.prod.js
+  # Run with verbose output
+  npx typeorm migration:run -d data-source.prod.js 2>&1
+  MIGRATION_EXIT_CODE=$?
 
+  echo ""
   echo "=========================================="
-  echo "✅ Migrations completed"
+  echo "📊 Migration command exit code: $MIGRATION_EXIT_CODE"
+  echo "=========================================="
+
+  if [ $MIGRATION_EXIT_CODE -ne 0 ]; then
+    echo "❌ Migration failed with exit code $MIGRATION_EXIT_CODE"
+    exit $MIGRATION_EXIT_CODE
+  fi
+
+  echo "✅ Migrations completed successfully"
   echo "=========================================="
   echo "Starting NestJS in prod mode..."
   exec node dist/src/main.js
