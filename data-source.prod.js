@@ -16,8 +16,8 @@ const AppDataSource = new DataSource({
   // IMPORTANT : Chemins ABSOLUS en production
   // __dirname ici sera /app après Docker build
   // Force .js extension to avoid TypeScript file loading
-  entities: ['dist/src/**/*.entity.js'],
-  migrations: ['dist/src/migrations/*.js'],
+  entities: [join(__dirname, 'dist', 'src', '**', '*.entity.js')],
+  migrations: [join(__dirname, 'dist', 'src', 'migrations', '*.js')],
 
   synchronize: false,
   logging: ['error', 'warn', 'migration'],
