@@ -33,7 +33,11 @@ import {
 } from './dto/achievement-response.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Achievement, AchievementCategory, AchievementRarity } from './entities/achievement.entity';
+import {
+  Achievement,
+  AchievementCategory,
+  AchievementRarity,
+} from './entities/achievement.entity';
 import { UserAchievement } from './entities/user-achievement.entity';
 import { User } from '../users/user.entity';
 
@@ -76,7 +80,11 @@ export class AchievementsController {
   @ApiQuery({ name: 'rarity', required: false, enum: AchievementRarity })
   @ApiQuery({ name: 'unlockedOnly', required: false, type: Boolean })
   @ApiQuery({ name: 'lockedOnly', required: false, type: Boolean })
-  @ApiResponse({ status: 200, description: 'List of achievements', type: [AchievementResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of achievements',
+    type: [AchievementResponseDto],
+  })
   async getAchievements(
     @Query() query: AchievementQueryDto,
     @CurrentUser('clerkId') clerkId?: string,
@@ -116,10 +124,11 @@ export class AchievementsController {
         // Get progress if not unlocked
         let progress = 0;
         if (!isUnlocked) {
-          progress = await this.achievementCalculatorService.getAchievementProgress(
-            userId,
-            achievement.id,
-          );
+          progress =
+            await this.achievementCalculatorService.getAchievementProgress(
+              userId,
+              achievement.id,
+            );
         }
 
         results.push({
@@ -160,14 +169,19 @@ export class AchievementsController {
    */
   @Get('me')
   @ApiOperation({ summary: 'Get my unlocked achievements' })
-  @ApiResponse({ status: 200, description: 'List of unlocked achievements', type: [UserAchievementResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of unlocked achievements',
+    type: [UserAchievementResponseDto],
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getMyAchievements(
     @CurrentUser('clerkId') clerkId: string,
   ): Promise<UserAchievementResponseDto[]> {
     const userId = await this.getUserIdFromClerkId(clerkId);
 
-    const userAchievements = await this.achievementCalculatorService.getUserAchievements(userId);
+    const userAchievements =
+      await this.achievementCalculatorService.getUserAchievements(userId);
 
     return userAchievements.map((ua) => ({
       id: ua.id,
@@ -193,8 +207,15 @@ export class AchievementsController {
   @Public()
   @Get('stats/:userId')
   @ApiOperation({ summary: 'Get user achievement and betting stats' })
-  @ApiParam({ name: 'userId', description: 'User UUID or "me" for current user' })
-  @ApiResponse({ status: 200, description: 'User stats', type: UserStatsResponseDto })
+  @ApiParam({
+    name: 'userId',
+    description: 'User UUID or "me" for current user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User stats',
+    type: UserStatsResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserStats(
     @Param('userId') userIdParam: string,
@@ -205,7 +226,9 @@ export class AchievementsController {
     // Handle "me" param
     if (userIdParam === 'me') {
       if (!clerkId) {
-        throw new BadRequestException('Authentication required for "me" parameter');
+        throw new BadRequestException(
+          'Authentication required for "me" parameter',
+        );
       }
       userId = await this.getUserIdFromClerkId(clerkId);
     }
@@ -217,7 +240,8 @@ export class AchievementsController {
     }
 
     // Get user stats from calculator service
-    const userStats = await this.achievementCalculatorService['getUserStats'](userId);
+    const userStats =
+      await this.achievementCalculatorService['getUserStats'](userId);
 
     // Get XP info
     const currentLevel = user.level;
@@ -225,12 +249,14 @@ export class AchievementsController {
     const xpForNextLevel = this.xpLevelService.getXPForLevel(currentLevel + 1);
     const xpForCurrentLevel = this.xpLevelService.getXPForLevel(currentLevel);
     const xpProgressPercent =
-      ((currentXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
+      ((currentXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) *
+      100;
 
     // Get achievement count
     const totalAchievements = await this.achievementRepository.count();
     const unlockedAchievements = user.achievementCount;
-    const achievementProgress = (unlockedAchievements / totalAchievements) * 100;
+    const achievementProgress =
+      (unlockedAchievements / totalAchievements) * 100;
 
     return {
       userId: user.id,
@@ -279,8 +305,15 @@ export class AchievementsController {
    */
   @Post('equip-title')
   @ApiOperation({ summary: 'Equip a title from an unlocked achievement' })
-  @ApiResponse({ status: 200, description: 'Title equipped successfully', type: EquipTitleResponseDto })
-  @ApiResponse({ status: 400, description: 'Achievement does not unlock a title or not unlocked' })
+  @ApiResponse({
+    status: 200,
+    description: 'Title equipped successfully',
+    type: EquipTitleResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Achievement does not unlock a title or not unlocked',
+  })
   @ApiResponse({ status: 404, description: 'Achievement or user not found' })
   async equipTitle(
     @CurrentUser('clerkId') clerkId: string,
@@ -294,12 +327,16 @@ export class AchievementsController {
     });
 
     if (!achievement) {
-      throw new NotFoundException(`Achievement ${equipTitleDto.achievementKey} not found`);
+      throw new NotFoundException(
+        `Achievement ${equipTitleDto.achievementKey} not found`,
+      );
     }
 
     // Check if achievement unlocks a title
     if (!achievement.unlocksTitle) {
-      throw new BadRequestException(`Achievement ${achievement.name} does not unlock a title`);
+      throw new BadRequestException(
+        `Achievement ${achievement.name} does not unlock a title`,
+      );
     }
 
     // Check if user has unlocked this achievement
@@ -308,7 +345,9 @@ export class AchievementsController {
     });
 
     if (!userAchievement) {
-      throw new BadRequestException(`You have not unlocked the achievement "${achievement.name}"`);
+      throw new BadRequestException(
+        `You have not unlocked the achievement "${achievement.name}"`,
+      );
     }
 
     // Equip title
@@ -337,10 +376,7 @@ export class AchievementsController {
   ): Promise<{ message: string }> {
     const userId = await this.getUserIdFromClerkId(clerkId);
 
-    await this.userRepository.update(
-      { id: userId },
-      { currentTitle: null },
-    );
+    await this.userRepository.update({ id: userId }, { currentTitle: null });
 
     return {
       message: 'Title removed successfully',

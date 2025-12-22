@@ -6,12 +6,13 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import { UploadService } from './upload.service';
 
-@Global()                              // ← ① visible dans tous les modules
+@Global() // ← ① visible dans tous les modules
 @Module({
   imports: [
     MulterModule.register({
       storage: diskStorage({
-        destination: (req, file, cb) => {       // ← ② crée le dossier si besoin
+        destination: (req, file, cb) => {
+          // ← ② crée le dossier si besoin
           const dir = './uploads';
           if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -22,10 +23,10 @@ import { UploadService } from './upload.service';
           cb(null, `${uuidv4()}${extname(file.originalname)}`);
         },
       }),
-      limits: { fileSize: 10 * 1024 * 1024 },   // 10 Mo, ajustez si nécessaire
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo, ajustez si nécessaire
     }),
   ],
   providers: [UploadService],
-  exports: [UploadService, MulterModule],       // ← ③
+  exports: [UploadService, MulterModule], // ← ③
 })
 export class UploadModule {}

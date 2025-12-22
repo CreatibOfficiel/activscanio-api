@@ -1,4 +1,7 @@
-import { AchievementCategory, AchievementRarity } from '../entities/achievement.entity';
+import {
+  AchievementCategory,
+  AchievementRarity,
+} from '../entities/achievement.entity';
 
 /**
  * Achievement DTO for API responses

@@ -1,10 +1,5 @@
 import { CharacterVariant } from '../character-variants/character-variant.entity';
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from 'typeorm';
 
 @Entity('competitors')
 export class Competitor {
@@ -63,10 +58,8 @@ export class Competitor {
   @Column({ default: false })
   isActiveThisWeek: boolean;
 
-  @OneToOne(
-    () => CharacterVariant,
-    (variant) => variant.competitor,
-    { nullable: true },
-  )
+  @OneToOne(() => CharacterVariant, (variant) => variant.competitor, {
+    nullable: true,
+  })
   characterVariant: CharacterVariant | null;
 }

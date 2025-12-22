@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BettingWeek, BettingWeekStatus } from '../entities/betting-week.entity';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../entities/betting-week.entity';
 import { BaseRepository } from '../../common/repositories/base.repository';
 
 /**

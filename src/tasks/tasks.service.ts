@@ -116,9 +116,7 @@ export class TasksService {
         `❌ Failed to reset weekly activity: ${error.message}`,
         error.stack,
       );
-      await this.retryTask(() =>
-        this.competitorsService.resetWeeklyActivity(),
-      );
+      await this.retryTask(() => this.competitorsService.resetWeeklyActivity());
     }
   }
 
@@ -186,7 +184,9 @@ export class TasksService {
       const podium = await this.determinePodium(currentWeek);
 
       if (!podium) {
-        this.logger.warn('Could not determine podium (insufficient competitors)');
+        this.logger.warn(
+          'Could not determine podium (insufficient competitors)',
+        );
         return;
       }
 
@@ -341,7 +341,8 @@ export class TasksService {
     );
 
     try {
-      const affectedUsers = await this.streakTrackerService.resetMonthlyStreaks();
+      const affectedUsers =
+        await this.streakTrackerService.resetMonthlyStreaks();
       this.logger.log(
         `✅ Monthly streaks reset successfully for ${affectedUsers} users`,
       );
@@ -350,7 +351,9 @@ export class TasksService {
         `❌ Failed to reset monthly streaks: ${error.message}`,
         error.stack,
       );
-      await this.retryTask(() => this.streakTrackerService.resetMonthlyStreaks());
+      await this.retryTask(() =>
+        this.streakTrackerService.resetMonthlyStreaks(),
+      );
     }
   }
 
@@ -479,11 +482,7 @@ export class TasksService {
     });
 
     // Return top 3
-    return [
-      scored[0].competitor,
-      scored[1].competitor,
-      scored[2].competitor,
-    ];
+    return [scored[0].competitor, scored[1].competitor, scored[2].competitor];
   }
 
   /**
@@ -508,7 +507,8 @@ export class TasksService {
   private async archiveMonthlyStats(): Promise<void> {
     const now = new Date();
     const previousMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-    const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const year =
+      now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
 
     this.logger.log(`Archiving stats for ${previousMonth}/${year}`);
 

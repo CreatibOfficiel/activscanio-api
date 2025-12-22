@@ -101,7 +101,10 @@ export class RacesService {
   // GET /competitors/:competitorId/recent-races (via CompetitorsController)
   async getRecentRacesForCompetitor(competitorId: string): Promise<any[]> {
     // Use repository method to get races for competitor
-    const races = await this.raceEventRepository.findForCompetitor(competitorId, 3);
+    const races = await this.raceEventRepository.findForCompetitor(
+      competitorId,
+      3,
+    );
 
     // Extract info
     return races.map((race) => {
@@ -138,19 +141,24 @@ export class RacesService {
   /**
    * Mark competitors as active this week (for betting eligibility)
    */
-  private async markCompetitorsActive(raceResults: RaceResult[]): Promise<void> {
+  private async markCompetitorsActive(
+    raceResults: RaceResult[],
+  ): Promise<void> {
     try {
-      const competitorIds = [...new Set(raceResults.map((r) => r.competitorId))];
+      const competitorIds = [
+        ...new Set(raceResults.map((r) => r.competitorId)),
+      ];
 
       for (const competitorId of competitorIds) {
         await this.competitorsService.markAsActiveThisWeek(competitorId);
       }
 
-      this.logger.log(`Marked ${competitorIds.length} competitors as active this week`);
+      this.logger.log(
+        `Marked ${competitorIds.length} competitors as active this week`,
+      );
     } catch (error) {
       this.logger.error('Error marking competitors as active:', error.message);
       // Don't throw - this is not critical
     }
   }
-
 }

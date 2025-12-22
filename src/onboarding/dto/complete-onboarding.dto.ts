@@ -8,6 +8,7 @@ import {
   MaxLength,
   Matches,
   IsNotEmpty,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -17,7 +18,8 @@ export class CreateCompetitorInOnboardingDto {
   @MinLength(2, { message: 'First name must be at least 2 characters' })
   @MaxLength(50, { message: 'First name must not exceed 50 characters' })
   @Matches(/^[a-zA-ZÀ-ÿ\s'-]+$/, {
-    message: 'First name can only contain letters, spaces, hyphens and apostrophes',
+    message:
+      'First name can only contain letters, spaces, hyphens and apostrophes',
   })
   firstName: string;
 
@@ -26,7 +28,8 @@ export class CreateCompetitorInOnboardingDto {
   @MinLength(2, { message: 'Last name must be at least 2 characters' })
   @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
   @Matches(/^[a-zA-ZÀ-ÿ\s'-]+$/, {
-    message: 'Last name can only contain letters, spaces, hyphens and apostrophes',
+    message:
+      'Last name can only contain letters, spaces, hyphens and apostrophes',
   })
   lastName: string;
 
@@ -36,6 +39,11 @@ export class CreateCompetitorInOnboardingDto {
 }
 
 export class CompleteOnboardingDto {
+  // Flag to indicate user is spectator only (no competitor/character)
+  @IsBoolean()
+  @IsOptional()
+  isSpectator?: boolean;
+
   // Option 1: Link to existing competitor
   @IsUUID()
   @IsOptional()
@@ -47,7 +55,8 @@ export class CompleteOnboardingDto {
   @IsOptional()
   newCompetitor?: CreateCompetitorInOnboardingDto;
 
-  // Required: Character variant selection
+  // Character variant selection (now optional, required only for competitors)
   @IsUUID()
-  characterVariantId: string;
+  @IsOptional()
+  characterVariantId?: string;
 }

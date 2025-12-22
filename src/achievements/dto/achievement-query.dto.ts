@@ -1,6 +1,9 @@
 import { IsEnum, IsOptional, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { AchievementCategory, AchievementRarity } from '../entities/achievement.entity';
+import {
+  AchievementCategory,
+  AchievementRarity,
+} from '../entities/achievement.entity';
 
 /**
  * Query DTO for listing achievements

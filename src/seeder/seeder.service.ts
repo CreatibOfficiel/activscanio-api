@@ -16,7 +16,7 @@ export class SeederService implements OnModuleInit {
     } else {
       this.logger.log('🚫 SEED DISABLED');
     }
-  }  
+  }
 
   async run() {
     await seedBaseCharacters(this.dataSource);

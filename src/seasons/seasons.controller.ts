@@ -1,24 +1,10 @@
-import {
-  Controller,
-  Get,
-  Param,
-  UseGuards,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { SeasonsService } from './seasons.service';
-import { ClerkGuard } from '../auth/clerk.guard';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('seasons')
-@ApiBearerAuth()
 @Controller('seasons')
-@UseGuards(ClerkGuard)
 export class SeasonsController {
   constructor(private readonly seasonsService: SeasonsService) {}
 
@@ -26,6 +12,7 @@ export class SeasonsController {
    * GET /seasons
    * Get all seasons
    */
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Get all archived seasons' })
   @ApiResponse({ status: 200, description: 'List of all seasons with stats' })
@@ -37,6 +24,7 @@ export class SeasonsController {
    * GET /seasons/:year/:month
    * Get specific season
    */
+  @Public()
   @Get(':year/:month')
   @ApiOperation({ summary: 'Get a specific season by year and month' })
   @ApiParam({ name: 'year', description: 'Season year', example: '2024' })
@@ -44,21 +32,22 @@ export class SeasonsController {
   @ApiResponse({ status: 200, description: 'Season details with stats' })
   @ApiResponse({ status: 404, description: 'Season not found' })
   async getSeason(@Param('year') year: string, @Param('month') month: string) {
-    return await this.seasonsService.getSeason(
-      parseInt(month),
-      parseInt(year),
-    );
+    return await this.seasonsService.getSeason(parseInt(month), parseInt(year));
   }
 
   /**
    * GET /seasons/:year/:month/competitors
    * Get competitor rankings for a season
    */
+  @Public()
   @Get(':year/:month/competitors')
   @ApiOperation({ summary: 'Get competitor rankings for a specific season' })
   @ApiParam({ name: 'year', description: 'Season year', example: '2024' })
   @ApiParam({ name: 'month', description: 'Season month (1-12)', example: '1' })
-  @ApiResponse({ status: 200, description: 'List of competitors with their ELO rankings' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of competitors with their ELO rankings',
+  })
   @ApiResponse({ status: 404, description: 'Season not found' })
   async getCompetitorRankings(
     @Param('year') year: string,
@@ -80,11 +69,15 @@ export class SeasonsController {
    * GET /seasons/:year/:month/bettors
    * Get bettor rankings for a season
    */
+  @Public()
   @Get(':year/:month/bettors')
   @ApiOperation({ summary: 'Get bettor rankings for a specific season' })
   @ApiParam({ name: 'year', description: 'Season year', example: '2024' })
   @ApiParam({ name: 'month', description: 'Season month (1-12)', example: '1' })
-  @ApiResponse({ status: 200, description: 'List of bettors with their points and rankings' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bettors with their points and rankings',
+  })
   @ApiResponse({ status: 404, description: 'Season not found' })
   async getBettorRankings(
     @Param('year') year: string,
@@ -100,11 +93,15 @@ export class SeasonsController {
    * GET /seasons/:year/:month/weeks
    * Get betting weeks for a season
    */
+  @Public()
   @Get(':year/:month/weeks')
   @ApiOperation({ summary: 'Get all betting weeks for a specific season' })
   @ApiParam({ name: 'year', description: 'Season year', example: '2024' })
   @ApiParam({ name: 'month', description: 'Season month (1-12)', example: '1' })
-  @ApiResponse({ status: 200, description: 'List of betting weeks with their status' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of betting weeks with their status',
+  })
   @ApiResponse({ status: 404, description: 'Season not found' })
   async getBettingWeeks(
     @Param('year') year: string,

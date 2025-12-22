@@ -30,9 +30,7 @@ export abstract class DomainException extends HttpException {
 export class EntityNotFoundException extends DomainException {
   constructor(entityName: string, identifier: string | Record<string, any>) {
     const identifierStr =
-      typeof identifier === 'string'
-        ? identifier
-        : JSON.stringify(identifier);
+      typeof identifier === 'string' ? identifier : JSON.stringify(identifier);
 
     super(
       `${entityName} with identifier ${identifierStr} not found`,
@@ -203,7 +201,11 @@ export class InsufficientDataException extends DomainException {
 }
 
 export class CalculationException extends DomainException {
-  constructor(calculationType: string, reason: string, details?: Record<string, any>) {
+  constructor(
+    calculationType: string,
+    reason: string,
+    details?: Record<string, any>,
+  ) {
     super(
       `${calculationType} calculation failed: ${reason}`,
       HttpStatus.INTERNAL_SERVER_ERROR,

@@ -15,13 +15,7 @@ import { RatingModule } from 'src/rating/rating.module';
     RatingModule,
   ],
   controllers: [CompetitorsController],
-  providers: [
-    CompetitorsService,
-    CompetitorRepository,
-  ],
-  exports: [
-    CompetitorsService,
-    CompetitorRepository,
-  ],
+  providers: [CompetitorsService, CompetitorRepository],
+  exports: [CompetitorsService, CompetitorRepository],
 })
 export class CompetitorsModule {}

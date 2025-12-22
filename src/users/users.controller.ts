@@ -18,7 +18,6 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('users')
-@UseGuards(ClerkGuard) // Protect all routes by default
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

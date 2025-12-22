@@ -42,7 +42,10 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
    * @param daysAgo - Number of days to look back
    * @param limit - Maximum number of races to return
    */
-  async findRecent(daysAgo: number = 7, limit: number = 20): Promise<RaceEvent[]> {
+  async findRecent(
+    daysAgo: number = 7,
+    limit: number = 20,
+  ): Promise<RaceEvent[]> {
     const now = new Date();
     const minDate = new Date(now.getTime() - daysAgo * 24 * 3600 * 1000);
 
@@ -60,14 +63,19 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
    * @param competitorId - Competitor UUID
    * @param limit - Maximum number of races to return
    */
-  async findForCompetitor(competitorId: string, limit: number = 3): Promise<RaceEvent[]> {
+  async findForCompetitor(
+    competitorId: string,
+    limit: number = 3,
+  ): Promise<RaceEvent[]> {
     const allRaces = await this.repository.find({
       relations: ['results'],
       order: { date: 'DESC' },
     });
 
     const competitorRaces = allRaces
-      .filter((race) => race.results.some((r) => r.competitorId === competitorId))
+      .filter((race) =>
+        race.results.some((r) => r.competitorId === competitorId),
+      )
       .slice(0, limit);
 
     return competitorRaces;
@@ -80,10 +88,7 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
    * @param raceId - Reference race UUID
    * @param limit - Maximum number of races to return
    */
-  async findSimilar(
-    raceId: string,
-    limit: number = 3,
-  ): Promise<RaceEvent[]> {
+  async findSimilar(raceId: string, limit: number = 3): Promise<RaceEvent[]> {
     // Get reference race
     const refRace = await this.repository.findOne({
       where: { id: raceId },
@@ -95,9 +100,7 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     }
 
     // Extract competitor IDs from reference race
-    const refCompetitorIds = refRace.results
-      .map((r) => r.competitorId)
-      .sort();
+    const refCompetitorIds = refRace.results.map((r) => r.competitorId).sort();
 
     // Get all races
     const allRaces = await this.repository.find({
@@ -112,7 +115,9 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
         const raceCompetitorIds = race.results
           .map((r) => r.competitorId)
           .sort();
-        return JSON.stringify(raceCompetitorIds) === JSON.stringify(refCompetitorIds);
+        return (
+          JSON.stringify(raceCompetitorIds) === JSON.stringify(refCompetitorIds)
+        );
       })
       .slice(0, limit);
 

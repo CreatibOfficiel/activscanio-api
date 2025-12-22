@@ -35,7 +35,8 @@ export class SeasonsService {
     this.logger.log(`Archiving season ${month}/${year}...`);
 
     // Use transaction for atomicity
-    const queryRunner = this.seasonArchiveRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.seasonArchiveRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -84,7 +85,11 @@ export class SeasonsService {
       await queryRunner.manager.save(archive);
 
       // Archive competitor rankings
-      await this.archiveCompetitorRankingsInTransaction(queryRunner, archive, competitors);
+      await this.archiveCompetitorRankingsInTransaction(
+        queryRunner,
+        archive,
+        competitors,
+      );
 
       // Link betting weeks to archive
       await queryRunner.manager.update(
@@ -208,10 +213,7 @@ export class SeasonsService {
   /**
    * Get betting weeks for a season
    */
-  async getBettingWeeks(
-    month: number,
-    year: number,
-  ): Promise<BettingWeek[]> {
+  async getBettingWeeks(month: number, year: number): Promise<BettingWeek[]> {
     return await this.bettingWeekRepository.find({
       where: { month, year },
       order: { weekNumber: 'ASC' },

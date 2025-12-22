@@ -131,14 +131,18 @@ describe('OnboardingService', () => {
       ...overrides,
     });
 
-    const createMockCompetitor = (overrides?: Partial<Competitor>): Partial<Competitor> => ({
+    const createMockCompetitor = (
+      overrides?: Partial<Competitor>,
+    ): Partial<Competitor> => ({
       id: competitorId,
       firstName: 'Mario',
       lastName: 'Bros',
       ...overrides,
     });
 
-    const createMockVariant = (overrides?: Partial<CharacterVariant>): Partial<CharacterVariant> => ({
+    const createMockVariant = (
+      overrides?: Partial<CharacterVariant>,
+    ): Partial<CharacterVariant> => ({
       id: variantId,
       label: 'Standard',
       competitor: undefined,

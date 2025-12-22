@@ -16,15 +16,7 @@ import { CompetitorsModule } from 'src/competitors/competitors.module';
     forwardRef(() => CompetitorsModule),
   ],
   controllers: [RacesController],
-  providers: [
-    RacesService,
-    RaceEventRepository,
-    RaceResultRepository,
-  ],
-  exports: [
-    RacesService,
-    RaceEventRepository,
-    RaceResultRepository,
-  ],
+  providers: [RacesService, RaceEventRepository, RaceResultRepository],
+  exports: [RacesService, RaceEventRepository, RaceResultRepository],
 })
 export class RacesModule {}

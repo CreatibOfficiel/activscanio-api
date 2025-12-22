@@ -36,11 +36,7 @@ export class XPLevelService {
    * @param source - Source of XP (for logging)
    * @returns Updated user with new XP and level
    */
-  async addXP(
-    userId: string,
-    amount: number,
-    source: string,
-  ): Promise<User> {
+  async addXP(userId: string, amount: number, source: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
@@ -117,7 +113,7 @@ export class XPLevelService {
    */
   getXPForLevel(level: number): number {
     if (level <= 1) return 0;
-    return LEVEL_FORMULA.BASE_MULTIPLIER * level * (level + 1) / 2;
+    return (LEVEL_FORMULA.BASE_MULTIPLIER * level * (level + 1)) / 2;
   }
 
   /**
@@ -159,7 +155,10 @@ export class XPLevelService {
 
     if (xpNeededForLevel === 0) return 100;
 
-    return Math.min(100, Math.max(0, (xpInCurrentLevel / xpNeededForLevel) * 100));
+    return Math.min(
+      100,
+      Math.max(0, (xpInCurrentLevel / xpNeededForLevel) * 100),
+    );
   }
 
   /**

@@ -16,7 +16,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BettingWeek, BettingWeekStatus } from '../entities/betting-week.entity';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../entities/betting-week.entity';
 import { OddsCalculatorService } from './odds-calculator.service';
 
 /**
@@ -140,7 +143,9 @@ export class WeekManagerService {
     try {
       this.logger.log(`Calculating initial odds for week ${weekId}`);
       await this.oddsCalculatorService.calculateOddsForWeek(weekId);
-      this.logger.log(`Initial odds calculated successfully for week ${weekId}`);
+      this.logger.log(
+        `Initial odds calculated successfully for week ${weekId}`,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to calculate initial odds for week ${weekId}`,
@@ -252,7 +257,9 @@ export class WeekManagerService {
 
     await this.bettingWeekRepository.save(week);
 
-    this.logger.log(`Week ${weekId} finalized with podium: ${podiumIds.join(', ')}`);
+    this.logger.log(
+      `Week ${weekId} finalized with podium: ${podiumIds.join(', ')}`,
+    );
   }
 
   /**

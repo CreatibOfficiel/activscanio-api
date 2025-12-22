@@ -26,7 +26,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BettingWeek, BettingWeekStatus } from '../entities/betting-week.entity';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../entities/betting-week.entity';
 import { Bet } from '../entities/bet.entity';
 import { BetPick } from '../entities/bet-pick.entity';
 import { BettorRanking } from '../entities/bettor-ranking.entity';
@@ -35,7 +38,10 @@ import {
   SCORING_LOGGER_CONFIG,
 } from '../config/betting-scoring.config';
 import { StreakTrackerService } from '../../achievements/services/streak-tracker.service';
-import { XPLevelService, XPSource } from '../../achievements/services/xp-level.service';
+import {
+  XPLevelService,
+  XPSource,
+} from '../../achievements/services/xp-level.service';
 
 /**
  * Podium result for a week
@@ -126,9 +132,9 @@ export class BettingFinalizerService {
 
     // 2. Extract podium
     const podium: PodiumResult = {
-      firstId: week.podiumFirstId!,
-      secondId: week.podiumSecondId!,
-      thirdId: week.podiumThirdId!,
+      firstId: week.podiumFirstId,
+      secondId: week.podiumSecondId,
+      thirdId: week.podiumThirdId,
     };
 
     this.logger.log(
@@ -238,13 +244,20 @@ export class BettingFinalizerService {
 
       // Update streak for this user
       try {
-        await this.streakTrackerService.updateStreak(bet.userId, bet.bettingWeekId);
+        await this.streakTrackerService.updateStreak(
+          bet.userId,
+          bet.bettingWeekId,
+        );
       } catch (error) {
-        this.logger.error(`Failed to update streak for user ${bet.userId}: ${error.message}`);
+        this.logger.error(
+          `Failed to update streak for user ${bet.userId}: ${error.message}`,
+        );
       }
 
       // Calculate stats for events and XP
-      const correctPicksCount = calculation.picks.filter((p) => p.isCorrect).length;
+      const correctPicksCount = calculation.picks.filter(
+        (p) => p.isCorrect,
+      ).length;
       const hasBoost = calculation.picks.some((p) => p.hasBoost);
       const highestOdd = Math.max(...calculation.picks.map((p) => p.oddAtBet));
 
@@ -260,13 +273,21 @@ export class BettingFinalizerService {
 
         // XP for perfect podium
         if (calculation.isPerfectPodium) {
-          await this.xpLevelService.awardXP(bet.userId, XPSource.PERFECT_PODIUM);
+          await this.xpLevelService.awardXP(
+            bet.userId,
+            XPSource.PERFECT_PODIUM,
+          );
         }
 
         // XP for weekly participation
-        await this.xpLevelService.awardXP(bet.userId, XPSource.WEEKLY_PARTICIPATION);
+        await this.xpLevelService.awardXP(
+          bet.userId,
+          XPSource.WEEKLY_PARTICIPATION,
+        );
       } catch (error) {
-        this.logger.error(`Failed to award XP for user ${bet.userId}: ${error.message}`);
+        this.logger.error(
+          `Failed to award XP for user ${bet.userId}: ${error.message}`,
+        );
       }
 
       // Emit event for achievement calculation
@@ -295,10 +316,7 @@ export class BettingFinalizerService {
   /**
    * Calculate points for a single bet
    */
-  private calculateBetPoints(
-    bet: Bet,
-    podium: PodiumResult,
-  ): BetCalculation {
+  private calculateBetPoints(bet: Bet, podium: PodiumResult): BetCalculation {
     const pickCalculations: PickCalculation[] = [];
 
     // Check each pick
@@ -350,7 +368,8 @@ export class BettingFinalizerService {
 
     if (isPerfectPodium) {
       perfectPodiumBonus =
-        totalPointsBeforeBonus * (DEFAULT_SCORING_PARAMS.perfectPodiumBonus - 1);
+        totalPointsBeforeBonus *
+        (DEFAULT_SCORING_PARAMS.perfectPodiumBonus - 1);
       finalPoints =
         totalPointsBeforeBonus * DEFAULT_SCORING_PARAMS.perfectPodiumBonus;
     }

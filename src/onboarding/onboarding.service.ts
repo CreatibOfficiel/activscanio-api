@@ -33,10 +33,9 @@ export class OnboardingService {
   async searchCompetitors(query: string): Promise<Competitor[]> {
     return await this.competitorRepository
       .createQueryBuilder('c')
-      .where(
-        'LOWER(c.firstName || \' \' || c.lastName) LIKE LOWER(:query)',
-        { query: `%${query}%` },
-      )
+      .where("LOWER(c.firstName || ' ' || c.lastName) LIKE LOWER(:query)", {
+        query: `%${query}%`,
+      })
       .orWhere('LOWER(c.firstName) LIKE LOWER(:query)', {
         query: `%${query}%`,
       })
@@ -75,6 +74,24 @@ export class OnboardingService {
 
       if (user.hasCompletedOnboarding) {
         throw new BadRequestException('User has already completed onboarding');
+      }
+
+      // SPECTATOR PATH: User chose to be spectator only (no competitor/character)
+      if (dto.isSpectator) {
+        user.role = UserRole.SPECTATOR;
+        // hasCompletedOnboarding sera automatiquement true via le getter
+        // car role=SPECTATOR et competitorId=null
+        const updatedUser = await queryRunner.manager.save(user);
+        await queryRunner.commitTransaction();
+        this.logger.log(`User ${userId} completed onboarding as SPECTATOR`);
+        return updatedUser;
+      }
+
+      // COMPETITOR PATH: Validate required fields
+      if (!dto.characterVariantId) {
+        throw new BadRequestException(
+          'Character variant is required for competitors',
+        );
       }
 
       let competitorId: string;
@@ -167,7 +184,8 @@ export class OnboardingService {
       // Update user
       user.competitorId = competitorId;
       user.role = UserRole.BOTH; // User is now both bettor and competitor
-      user.hasCompletedOnboarding = true;
+      // hasCompletedOnboarding sera automatiquement true via le getter
+      // car role=BOTH et competitorId est défini
 
       const updatedUser = await queryRunner.manager.save(user);
 
@@ -188,19 +206,5 @@ export class OnboardingService {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  /**
-   * Skip onboarding (mark as completed without linking)
-   */
-  async skipOnboarding(userId: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    user.hasCompletedOnboarding = true;
-    return await this.userRepository.save(user);
   }
 }

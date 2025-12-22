@@ -9,22 +9,28 @@ import {
 } from 'class-validator';
 
 export class UpdateCompetitorDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   firstName?: string;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   lastName?: string;
 
-  @IsOptional() @IsUrl()
+  @IsOptional()
+  @IsUrl()
   profilePictureUrl?: string;
 
-  @IsOptional() @IsInt()
+  @IsOptional()
+  @IsInt()
   rank?: number;
 
-  @IsOptional() @IsInt()
+  @IsOptional()
+  @IsInt()
   raceCount?: number;
 
-  @IsOptional() @IsNumber()
+  @IsOptional()
+  @IsNumber()
   avgRank12?: number;
 
   /**

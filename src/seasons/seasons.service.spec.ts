@@ -290,9 +290,7 @@ describe('SeasonsService', () => {
         if (entity === SeasonArchive) {
           // Verify date range
           expect(data.startDate).toEqual(new Date(2024, 0, 1)); // Jan 1
-          expect(data.endDate).toEqual(
-            new Date(2024, 1, 0, 23, 59, 59, 999),
-          ); // Jan 31 end
+          expect(data.endDate).toEqual(new Date(2024, 1, 0, 23, 59, 59, 999)); // Jan 31 end
           return data;
         }
         return data;

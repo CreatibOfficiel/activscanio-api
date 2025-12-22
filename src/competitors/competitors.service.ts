@@ -27,7 +27,10 @@ export class CompetitorsService {
   }
 
   async findOne(id: string): Promise<Competitor | null> {
-    return this.competitorRepository.findOne(id, ['characterVariant', 'characterVariant.baseCharacter']);
+    return this.competitorRepository.findOne(id, [
+      'characterVariant',
+      'characterVariant.baseCharacter',
+    ]);
   }
 
   /* ░░░░░░░░░░░░   CREATE   ░░░░░░░░░░░░ */
@@ -40,56 +43,62 @@ export class CompetitorsService {
   /* ░░░░░░░░░░░░   UPDATE   ░░░░░░░░░░░░ */
 
   async update(id: string, dto: UpdateCompetitorDto): Promise<Competitor> {
-    return this.competitorRepository.repository.manager.transaction(async (em) => {
-      const competitor = await em.findOne(Competitor, {
-        where: { id },
-        relations: ['characterVariant', 'characterVariant.baseCharacter'],
-      });
-      if (!competitor) throw new CompetitorNotFoundException(id);
+    return this.competitorRepository.repository.manager.transaction(
+      async (em) => {
+        const competitor = await em.findOne(Competitor, {
+          where: { id },
+          relations: ['characterVariant', 'characterVariant.baseCharacter'],
+        });
+        if (!competitor) throw new CompetitorNotFoundException(id);
 
-      // Separate characterVariantId from simple fields
-      const { characterVariantId, ...simpleFields } = dto;
-      Object.assign(competitor, simpleFields);
+        // Separate characterVariantId from simple fields
+        const { characterVariantId, ...simpleFields } = dto;
+        Object.assign(competitor, simpleFields);
 
-      // Handle characterVariantId, only if present in the payload
-      if (dto.hasOwnProperty('characterVariantId')) {
-        if (characterVariantId) {
-          // We want to link
-          const variant = await em.findOne(CharacterVariant, {
-            where: { id: characterVariantId },
-            relations: ['competitor', 'baseCharacter'],
-          });
-          if (!variant)
-            throw new EntityNotFoundException('CharacterVariant', characterVariantId);
-          if (variant.competitor && variant.competitor.id !== competitor.id) {
-            throw new ValidationException(
-              'characterVariantId',
-              `Already linked to competitor ${variant.competitor.id}`,
-            );
+        // Handle characterVariantId, only if present in the payload
+        if (dto.hasOwnProperty('characterVariantId')) {
+          if (characterVariantId) {
+            // We want to link
+            const variant = await em.findOne(CharacterVariant, {
+              where: { id: characterVariantId },
+              relations: ['competitor', 'baseCharacter'],
+            });
+            if (!variant)
+              throw new EntityNotFoundException(
+                'CharacterVariant',
+                characterVariantId,
+              );
+            if (variant.competitor && variant.competitor.id !== competitor.id) {
+              throw new ValidationException(
+                'characterVariantId',
+                `Already linked to competitor ${variant.competitor.id}`,
+              );
+            }
+            variant.competitor = competitor;
+            competitor.characterVariant = variant;
+            await em.save(variant);
+          } else {
+            // We want to unlink
+            competitor.characterVariant = null;
           }
-          variant.competitor = competitor;
-          competitor.characterVariant = variant;
-          await em.save(variant);
-        } else {
-          // We want to unlink
-          competitor.characterVariant = null;
         }
-      }
 
-      return em.save(competitor);
-    });
+        return em.save(competitor);
+      },
+    );
   }
 
   async updateRatingsForRace(raceResults: RaceResult[]) {
     // Get competitors
-    const ids = raceResults.map(r => r.competitorId);
+    const ids = raceResults.map((r) => r.competitorId);
     const competitors = await this.competitorRepository.findByIds(ids);
 
     // Calculate updated ratings using Glicko-2
-    const updatedRatings = this.ratingCalculationService.calculateRatingsForRace(
-      competitors,
-      raceResults,
-    );
+    const updatedRatings =
+      this.ratingCalculationService.calculateRatingsForRace(
+        competitors,
+        raceResults,
+      );
 
     // Use repository method to update all ratings in a transaction
     await this.competitorRepository.updateManyRatings(

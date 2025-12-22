@@ -19,7 +19,9 @@ export class RaceCreatedListener {
 
     // Only recalculate odds if race is assigned to a betting week
     if (!event.bettingWeekId) {
-      this.logger.log('Race not assigned to betting week, skipping odds calculation');
+      this.logger.log(
+        'Race not assigned to betting week, skipping odds calculation',
+      );
       return;
     }
 

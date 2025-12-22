@@ -12,9 +12,7 @@ import {
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private readonly userRepository: UserRepository,
-  ) {}
+  constructor(private readonly userRepository: UserRepository) {}
 
   /**
    * Create a new user
@@ -128,7 +126,10 @@ export class UsersService {
     const user = await this.findOne(userId);
 
     if (!user.competitorId) {
-      throw new ValidationException('competitorId', 'User is not linked to any competitor');
+      throw new ValidationException(
+        'competitorId',
+        'User is not linked to any competitor',
+      );
     }
 
     user.competitorId = null as any; // TypeORM accepts null for nullable columns

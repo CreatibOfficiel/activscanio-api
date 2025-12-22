@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -24,7 +17,6 @@ import { UsersService } from '../users/users.service';
 @ApiTags('onboarding')
 @ApiBearerAuth()
 @Controller('onboarding')
-@UseGuards(ClerkGuard)
 export class OnboardingController {
   constructor(
     private readonly onboardingService: OnboardingService,
@@ -50,10 +42,17 @@ export class OnboardingController {
   @Get('search')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: 'Search competitors by name' })
-  @ApiQuery({ name: 'query', description: 'Search query (min 2 characters)', example: 'john' })
+  @ApiQuery({
+    name: 'query',
+    description: 'Search query (min 2 characters)',
+    example: 'john',
+  })
   @ApiResponse({ status: 200, description: 'List of matching competitors' })
   @ApiResponse({ status: 400, description: 'Invalid query' })
-  @ApiResponse({ status: 429, description: 'Too many requests (rate limit exceeded)' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too many requests (rate limit exceeded)',
+  })
   async searchCompetitors(@Query() dto: SearchCompetitorDto) {
     return await this.onboardingService.searchCompetitors(dto.query);
   }
@@ -63,29 +62,30 @@ export class OnboardingController {
    * Complete onboarding flow
    */
   @Post('complete')
-  @ApiOperation({ summary: 'Complete onboarding by linking competitor and character' })
-  @ApiResponse({ status: 200, description: 'Onboarding completed successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid request or already completed' })
-  @ApiResponse({ status: 404, description: 'Competitor or character variant not found' })
-  @ApiResponse({ status: 409, description: 'Competitor or character already linked' })
+  @ApiOperation({
+    summary: 'Complete onboarding by linking competitor and character',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Onboarding completed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request or already completed',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Competitor or character variant not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Competitor or character already linked',
+  })
   async completeOnboarding(
     @CurrentUser('clerkId') clerkId: string,
     @Body() dto: CompleteOnboardingDto,
   ) {
     const userId = await this.getUserIdFromClerkId(clerkId);
     return await this.onboardingService.completeOnboarding(userId, dto);
-  }
-
-  /**
-   * POST /onboarding/skip
-   * Skip onboarding (mark as completed)
-   */
-  @Post('skip')
-  @ApiOperation({ summary: 'Skip onboarding process' })
-  @ApiResponse({ status: 200, description: 'Onboarding skipped successfully' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async skipOnboarding(@CurrentUser('clerkId') clerkId: string) {
-    const userId = await this.getUserIdFromClerkId(clerkId);
-    return await this.onboardingService.skipOnboarding(userId);
   }
 }

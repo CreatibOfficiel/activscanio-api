@@ -1,4 +1,4 @@
-import { Competitor } from "../competitor.entity";
+import { Competitor } from '../competitor.entity';
 
 export const sanitizeCompetitor = (c: Competitor) => ({
   id: c.id,

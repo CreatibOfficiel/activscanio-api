@@ -56,9 +56,6 @@ export class User {
   @Column({ type: 'int', nullable: true })
   lastBoostUsedYear: number | null;
 
-  @Column({ type: 'boolean', default: false })
-  hasCompletedOnboarding: boolean;
-
   // Gamification fields
   @Column({ type: 'int', default: 0 })
   @Index()
@@ -92,4 +89,26 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  /**
+   * Getter dynamique : vérifie si l'utilisateur a complété l'onboarding
+   * basé sur l'état réel des données (rôle + competitorId)
+   */
+  get hasCompletedOnboarding(): boolean {
+    // Spectateur : doit avoir le rôle SPECTATOR et pas de competitorId
+    if (this.role === UserRole.SPECTATOR && !this.competitorId) {
+      return true;
+    }
+
+    // Compétiteur (BOTH ou COMPETITOR) : doit avoir un competitorId
+    if (
+      (this.role === UserRole.BOTH || this.role === UserRole.COMPETITOR) &&
+      this.competitorId
+    ) {
+      return true;
+    }
+
+    // Sinon, onboarding incomplet
+    return false;
+  }
 }

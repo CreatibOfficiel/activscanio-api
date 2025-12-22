@@ -20,7 +20,9 @@ export class BaseCharactersController {
 
   // GET /base-characters/:id
   @Get(':id')
-  async findOne(@Param('id', new ParseUUIDPipe()) id: string): Promise<BaseCharacter> {
+  async findOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<BaseCharacter> {
     return this.baseCharactersService.findOne(id);
   }
 

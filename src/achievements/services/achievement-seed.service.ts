@@ -107,8 +107,7 @@ export class AchievementSeedService {
         (byCategory[achievement.category] || 0) + 1;
 
       // Count by rarity
-      byRarity[achievement.rarity] =
-        (byRarity[achievement.rarity] || 0) + 1;
+      byRarity[achievement.rarity] = (byRarity[achievement.rarity] || 0) + 1;
     }
 
     return {

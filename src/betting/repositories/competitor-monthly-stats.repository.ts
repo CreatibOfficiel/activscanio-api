@@ -38,7 +38,10 @@ export class CompetitorMonthlyStatsRepository extends BaseRepository<CompetitorM
    * @param month - Month (1-12)
    * @param year - Year (e.g., 2025)
    */
-  async findByMonth(month: number, year: number): Promise<CompetitorMonthlyStats[]> {
+  async findByMonth(
+    month: number,
+    year: number,
+  ): Promise<CompetitorMonthlyStats[]> {
     return this.repository.find({
       where: { month, year },
       relations: ['competitor'],
@@ -50,7 +53,9 @@ export class CompetitorMonthlyStatsRepository extends BaseRepository<CompetitorM
    * Find all stats for a specific competitor
    * @param competitorId - Competitor UUID
    */
-  async findByCompetitor(competitorId: string): Promise<CompetitorMonthlyStats[]> {
+  async findByCompetitor(
+    competitorId: string,
+  ): Promise<CompetitorMonthlyStats[]> {
     return this.repository.find({
       where: { competitorId },
       order: { year: 'DESC', month: 'DESC' },

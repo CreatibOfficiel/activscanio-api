@@ -8,10 +8,7 @@ async function bootstrap() {
 
   // Register global exception filters
   // Order matters: HttpExceptionFilter catches HttpException, AllExceptionsFilter catches everything else
-  app.useGlobalFilters(
-    new AllExceptionsFilter(),
-    new HttpExceptionFilter(),
-  );
+  app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());
 
   app.enableCors();
   app.setGlobalPrefix('api');
@@ -32,9 +29,13 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 
-  console.log(`🚀 API running on: http://localhost:${process.env.PORT ?? 3000}/api`);
-  console.log(`📚 Swagger docs: http://localhost:${process.env.PORT ?? 3000}/api/docs`);
+  console.log(
+    `🚀 API running on: http://localhost:${process.env.PORT ?? 3000}/api`,
+  );
+  console.log(
+    `📚 Swagger docs: http://localhost:${process.env.PORT ?? 3000}/api/docs`,
+  );
 }
 bootstrap();

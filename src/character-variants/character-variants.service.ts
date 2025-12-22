@@ -27,7 +27,9 @@ export class CharacterVariantsService {
     return variant;
   }
 
-  async findByCompetitorIds(competitorIds: string[]): Promise<CharacterVariant[]> {
+  async findByCompetitorIds(
+    competitorIds: string[],
+  ): Promise<CharacterVariant[]> {
     if (!competitorIds.length) return [];
     return this.variantRepo.find({
       where: {

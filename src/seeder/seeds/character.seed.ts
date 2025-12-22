@@ -129,7 +129,10 @@ export async function seedBaseCharacters(dataSource: DataSource) {
    *    If "variant" exists, we use it as a label (e.g. "Red").
    *    If "variant" is absent, we consider it a "default" variant.
    */
-  const baseMap = new Map<string, { name: string; variants: { label: string | null }[] }>();
+  const baseMap = new Map<
+    string,
+    { name: string; variants: { label: string | null }[] }
+  >();
 
   for (const c of charactersData) {
     if (!baseMap.has(c.name)) {

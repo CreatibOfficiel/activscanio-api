@@ -37,9 +37,7 @@ export class RaceAnalysisService {
         ? v.baseCharacter.name
         : `${v.label} ${v.baseCharacter.name}`.trim();
 
-    const nameToVariant = new Map(
-      variants.map((v) => [labelForVariant(v), v]),
-    );
+    const nameToVariant = new Map(variants.map((v) => [labelForVariant(v), v]));
 
     const whitelist = [...nameToVariant.keys()];
 

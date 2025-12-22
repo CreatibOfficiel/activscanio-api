@@ -23,7 +23,11 @@ export class UserRepository extends BaseRepository<User> {
   async findByClerkId(clerkId: string): Promise<User | null> {
     return this.repository.findOne({
       where: { clerkId },
-      relations: ['competitor'],
+      relations: [
+        'competitor',
+        'competitor.characterVariant',
+        'competitor.characterVariant.baseCharacter',
+      ],
     });
   }
 

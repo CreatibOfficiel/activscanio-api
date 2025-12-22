@@ -54,9 +54,7 @@ export class BettingService {
   /**
    * Create a new betting week
    */
-  async createWeek(
-    createWeekDto: CreateBettingWeekDto,
-  ): Promise<BettingWeek> {
+  async createWeek(createWeekDto: CreateBettingWeekDto): Promise<BettingWeek> {
     // Check if week already exists
     const existing = await this.bettingWeekRepository.findOne({
       where: {
@@ -158,7 +156,9 @@ export class BettingService {
     const competitorIds = placeBetDto.picks.map((p) => p.competitorId);
     const uniqueIds = new Set(competitorIds);
     if (uniqueIds.size !== 3) {
-      throw new BadRequestException('You cannot select the same competitor twice');
+      throw new BadRequestException(
+        'You cannot select the same competitor twice',
+      );
     }
 
     // Check boost - only one competitor can have boost

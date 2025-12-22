@@ -191,7 +191,8 @@ export class OddsCalculatorService {
         return {
           competitor,
           recentRaces: recentRacePerformances,
-          isEligible: racesThisWeek.length >= ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK,
+          isEligible:
+            racesThisWeek.length >= ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK,
         };
       }),
     );

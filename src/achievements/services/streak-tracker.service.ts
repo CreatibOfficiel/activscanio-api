@@ -81,9 +81,7 @@ export class StreakTrackerService {
         userStreak.lastBetYear === currentYear
       ) {
         // Same week, don't update streak
-        this.logger.debug(
-          `User ${userId}: Bet in same week, streak unchanged`,
-        );
+        this.logger.debug(`User ${userId}: Bet in same week, streak unchanged`);
         return userStreak;
       }
 
@@ -109,9 +107,7 @@ export class StreakTrackerService {
     }
 
     // Update longest lifetime streak if current is higher
-    if (
-      userStreak.currentLifetimeStreak > userStreak.longestLifetimeStreak
-    ) {
+    if (userStreak.currentLifetimeStreak > userStreak.longestLifetimeStreak) {
       const previousRecord = userStreak.longestLifetimeStreak;
       userStreak.longestLifetimeStreak = userStreak.currentLifetimeStreak;
 
@@ -141,8 +137,7 @@ export class StreakTrackerService {
       monthlyStreak: savedStreak.currentMonthlyStreak,
       lifetimeStreak: savedStreak.currentLifetimeStreak,
       isNewRecord:
-        savedStreak.currentLifetimeStreak ===
-        savedStreak.longestLifetimeStreak,
+        savedStreak.currentLifetimeStreak === savedStreak.longestLifetimeStreak,
     });
 
     return savedStreak;

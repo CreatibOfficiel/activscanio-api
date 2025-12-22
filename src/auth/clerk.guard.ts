@@ -4,16 +4,31 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { verifyToken } from '@clerk/backend';
+import { IS_PUBLIC_KEY } from './decorators/public.decorator';
 
 /**
  * Clerk Authentication Guard
  * Verifies JWT tokens from Clerk and attaches user info to request
+ * Supports @Public() decorator to skip authentication for specific routes
  */
 @Injectable()
 export class ClerkGuard implements CanActivate {
+  constructor(private reflector: Reflector) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Check if route is marked as public
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true; // Skip authentication for public routes
+    }
+
     const request = context.switchToHttp().getRequest<Request>();
 
     // Extract token from Authorization header

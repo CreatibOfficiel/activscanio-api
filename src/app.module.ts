@@ -6,6 +6,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { typeOrmAsyncConfig } from './config/typeorm.config';
+import { ClerkGuard } from './auth/clerk.guard';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -61,6 +62,11 @@ import { AchievementsModule } from './achievements/achievements.module';
   providers: [
     AppService,
     OpenAIService,
+    // Apply authentication globally (unless route is marked @Public())
+    {
+      provide: APP_GUARD,
+      useClass: ClerkGuard,
+    },
     // Apply rate limiting globally
     {
       provide: APP_GUARD,

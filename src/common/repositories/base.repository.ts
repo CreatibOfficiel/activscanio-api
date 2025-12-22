@@ -34,10 +34,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     try {
       return await this.repository.find(options);
     } catch (error) {
-      this.logger.error(
-        `Error finding all ${this.entityName}:`,
-        error.stack,
-      );
+      this.logger.error(`Error finding all ${this.entityName}:`, error.stack);
       throw error;
     }
   }
@@ -91,10 +88,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
       this.logger.log(`${this.entityName} saved successfully`);
       return saved;
     } catch (error) {
-      this.logger.error(
-        `Error saving ${this.entityName}:`,
-        error.stack,
-      );
+      this.logger.error(`Error saving ${this.entityName}:`, error.stack);
       throw error;
     }
   }
@@ -102,7 +96,9 @@ export abstract class BaseRepository<T extends ObjectLiteral>
   async saveMany(entities: T[]): Promise<T[]> {
     try {
       const saved = await this.repository.save(entities);
-      this.logger.log(`${entities.length} ${this.entityName} entities saved successfully`);
+      this.logger.log(
+        `${entities.length} ${this.entityName} entities saved successfully`,
+      );
       return saved;
     } catch (error) {
       this.logger.error(
@@ -118,7 +114,9 @@ export abstract class BaseRepository<T extends ObjectLiteral>
       await this.repository.update(id, data as any);
       const updated = await this.findOne(id);
       if (!updated) {
-        throw new Error(`${this.entityName} with ID ${id} not found after update`);
+        throw new Error(
+          `${this.entityName} with ID ${id} not found after update`,
+        );
       }
       this.logger.log(`${this.entityName} with ID ${id} updated successfully`);
       return updated;
@@ -148,10 +146,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     try {
       return await this.repository.count({ where });
     } catch (error) {
-      this.logger.error(
-        `Error counting ${this.entityName}:`,
-        error.stack,
-      );
+      this.logger.error(`Error counting ${this.entityName}:`, error.stack);
       throw error;
     }
   }

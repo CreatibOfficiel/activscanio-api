@@ -71,6 +71,8 @@ export class BettorRankingRepository extends BaseRepository<BettorRanking> {
       await this.repository.save(rankings[i]);
     }
 
-    this.logger.log(`Updated ranks for ${year}-${month}: ${rankings.length} bettors`);
+    this.logger.log(
+      `Updated ranks for ${year}-${month}: ${rankings.length} bettors`,
+    );
   }
 }

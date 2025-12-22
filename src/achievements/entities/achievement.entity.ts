@@ -32,7 +32,7 @@ export enum AchievementConditionType {
 export enum AchievementConditionOperator {
   GTE = 'gte', // Greater than or equal
   LTE = 'lte', // Less than or equal
-  EQ = 'eq',   // Equal
+  EQ = 'eq', // Equal
 }
 
 export enum AchievementScope {
@@ -87,7 +87,10 @@ export class Achievement {
   @Column({ type: 'jsonb' })
   condition: AchievementCondition;
 
-  @OneToMany(() => UserAchievement, (userAchievement) => userAchievement.achievement)
+  @OneToMany(
+    () => UserAchievement,
+    (userAchievement) => userAchievement.achievement,
+  )
   userAchievements: UserAchievement[];
 
   @CreateDateColumn()

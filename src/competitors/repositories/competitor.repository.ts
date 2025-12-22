@@ -102,8 +102,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
           raceCount: c.raceCount + 1,
           lastRaceDate: new Date(),
           avgRank12:
-            c.avgRank12 +
-            (result.rank12 - c.avgRank12) / (c.raceCount + 1),
+            c.avgRank12 + (result.rank12 - c.avgRank12) / (c.raceCount + 1),
         });
         await em.save(c);
       }

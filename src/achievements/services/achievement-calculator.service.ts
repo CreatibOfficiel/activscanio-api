@@ -2,14 +2,23 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { Achievement, AchievementConditionType, AchievementConditionOperator, AchievementScope } from '../entities/achievement.entity';
+import {
+  Achievement,
+  AchievementConditionType,
+  AchievementConditionOperator,
+  AchievementScope,
+} from '../entities/achievement.entity';
 import { UserAchievement } from '../entities/user-achievement.entity';
 import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
 import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 import { Bet } from '../../betting/entities/bet.entity';
 import { XPLevelService, XPSource } from './xp-level.service';
-import { BetFinalizedContext, UserStats, AchievementUnlockResult } from '../types/achievement-calculator.types';
+import {
+  BetFinalizedContext,
+  UserStats,
+  AchievementUnlockResult,
+} from '../types/achievement-calculator.types';
 
 @Injectable()
 export class AchievementCalculatorService {
@@ -37,10 +46,15 @@ export class AchievementCalculatorService {
    */
   @OnEvent('bet.finalized')
   async handleBetFinalized(context: BetFinalizedContext): Promise<void> {
-    this.logger.log(`Checking achievements for user ${context.userId} after bet finalized`);
+    this.logger.log(
+      `Checking achievements for user ${context.userId} after bet finalized`,
+    );
 
     try {
-      const unlockedAchievements = await this.checkAchievements(context.userId, context);
+      const unlockedAchievements = await this.checkAchievements(
+        context.userId,
+        context,
+      );
 
       if (unlockedAchievements.length > 0) {
         this.logger.log(
@@ -57,7 +71,9 @@ export class AchievementCalculatorService {
         }
       }
     } catch (error) {
-      this.logger.error(`Failed to check achievements for user ${context.userId}: ${error.message}`);
+      this.logger.error(
+        `Failed to check achievements for user ${context.userId}: ${error.message}`,
+      );
     }
   }
 
@@ -98,7 +114,10 @@ export class AchievementCalculatorService {
       }
 
       // Evaluate condition
-      const isUnlocked = this.evaluateCondition(achievement.condition, userStats);
+      const isUnlocked = this.evaluateCondition(
+        achievement.condition,
+        userStats,
+      );
 
       if (isUnlocked) {
         // Create UserAchievement
@@ -112,8 +131,15 @@ export class AchievementCalculatorService {
         await this.userAchievementRepository.save(userAchievement);
 
         // Update user achievement count
-        await this.userRepository.increment({ id: userId }, 'achievementCount', 1);
-        await this.userRepository.update({ id: userId }, { lastAchievementUnlockedAt: new Date() });
+        await this.userRepository.increment(
+          { id: userId },
+          'achievementCount',
+          1,
+        );
+        await this.userRepository.update(
+          { id: userId },
+          { lastAchievementUnlockedAt: new Date() },
+        );
 
         // Award XP based on rarity
         const xpSource = `ACHIEVEMENT_${achievement.rarity}` as XPSource;
@@ -129,7 +155,9 @@ export class AchievementCalculatorService {
           unlockedAt: userAchievement.unlockedAt,
         });
 
-        this.logger.log(`Achievement unlocked: ${achievement.key} for user ${userId}`);
+        this.logger.log(
+          `Achievement unlocked: ${achievement.key} for user ${userId}`,
+        );
       }
     }
 
@@ -143,11 +171,12 @@ export class AchievementCalculatorService {
    * @param userStats - User statistics
    * @returns True if condition is met
    */
-  private evaluateCondition(
-    condition: any,
-    userStats: UserStats,
-  ): boolean {
-    const actualValue = this.getMetricValue(userStats, condition.metric, condition.scope);
+  private evaluateCondition(condition: any, userStats: UserStats): boolean {
+    const actualValue = this.getMetricValue(
+      userStats,
+      condition.metric,
+      condition.scope,
+    );
 
     switch (condition.operator) {
       case AchievementConditionOperator.GTE:
@@ -181,11 +210,15 @@ export class AchievementCalculatorService {
     switch (metric) {
       // Betting counts
       case 'betsPlaced':
-        return isMonthly ? userStats.monthlyBetsPlaced : userStats.totalBetsPlaced;
+        return isMonthly
+          ? userStats.monthlyBetsPlaced
+          : userStats.totalBetsPlaced;
       case 'betsWon':
         return isMonthly ? userStats.monthlyBetsWon : userStats.totalBetsWon;
       case 'perfectBets':
-        return isMonthly ? userStats.monthlyPerfectBets : userStats.totalPerfectBets;
+        return isMonthly
+          ? userStats.monthlyPerfectBets
+          : userStats.totalPerfectBets;
       case 'totalPoints':
         return isMonthly ? userStats.monthlyPoints : userStats.totalPoints;
 
@@ -217,7 +250,9 @@ export class AchievementCalculatorService {
 
       // Ranking
       case 'rank':
-        return isMonthly ? (userStats.monthlyRank || 999) : (userStats.bestMonthlyRank || 999);
+        return isMonthly
+          ? userStats.monthlyRank || 999
+          : userStats.bestMonthlyRank || 999;
       case 'consecutiveMonthlyWins':
         return userStats.consecutiveMonthlyWins;
 
@@ -266,13 +301,19 @@ export class AchievementCalculatorService {
 
     // Calculate stats
     const totalBetsPlaced = allBets.length;
-    const totalBetsWon = allBets.filter((bet) => bet.isFinalized && bet.pointsEarned > 0).length;
-    const totalPerfectBets = allBets.filter((bet) =>
-      bet.isFinalized && bet.picks.every((pick) => pick.isCorrect)
+    const totalBetsWon = allBets.filter(
+      (bet) => bet.isFinalized && bet.pointsEarned > 0,
     ).length;
-    const totalPoints = allBets.reduce((sum, bet) => sum + (bet.pointsEarned || 0), 0);
+    const totalPerfectBets = allBets.filter(
+      (bet) => bet.isFinalized && bet.picks.every((pick) => pick.isCorrect),
+    ).length;
+    const totalPoints = allBets.reduce(
+      (sum, bet) => sum + (bet.pointsEarned || 0),
+      0,
+    );
 
-    const winRate = totalBetsPlaced > 0 ? (totalBetsWon / totalBetsPlaced) * 100 : 0;
+    const winRate =
+      totalBetsPlaced > 0 ? (totalBetsWon / totalBetsPlaced) * 100 : 0;
 
     // Partial wins (2/3 correct)
     const partialWins = allBets.filter((bet) => {
@@ -283,7 +324,7 @@ export class AchievementCalculatorService {
 
     // Boost stats
     const totalBoostsUsed = allBets.filter((bet) =>
-      bet.picks.some((pick) => pick.hasBoost)
+      bet.picks.some((pick) => pick.hasBoost),
     ).length;
 
     // High odds wins
@@ -294,26 +335,37 @@ export class AchievementCalculatorService {
 
     const boostedHighOddsWins = allBets.filter((bet) => {
       if (!bet.isFinalized || bet.pointsEarned <= 0) return false;
-      return bet.picks.some((pick) => pick.isCorrect && pick.hasBoost && pick.oddAtBet > 10);
+      return bet.picks.some(
+        (pick) => pick.isCorrect && pick.hasBoost && pick.oddAtBet > 10,
+      );
     }).length;
 
     // Monthly stats
     const monthlyBets = allBets.filter((bet) => {
       const betDate = new Date(bet.createdAt);
-      return betDate.getMonth() + 1 === currentMonth && betDate.getFullYear() === currentYear;
+      return (
+        betDate.getMonth() + 1 === currentMonth &&
+        betDate.getFullYear() === currentYear
+      );
     });
 
     const monthlyBetsPlaced = monthlyBets.length;
-    const monthlyBetsWon = monthlyBets.filter((bet) => bet.isFinalized && bet.pointsEarned > 0).length;
-    const monthlyPerfectBets = monthlyBets.filter((bet) =>
-      bet.isFinalized && bet.picks.every((pick) => pick.isCorrect)
+    const monthlyBetsWon = monthlyBets.filter(
+      (bet) => bet.isFinalized && bet.pointsEarned > 0,
     ).length;
-    const monthlyPoints = monthlyBets.reduce((sum, bet) => sum + (bet.pointsEarned || 0), 0);
+    const monthlyPerfectBets = monthlyBets.filter(
+      (bet) => bet.isFinalized && bet.picks.every((pick) => pick.isCorrect),
+    ).length;
+    const monthlyPoints = monthlyBets.reduce(
+      (sum, bet) => sum + (bet.pointsEarned || 0),
+      0,
+    );
 
     // Best rank
-    const bestMonthlyRank = allRankings.length > 0 && allRankings[0].rank !== null
-      ? allRankings[0].rank
-      : null;
+    const bestMonthlyRank =
+      allRankings.length > 0 && allRankings[0].rank !== null
+        ? allRankings[0].rank
+        : null;
 
     // Consecutive monthly wins (rank 1)
     let consecutiveMonthlyWins = 0;
@@ -377,7 +429,10 @@ export class AchievementCalculatorService {
    * @param achievementId - Achievement ID
    * @returns Progress percentage (0-100)
    */
-  async getAchievementProgress(userId: string, achievementId: string): Promise<number> {
+  async getAchievementProgress(
+    userId: string,
+    achievementId: string,
+  ): Promise<number> {
     const achievement = await this.achievementRepository.findOne({
       where: { id: achievementId },
     });
@@ -397,7 +452,11 @@ export class AchievementCalculatorService {
 
     // Get user stats and calculate progress
     const userStats = await this.getUserStats(userId);
-    const actualValue = this.getMetricValue(userStats, achievement.condition.metric, achievement.condition.scope);
+    const actualValue = this.getMetricValue(
+      userStats,
+      achievement.condition.metric,
+      achievement.condition.scope,
+    );
     const targetValue = achievement.condition.value;
 
     return Math.min(100, Math.max(0, (actualValue / targetValue) * 100));
