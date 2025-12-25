@@ -26,6 +26,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { AchievementsModule } from './achievements/achievements.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { AchievementsModule } from './achievements/achievements.module';
     OnboardingModule,
     SeasonsModule,
     AchievementsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [
