@@ -1,18 +1,17 @@
 # ----------- Stage 1: Dependencies -----------
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 
 WORKDIR /app
 
 # Install build dependencies for canvas
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    cairo-dev \
-    pango-dev \
-    jpeg-dev \
-    giflib-dev \
-    pixman-dev
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy only the dependency files to take advantage of the cache
 COPY package.json package-lock.json ./
@@ -21,7 +20,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ----------- Stage 2: Build -----------
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -37,19 +36,20 @@ COPY . .
 RUN npm run build
 
 # ----------- Stage 3: Production Runner -----------
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
 
-# Install runtime dependencies for canvas
-RUN apk add --no-cache \
-    cairo \
-    pango \
-    jpeg \
-    giflib \
-    pixman \
+# Install runtime dependencies for canvas and netcat
+RUN apt-get update && apt-get install -y \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
     netcat-openbsd \
-    bash
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy only the files needed for production
 COPY --from=builder /app/dist ./dist
