@@ -20,6 +20,8 @@ import {
 import { AchievementCalculatorService } from './services/achievement-calculator.service';
 import { XPLevelService } from './services/xp-level.service';
 import { StreakTrackerService } from './services/streak-tracker.service';
+import { LevelRewardsService } from './services/level-rewards.service';
+import { AdvancedStatsService } from '../betting/services/advanced-stats.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -56,6 +58,8 @@ export class AchievementsController {
     private readonly achievementCalculatorService: AchievementCalculatorService,
     private readonly xpLevelService: XPLevelService,
     private readonly streakTrackerService: StreakTrackerService,
+    private readonly levelRewardsService: LevelRewardsService,
+    private readonly advancedStatsService: AdvancedStatsService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -141,6 +145,11 @@ export class AchievementsController {
           icon: achievement.icon,
           xpReward: achievement.xpReward,
           unlocksTitle: achievement.unlocksTitle,
+          prerequisiteAchievementKey: achievement.prerequisiteAchievementKey,
+          tierLevel: achievement.tierLevel,
+          chainName: achievement.chainName,
+          isTemporary: achievement.isTemporary,
+          canBeLost: achievement.canBeLost,
           isUnlocked,
           unlockedAt: userAchievement?.unlockedAt || null,
           progress: isUnlocked ? 100 : progress,
@@ -161,6 +170,11 @@ export class AchievementsController {
       icon: achievement.icon,
       xpReward: achievement.xpReward,
       unlocksTitle: achievement.unlocksTitle,
+      prerequisiteAchievementKey: achievement.prerequisiteAchievementKey,
+      tierLevel: achievement.tierLevel,
+      chainName: achievement.chainName,
+      isTemporary: achievement.isTemporary,
+      canBeLost: achievement.canBeLost,
     }));
   }
 
@@ -380,6 +394,183 @@ export class AchievementsController {
 
     return {
       message: 'Title removed successfully',
+    };
+  }
+
+  /**
+   * Get stats history for graphs
+   */
+  @Public()
+  @Get('stats/:userId/history')
+  @ApiOperation({ summary: 'Get user stats history for graphs' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User UUID or "me" for current user',
+  })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['7d', '30d', '3m', '1y'],
+  })
+  @ApiResponse({ status: 200, description: 'Daily stats history' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getStatsHistory(
+    @Param('userId') userIdParam: string,
+    @Query('period') period: '7d' | '30d' | '3m' | '1y' = '30d',
+    @CurrentUser('clerkId') clerkId?: string,
+  ) {
+    let userId = userIdParam;
+    if (userIdParam === 'me') {
+      if (!clerkId) {
+        throw new BadRequestException('Authentication required for "me"');
+      }
+      userId = await this.getUserIdFromClerkId(clerkId);
+    }
+
+    return await this.advancedStatsService.getStatsHistory(userId, period);
+  }
+
+  /**
+   * Get comparison stats (user vs average)
+   */
+  @Public()
+  @Get('stats/:userId/comparison')
+  @ApiOperation({ summary: 'Compare user stats with average' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User UUID or "me" for current user',
+  })
+  @ApiResponse({ status: 200, description: 'Comparison data' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getStatsComparison(
+    @Param('userId') userIdParam: string,
+    @CurrentUser('clerkId') clerkId?: string,
+  ) {
+    let userId = userIdParam;
+    if (userIdParam === 'me') {
+      if (!clerkId) {
+        throw new BadRequestException('Authentication required for "me"');
+      }
+      userId = await this.getUserIdFromClerkId(clerkId);
+    }
+
+    return await this.advancedStatsService.getComparisonStats(userId);
+  }
+
+  /**
+   * Get advanced stats (best day, patterns, etc.)
+   */
+  @Public()
+  @Get('stats/:userId/advanced')
+  @ApiOperation({ summary: 'Get advanced user stats' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User UUID or "me" for current user',
+  })
+  @ApiResponse({ status: 200, description: 'Advanced stats data' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getAdvancedStats(
+    @Param('userId') userIdParam: string,
+    @CurrentUser('clerkId') clerkId?: string,
+  ) {
+    let userId = userIdParam;
+    if (userIdParam === 'me') {
+      if (!clerkId) {
+        throw new BadRequestException('Authentication required for "me"');
+      }
+      userId = await this.getUserIdFromClerkId(clerkId);
+    }
+
+    const [bestDay, favoriteCompetitors, patterns, winRateTrend] =
+      await Promise.all([
+        this.advancedStatsService.getBestDayOfWeek(userId),
+        this.advancedStatsService.getFavoriteCompetitors(userId, 5),
+        this.advancedStatsService.getBettingPatterns(userId),
+        this.advancedStatsService.getWinRateTrend(userId, 30),
+      ]);
+
+    return {
+      bestDay,
+      favoriteCompetitors,
+      patterns,
+      winRateTrend,
+    };
+  }
+
+  /**
+   * Get XP history
+   */
+  @Public()
+  @Get('xp-history/:userId')
+  @ApiOperation({ summary: 'Get user XP history' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User UUID or "me" for current user',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'XP history entries' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getXPHistory(
+    @Param('userId') userIdParam: string,
+    @Query('limit') limit: number = 50,
+    @CurrentUser('clerkId') clerkId?: string,
+  ) {
+    let userId = userIdParam;
+    if (userIdParam === 'me') {
+      if (!clerkId) {
+        throw new BadRequestException('Authentication required for "me"');
+      }
+      userId = await this.getUserIdFromClerkId(clerkId);
+    }
+
+    return await this.xpLevelService.getXPHistory(userId, limit);
+  }
+
+  /**
+   * Get all level rewards
+   */
+  @Public()
+  @Get('level-rewards')
+  @ApiOperation({ summary: 'Get all level rewards' })
+  @ApiResponse({ status: 200, description: 'List of all level rewards' })
+  async getLevelRewards() {
+    return await this.levelRewardsService.getAllRewards();
+  }
+
+  /**
+   * Get unlocked rewards for a user
+   */
+  @Public()
+  @Get('level-rewards/:userId')
+  @ApiOperation({ summary: 'Get unlocked rewards for a user' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User UUID or "me" for current user',
+  })
+  @ApiResponse({ status: 200, description: 'Unlocked rewards' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getUnlockedRewards(
+    @Param('userId') userIdParam: string,
+    @CurrentUser('clerkId') clerkId?: string,
+  ) {
+    let userId = userIdParam;
+    if (userIdParam === 'me') {
+      if (!clerkId) {
+        throw new BadRequestException('Authentication required for "me"');
+      }
+      userId = await this.getUserIdFromClerkId(clerkId);
+    }
+
+    const [unlockedRewards, nextReward, activeMultiplier] = await Promise.all([
+      this.levelRewardsService.getUnlockedRewards(userId),
+      this.levelRewardsService.getNextReward(userId),
+      this.levelRewardsService.getActiveXPMultiplier(userId),
+    ]);
+
+    return {
+      unlockedRewards,
+      nextReward,
+      activeMultiplier,
     };
   }
 }

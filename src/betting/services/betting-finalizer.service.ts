@@ -42,6 +42,10 @@ import {
   XPLevelService,
   XPSource,
 } from '../../achievements/services/xp-level.service';
+import { DailyBonusService } from '../../achievements/services/daily-bonus.service';
+import { CanvasImageService } from '../../image-generation/services/canvas-image.service';
+import { ImageStorageService } from '../../image-generation/services/image-storage.service';
+import { TvDisplayService } from '../../image-generation/services/tv-display.service';
 
 /**
  * Podium result for a week
@@ -109,6 +113,10 @@ export class BettingFinalizerService {
     private readonly eventEmitter: EventEmitter2,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly xpLevelService: XPLevelService,
+    private readonly dailyBonusService: DailyBonusService,
+    private readonly canvasImageService: CanvasImageService,
+    private readonly imageStorageService: ImageStorageService,
+    private readonly tvDisplayService: TvDisplayService,
   ) {}
 
   /**
@@ -261,6 +269,9 @@ export class BettingFinalizerService {
       const hasBoost = calculation.picks.some((p) => p.hasBoost);
       const highestOdd = Math.max(...calculation.picks.map((p) => p.oddAtBet));
 
+      // Calculate high odds bonus (declare outside try block for later use)
+      const highOddsBonus = this.calculateHighOddsXP(calculation.picks);
+
       // Award XP for betting actions
       try {
         // Base XP for placing bet
@@ -284,9 +295,98 @@ export class BettingFinalizerService {
           bet.userId,
           XPSource.WEEKLY_PARTICIPATION,
         );
+
+        // XP bonus for high odds (odds >= 5)
+        if (highOddsBonus > 0) {
+          await this.xpLevelService.awardXP(
+            bet.userId,
+            XPSource.HIGH_ODDS_BONUS,
+            highOddsBonus,
+            bet.id,
+            `High odds bonus (${highOddsBonus} XP)`,
+          );
+        }
+
+        // Comeback bonus - award 25 XP for winning after 3+ consecutive losses
+        const betWon = correctPicksCount > 0;
+        if (betWon) {
+          // Get last 3 finalized bets before this one
+          const previousBets = await this.betRepository.find({
+            where: { userId: bet.userId, isFinalized: true },
+            order: { createdAt: 'DESC' },
+            take: 4, // Take 4 to exclude current bet
+          });
+
+          // Filter out current bet and keep only last 3
+          const lastThreeBets = previousBets
+            .filter((b) => b.id !== bet.id)
+            .slice(0, 3);
+
+          // Check if all 3 previous bets were losses
+          if (
+            lastThreeBets.length === 3 &&
+            lastThreeBets.every((b) => b.pointsEarned === 0)
+          ) {
+            await this.xpLevelService.awardXP(
+              bet.userId,
+              XPSource.COMEBACK_BONUS,
+              null,
+              bet.id,
+              'Comeback bonus (won after 3 consecutive losses)',
+            );
+            this.logger.log(
+              `Comeback bonus awarded to user ${bet.userId} for bet ${bet.id}`,
+            );
+          }
+        }
       } catch (error) {
         this.logger.error(
           `Failed to award XP for user ${bet.userId}: ${error.message}`,
+        );
+      }
+
+      // Track daily stats
+      try {
+        const betWonForStats = correctPicksCount > 0; // At least one correct pick = win
+
+        // Calculate total XP earned for this bet
+        let totalXP = 0;
+        totalXP += 10; // BET_PLACED
+        totalXP += correctPicksCount * 15; // CORRECT_PICK
+        if (calculation.isPerfectPodium) {
+          totalXP += 100; // PERFECT_PODIUM
+        }
+        totalXP += 20; // WEEKLY_PARTICIPATION
+        totalXP += highOddsBonus; // HIGH_ODDS_BONUS if any
+
+        // Check if comeback bonus was awarded (same logic as above)
+        if (betWonForStats) {
+          const previousBets = await this.betRepository.find({
+            where: { userId: bet.userId, isFinalized: true },
+            order: { createdAt: 'DESC' },
+            take: 4,
+          });
+          const lastThreeBets = previousBets
+            .filter((b) => b.id !== bet.id)
+            .slice(0, 3);
+          if (
+            lastThreeBets.length === 3 &&
+            lastThreeBets.every((b) => b.pointsEarned === 0)
+          ) {
+            totalXP += 25; // COMEBACK_BONUS
+          }
+        }
+
+        await this.dailyBonusService.trackDailyActivity(
+          bet.userId,
+          true, // bet was placed
+          betWonForStats,
+          calculation.finalPoints,
+          totalXP,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to track daily stats for user ${bet.userId}: ${error.message}`,
         );
       }
 
@@ -302,6 +402,18 @@ export class BettingFinalizerService {
         hasBoost,
         highestOdd,
       });
+
+      // 🎉 PERFECT SCORE CELEBRATION (60 points)
+      if (calculation.finalPoints === 60) {
+        // Fire and forget - don't block bet finalization
+        this.handlePerfectScoreCelebration(bet, calculation)
+          .catch((error) => {
+            this.logger.error(
+              `Perfect score celebration failed for bet ${bet.id} but bet finalized successfully`,
+              error,
+            );
+          });
+      }
 
       if (SCORING_LOGGER_CONFIG.logFinalPoints) {
         this.logger.log(
@@ -509,5 +621,115 @@ export class BettingFinalizerService {
     this.logger.log(
       `Ranks recalculated for ${rankings.length} users in ${month}/${year}`,
     );
+  }
+
+  /**
+   * Calculate XP bonus for high odds picks
+   * Formula: (odds - 5) * 5 XP per correct pick with odds >= 5
+   * Capped at 200 XP total per bet
+   *
+   * @param picks - Pick calculations
+   * @returns XP bonus amount
+   */
+  private calculateHighOddsXP(picks: PickCalculation[]): number {
+    let bonus = 0;
+
+    for (const pick of picks) {
+      if (pick.isCorrect && pick.oddAtBet >= 5) {
+        // Formula: (cote - 5) * 5 XP
+        // Ex: cote 10 = 25 XP, cote 20 = 75 XP
+        bonus += Math.floor((pick.oddAtBet - 5) * 5);
+      }
+    }
+
+    // Cap at 200 XP per bet
+    return Math.min(bonus, 200);
+  }
+
+  /**
+   * Handle perfect score celebration (60 points)
+   * Generates celebration image and sends to TV display
+   *
+   * This runs asynchronously and does not block bet finalization
+   */
+  private async handlePerfectScoreCelebration(
+    bet: Bet,
+    calculation: BetCalculation,
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        `🎉 Generating perfect score celebration for user ${bet.userId} (${calculation.finalPoints} points)`,
+      );
+
+      // Get user and betting week info for celebration
+      const user = await this.betRepository.manager.findOne('users', {
+        where: { id: bet.userId },
+        relations: ['characterVariant', 'characterVariant.baseCharacter'],
+      }) as any; // Type cast as User entity isn't fully typed here
+
+      const bettingWeek = await this.bettingWeekRepository.findOne({
+        where: { id: bet.bettingWeekId },
+      });
+
+      if (!user) {
+        this.logger.error(`User ${bet.userId} not found for celebration`);
+        return;
+      }
+
+      if (!bettingWeek) {
+        this.logger.error(`Betting week ${bet.bettingWeekId} not found`);
+        return;
+      }
+
+      const characterName = user.characterVariant?.baseCharacter?.name || 'Champion';
+      const characterImageUrl = user.characterVariant?.iconUrl || null;
+      const raceTitle = `Week ${bettingWeek.weekNumber} - ${bettingWeek.year}`;
+
+      // 1. Generate celebration image using canvas
+      const imageBuffer = await this.canvasImageService.generatePerfectScoreCelebration({
+        userName: user.username,
+        characterName,
+        characterImageUrl,
+        score: 60,
+        raceTitle,
+        date: new Date(),
+      });
+
+      this.logger.log('✅ Celebration image generated successfully');
+
+      // 2. Upload image to storage
+      const imageUrl = await this.imageStorageService.uploadImage(imageBuffer, 'celebration');
+
+      this.logger.log(`✅ Image uploaded: ${imageUrl}`);
+
+      // 3. Send to TV display
+      const sentToTv = await this.tvDisplayService.sendImageToTv(imageUrl, {
+        type: 'celebration',
+        duration: 15, // Display for 15 seconds
+        priority: 10, // Highest priority
+        title: `Perfect Score - ${user.username}`,
+        subtitle: raceTitle,
+      });
+
+      if (sentToTv) {
+        this.logger.log('🎉 Perfect score celebration sent to TV display successfully!');
+      } else {
+        this.logger.warn('⚠️  Failed to send celebration to TV display (TV may be disabled)');
+      }
+
+      // 4. Emit event for other systems (e.g., notifications, social sharing)
+      this.eventEmitter.emit('perfect.score', {
+        userId: bet.userId,
+        userName: user.username,
+        betId: bet.id,
+        weekId: bet.bettingWeekId,
+        points: calculation.finalPoints,
+        imageUrl,
+        celebratedAt: new Date(),
+      });
+    } catch (error) {
+      this.logger.error('❌ Failed to handle perfect score celebration', error);
+      throw error; // Re-throw to be caught by the fire-and-forget handler
+    }
   }
 }

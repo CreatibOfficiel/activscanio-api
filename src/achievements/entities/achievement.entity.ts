@@ -87,6 +87,21 @@ export class Achievement {
   @Column({ type: 'jsonb' })
   condition: AchievementCondition;
 
+  @Column({ type: 'varchar', nullable: true })
+  prerequisiteAchievementKey: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  isTemporary: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  canBeLost: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  tierLevel: number; // For progressive chains (1, 2, 3, 4)
+
+  @Column({ type: 'varchar', nullable: true })
+  chainName: string | null; // e.g., "perfect_podium_chain"
+
   @OneToMany(
     () => UserAchievement,
     (userAchievement) => userAchievement.achievement,

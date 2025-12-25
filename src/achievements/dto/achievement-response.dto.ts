@@ -17,6 +17,15 @@ export class AchievementResponseDto {
   xpReward: number;
   unlocksTitle: string | null;
 
+  // Progressive chain fields
+  prerequisiteAchievementKey?: string | null;
+  tierLevel?: number;
+  chainName?: string | null;
+
+  // Temporary achievement fields
+  isTemporary?: boolean;
+  canBeLost?: boolean;
+
   // User-specific fields (if querying for a specific user)
   isUnlocked?: boolean;
   unlockedAt?: Date | null;

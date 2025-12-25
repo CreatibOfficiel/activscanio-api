@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { BettingService } from './betting.service';
 import { BettingController } from './betting.controller';
 import { BettingWeek } from './entities/betting-week.entity';
@@ -8,10 +9,14 @@ import { BetPick } from './entities/bet-pick.entity';
 import { CompetitorOdds } from './entities/competitor-odds.entity';
 import { BettorRanking } from './entities/bettor-ranking.entity';
 import { CompetitorMonthlyStats } from './entities/competitor-monthly-stats.entity';
+import { DailyUserStats } from './entities/daily-user-stats.entity';
 import { OddsCalculatorService } from './services/odds-calculator.service';
 import { WeekManagerService } from './services/week-manager.service';
 import { BettingFinalizerService } from './services/betting-finalizer.service';
 import { RankingsService } from './services/rankings.service';
+import { AdvancedStatsService } from './services/advanced-stats.service';
+import { DailyStatsTrackerService } from './services/daily-stats-tracker.service';
+import { DailyStatsCronService } from './services/daily-stats-cron.service';
 import { RaceCreatedListener } from './listeners/race-created.listener';
 import { BettingWeekRepository } from './repositories/betting-week.repository';
 import { BetRepository } from './repositories/bet.repository';
@@ -27,6 +32,7 @@ import { UserAchievement } from '../achievements/entities/user-achievement.entit
 import { Achievement } from '../achievements/entities/achievement.entity';
 import { UsersModule } from '../users/users.module';
 import { AchievementsModule } from '../achievements/achievements.module';
+import { ImageGenerationModule } from '../image-generation/image-generation.module';
 
 @Module({
   imports: [
@@ -37,6 +43,7 @@ import { AchievementsModule } from '../achievements/achievements.module';
       CompetitorOdds,
       BettorRanking,
       CompetitorMonthlyStats,
+      DailyUserStats,
       Competitor,
       RaceEvent,
       RaceResult,
@@ -44,8 +51,10 @@ import { AchievementsModule } from '../achievements/achievements.module';
       UserAchievement,
       Achievement,
     ]),
+    ScheduleModule.forRoot(),
     UsersModule,
-    AchievementsModule,
+    forwardRef(() => AchievementsModule),
+    ImageGenerationModule,
   ],
   controllers: [BettingController],
   providers: [
@@ -54,6 +63,9 @@ import { AchievementsModule } from '../achievements/achievements.module';
     WeekManagerService,
     BettingFinalizerService,
     RankingsService,
+    AdvancedStatsService,
+    DailyStatsTrackerService,
+    DailyStatsCronService,
     RaceCreatedListener,
     BettingWeekRepository,
     BetRepository,
@@ -68,6 +80,8 @@ import { AchievementsModule } from '../achievements/achievements.module';
     WeekManagerService,
     BettingFinalizerService,
     RankingsService,
+    AdvancedStatsService,
+    DailyStatsTrackerService,
     BettingWeekRepository,
     BetRepository,
     BetPickRepository,

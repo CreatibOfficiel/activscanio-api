@@ -4,19 +4,11 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/user.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { XP_SOURCES, LEVEL_FORMULA } from '../config/xp-sources.config';
+import { XPHistory } from '../entities/xp-history.entity';
+import { XPSource } from '../enums/xp-source.enum';
 
-export enum XPSource {
-  BET_PLACED = 'BET_PLACED',
-  CORRECT_PICK = 'CORRECT_PICK',
-  PERFECT_PODIUM = 'PERFECT_PODIUM',
-  WEEKLY_PARTICIPATION = 'WEEKLY_PARTICIPATION',
-  STREAK_MAINTAINED = 'STREAK_MAINTAINED',
-  ACHIEVEMENT_COMMON = 'ACHIEVEMENT_COMMON',
-  ACHIEVEMENT_RARE = 'ACHIEVEMENT_RARE',
-  ACHIEVEMENT_EPIC = 'ACHIEVEMENT_EPIC',
-  ACHIEVEMENT_LEGENDARY = 'ACHIEVEMENT_LEGENDARY',
-  LEVEL_UP_BONUS = 'LEVEL_UP_BONUS',
-}
+// Re-export for backward compatibility
+export { XPSource } from '../enums/xp-source.enum';
 
 @Injectable()
 export class XPLevelService {
@@ -25,6 +17,8 @@ export class XPLevelService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(XPHistory)
+    private readonly xpHistoryRepository: Repository<XPHistory>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -34,9 +28,17 @@ export class XPLevelService {
    * @param userId - User ID
    * @param amount - XP amount to add
    * @param source - Source of XP (for logging)
+   * @param relatedEntityId - Optional related entity ID (betId, achievementId, etc.)
+   * @param description - Optional description
    * @returns Updated user with new XP and level
    */
-  async addXP(userId: string, amount: number, source: string): Promise<User> {
+  async addXP(
+    userId: string,
+    amount: number,
+    source: string,
+    relatedEntityId: string | null = null,
+    description: string | null = null,
+  ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });
@@ -50,6 +52,15 @@ export class XPLevelService {
 
     // Add XP
     user.xp += amount;
+
+    // Track XP history
+    await this.xpHistoryRepository.save({
+      userId,
+      xpAmount: amount,
+      source: source as XPSource,
+      relatedEntityId,
+      description,
+    });
 
     // Calculate new level
     const newLevel = this.calculateLevel(user.xp);
@@ -73,6 +84,16 @@ export class XPLevelService {
       // Award bonus XP for leveling up (doesn't cause recursive level up)
       if (source !== XPSource.LEVEL_UP_BONUS) {
         user.xp += XP_SOURCES.LEVEL_UP_BONUS;
+
+        // Track level up bonus
+        await this.xpHistoryRepository.save({
+          userId,
+          xpAmount: XP_SOURCES.LEVEL_UP_BONUS,
+          source: XPSource.LEVEL_UP_BONUS,
+          relatedEntityId: null,
+          description: `Level up bonus (${previousLevel} → ${newLevel})`,
+        });
+
         this.logger.log(
           `User ${userId} received ${XP_SOURCES.LEVEL_UP_BONUS} bonus XP for leveling up`,
         );
@@ -214,10 +235,34 @@ export class XPLevelService {
    *
    * @param userId - User ID
    * @param source - XP source enum
+   * @param customAmount - Optional custom amount (overrides source default)
+   * @param relatedEntityId - Optional related entity ID
+   * @param description - Optional description
    * @returns Updated user
    */
-  async awardXP(userId: string, source: XPSource): Promise<User> {
-    const amount = XP_SOURCES[source] || 0;
-    return await this.addXP(userId, amount, source);
+  async awardXP(
+    userId: string,
+    source: XPSource,
+    customAmount: number | null = null,
+    relatedEntityId: string | null = null,
+    description: string | null = null,
+  ): Promise<User> {
+    const amount = customAmount ?? XP_SOURCES[source] ?? 0;
+    return await this.addXP(userId, amount, source, relatedEntityId, description);
+  }
+
+  /**
+   * Get XP history for a user
+   *
+   * @param userId - User ID
+   * @param limit - Number of records to return
+   * @returns XP history records
+   */
+  async getXPHistory(userId: string, limit: number = 50): Promise<XPHistory[]> {
+    return await this.xpHistoryRepository.find({
+      where: { userId },
+      order: { earnedAt: 'DESC' },
+      take: limit,
+    });
   }
 }

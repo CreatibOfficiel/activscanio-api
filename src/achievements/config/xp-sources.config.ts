@@ -20,6 +20,17 @@ export const XP_SOURCES = {
 
   // Bonus XP
   LEVEL_UP_BONUS: 100,
+
+  // New daily/weekly bonuses
+  DAILY_LOGIN_BONUS: 5,
+  DAILY_FIRST_BET_BONUS: 10,
+  WEEKLY_STREAK_BONUS: 50,
+  PERFECT_WEEK_BONUS: 100,
+  COMEBACK_BONUS: 25,
+
+  // HIGH_ODDS_BONUS is calculated dynamically based on odds
+  // Formula: (odds - 5) * 5 XP, capped at 200 XP
+  HIGH_ODDS_BONUS: 0, // Placeholder, actual value calculated dynamically
 };
 
 /**

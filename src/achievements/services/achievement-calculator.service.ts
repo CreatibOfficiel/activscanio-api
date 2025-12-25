@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   Achievement,
@@ -107,10 +107,27 @@ export class AchievementCalculatorService {
     // Check each achievement
     const newlyUnlocked: AchievementUnlockResult[] = [];
 
+    // Get unlocked achievements with their keys for prerequisite checking
+    const unlockedAchievements = await this.userAchievementRepository.find({
+      where: { userId, revokedAt: IsNull() },
+      relations: ['achievement'],
+    });
+    const unlockedKeys = new Set(
+      unlockedAchievements.map((ua) => ua.achievement.key),
+    );
+
     for (const achievement of allAchievements) {
       // Skip if already unlocked
       if (unlockedSet.has(achievement.id)) {
         continue;
+      }
+
+      // Check prerequisite
+      if (achievement.prerequisiteAchievementKey) {
+        if (!unlockedKeys.has(achievement.prerequisiteAchievementKey)) {
+          // Prerequisite not unlocked, skip this achievement
+          continue;
+        }
       }
 
       // Evaluate condition
@@ -340,6 +357,61 @@ export class AchievementCalculatorService {
       );
     }).length;
 
+    // Calculate consecutive boost months
+    const boostsByMonth = new Map<string, boolean>();
+    allBets.forEach((bet) => {
+      const hasBoost = bet.picks.some((pick) => pick.hasBoost);
+      if (hasBoost) {
+        const betDate = new Date(bet.createdAt);
+        const monthKey = `${betDate.getFullYear()}-${betDate.getMonth() + 1}`;
+        boostsByMonth.set(monthKey, true);
+      }
+    });
+
+    // Count consecutive months with boosts (from current month backwards)
+    let consecutiveBoostMonths = 0;
+    let checkYear = currentYear;
+    let checkMonth = currentMonth;
+    while (true) {
+      const monthKey = `${checkYear}-${checkMonth}`;
+      if (boostsByMonth.has(monthKey)) {
+        consecutiveBoostMonths++;
+        // Go to previous month
+        checkMonth--;
+        if (checkMonth === 0) {
+          checkMonth = 12;
+          checkYear--;
+        }
+      } else {
+        break;
+      }
+      // Safety: don't go back more than 24 months
+      if (consecutiveBoostMonths >= 24) break;
+    }
+
+    // Calculate comeback bets (winning after 3+ consecutive losses)
+    const sortedBets = [...allBets].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    let comebackBets = 0;
+    let consecutiveLosses = 0;
+
+    for (const bet of sortedBets) {
+      if (!bet.isFinalized) continue;
+
+      const isWin = bet.pointsEarned > 0;
+
+      if (isWin) {
+        // If we had 3+ consecutive losses, this is a comeback
+        if (consecutiveLosses >= 3) {
+          comebackBets++;
+        }
+        consecutiveLosses = 0;
+      } else {
+        consecutiveLosses++;
+      }
+    }
+
     // Monthly stats
     const monthlyBets = allBets.filter((bet) => {
       const betDate = new Date(bet.createdAt);
@@ -391,7 +463,7 @@ export class AchievementCalculatorService {
       winRate,
       partialWins,
       totalBoostsUsed,
-      consecutiveBoostMonths: 0, // TODO: Calculate based on monthly boost usage
+      consecutiveBoostMonths,
       highOddsWins,
       boostedHighOddsWins,
       currentMonthlyStreak: userStreak?.currentMonthlyStreak || 0,
@@ -404,7 +476,7 @@ export class AchievementCalculatorService {
       monthlyRank: currentMonthRanking?.rank || null,
       bestMonthlyRank,
       consecutiveMonthlyWins,
-      comebackBets: 0, // TODO: Calculate based on losing streak tracking
+      comebackBets,
     };
   }
 

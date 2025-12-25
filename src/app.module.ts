@@ -27,6 +27,9 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ImageGenerationModule } from './image-generation/image-generation.module';
+import { WebsocketModule } from './websocket/websocket.module';
+import { ExportModule } from './export/export.module';
 
 @Module({
   imports: [
@@ -59,6 +62,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     SeasonsModule,
     AchievementsModule,
     NotificationsModule,
+    ImageGenerationModule,
+    WebsocketModule,
+    ExportModule,
   ],
   controllers: [AppController],
   providers: [

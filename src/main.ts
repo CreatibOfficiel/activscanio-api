@@ -2,15 +2,27 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter, AllExceptionsFilter } from './common/filters';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as path from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Register global exception filters
   // Order matters: HttpExceptionFilter catches HttpException, AllExceptionsFilter catches everything else
   app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());
 
   app.enableCors();
+
+  // Serve static files for generated images using Express static middleware
+  // This must be done BEFORE setting the global prefix
+  // __dirname in compiled code is dist/src, so we need to go up 2 levels to reach project root
+  const publicPath = path.join(__dirname, '..', '..', 'public');
+  console.log(`📁 Serving static files from: ${publicPath}`);
+  app.use('/images', express.static(path.join(publicPath, 'images')));
+
+  // Set global prefix for API routes
   app.setGlobalPrefix('api');
 
   // Swagger API Documentation

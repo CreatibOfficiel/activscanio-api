@@ -34,6 +34,15 @@ export class UserAchievement {
   @Column({ type: 'boolean', default: false })
   notificationSent: boolean;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  revokedAt: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  revocationReason: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  timesEarned: number; // For temporary achievements that can be re-earned
+
   @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
