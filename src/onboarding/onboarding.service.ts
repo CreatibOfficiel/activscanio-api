@@ -29,10 +29,22 @@ export class OnboardingService {
 
   /**
    * Search competitors by name (firstName or lastName)
+   * If query is empty, returns all competitors
    */
   async searchCompetitors(query: string): Promise<Competitor[]> {
-    return await this.competitorRepository
+    const qb = this.competitorRepository
       .createQueryBuilder('c')
+      .leftJoinAndSelect('c.characterVariant', 'variant')
+      .leftJoinAndSelect('variant.baseCharacter', 'base')
+      .orderBy('c.firstName', 'ASC');
+
+    // If query is empty, return all competitors
+    if (!query || query.trim().length === 0) {
+      return await qb.getMany();
+    }
+
+    // Otherwise, filter by name
+    return await qb
       .where("LOWER(c.firstName || ' ' || c.lastName) LIKE LOWER(:query)", {
         query: `%${query}%`,
       })
@@ -40,9 +52,7 @@ export class OnboardingService {
         query: `%${query}%`,
       })
       .orWhere('LOWER(c.lastName) LIKE LOWER(:query)', { query: `%${query}%` })
-      .leftJoinAndSelect('c.characterVariant', 'variant')
-      .leftJoinAndSelect('variant.baseCharacter', 'base')
-      .limit(10)
+      .limit(20)
       .getMany();
   }
 
@@ -76,14 +86,13 @@ export class OnboardingService {
         throw new BadRequestException('User has already completed onboarding');
       }
 
-      // SPECTATOR PATH: User chose to be spectator only (no competitor/character)
+      // BETTOR PATH: User chose to be bettor only (no competitor/character)
       if (dto.isSpectator) {
-        user.role = UserRole.SPECTATOR;
-        // hasCompletedOnboarding sera automatiquement true via le getter
-        // car role=SPECTATOR et competitorId=null
+        user.role = UserRole.BETTOR;
+        // hasCompletedOnboarding will automatically be true via getter (role=BETTOR)
         const updatedUser = await queryRunner.manager.save(user);
         await queryRunner.commitTransaction();
-        this.logger.log(`User ${userId} completed onboarding as SPECTATOR`);
+        this.logger.log(`User ${userId} completed onboarding as BETTOR`);
         return updatedUser;
       }
 
@@ -183,9 +192,8 @@ export class OnboardingService {
 
       // Update user
       user.competitorId = competitorId;
-      user.role = UserRole.BOTH; // User is now both bettor and competitor
-      // hasCompletedOnboarding sera automatiquement true via le getter
-      // car role=BOTH et competitorId est défini
+      user.role = UserRole.PLAYER; // User is now a player (competes, can also bet)
+      // hasCompletedOnboarding will automatically be true via getter (role=PLAYER + competitorId set)
 
       const updatedUser = await queryRunner.manager.save(user);
 
