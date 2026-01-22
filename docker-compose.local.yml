@@ -30,6 +30,7 @@ services:
     # Local : we mount the local folder to the container to have live reload
     volumes:
       - .:/app
+      - /app/node_modules
 
     # Local : override the command to start the server in dev mode
     command: npm run start:dev

@@ -50,11 +50,18 @@ export class UsersController {
 
   /**
    * Get current authenticated user
-   * Automatically extracts clerkId from JWT token via ClerkGuard
+   * Automatically creates user if doesn't exist (first login)
+   * Extracts user info from JWT token via ClerkGuard
    */
   @Get('me')
-  async getMe(@CurrentUser('clerkId') clerkId: string) {
-    return await this.usersService.findByClerkId(clerkId);
+  async getMe(@CurrentUser() user: any) {
+    return await this.usersService.getOrCreateByClerkId({
+      clerkId: user.clerkId,
+      email: user.email,
+      firstName: user.first_name || user.firstName,
+      lastName: user.last_name || user.lastName,
+      profilePictureUrl: user.image_url || user.profilePictureUrl,
+    });
   }
 
   /**

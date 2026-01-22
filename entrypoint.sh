@@ -15,6 +15,8 @@ done
 echo "PostgreSQL is up - continuing"
 
 if [ "$NODE_ENV" = "development" ]; then
+  echo "Installing dependencies for dev mode..."
+  npm install
   echo "Running migrations in dev mode..."
   npx typeorm-ts-node-commonjs migration:run -d data-source.ts
   echo "Starting NestJS in dev mode..."
