@@ -127,7 +127,7 @@ describe('OnboardingService', () => {
     const createMockUser = (overrides?: Partial<User>): Partial<User> => ({
       id: userId,
       hasCompletedOnboarding: false,
-      role: UserRole.SPECTATOR,
+      role: UserRole.BETTOR,
       ...overrides,
     });
 
@@ -178,7 +178,7 @@ describe('OnboardingService', () => {
         const updatedUser = {
           ...mockUser,
           competitorId,
-          role: UserRole.BOTH,
+          role: UserRole.PLAYER,
           hasCompletedOnboarding: true,
         };
         mockQueryRunner.manager.save.mockResolvedValue(updatedUser);
@@ -263,7 +263,7 @@ describe('OnboardingService', () => {
             // Save updated user
             ...mockUser,
             competitorId: newCompetitor.id,
-            role: UserRole.BOTH,
+            role: UserRole.PLAYER,
             hasCompletedOnboarding: true,
           });
 

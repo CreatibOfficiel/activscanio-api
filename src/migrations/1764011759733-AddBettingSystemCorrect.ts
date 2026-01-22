@@ -21,7 +21,7 @@ export class AddBettingSystemCorrect1764011759733
 
     // Create users table
     await queryRunner.query(
-      `CREATE TYPE "public"."users_role_enum" AS ENUM('spectator', 'competitor', 'both')`,
+      `CREATE TYPE "public"."users_role_enum" AS ENUM('pending', 'bettor', 'player')`,
     );
     await queryRunner.query(`CREATE TABLE "users" (
             "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -30,7 +30,7 @@ export class AddBettingSystemCorrect1764011759733
             "firstName" character varying NOT NULL,
             "lastName" character varying NOT NULL,
             "profilePictureUrl" character varying,
-            "role" "public"."users_role_enum" NOT NULL DEFAULT 'spectator',
+            "role" "public"."users_role_enum" NOT NULL DEFAULT 'pending',
             "competitorId" uuid,
             "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
             "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),

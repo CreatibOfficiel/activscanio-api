@@ -48,14 +48,14 @@ export class UsersService {
 
       return await this.userRepository.save(user);
     } else {
-      // Create new user
+      // Create new user with PENDING role (onboarding not completed)
       user = this.userRepository.create({
         clerkId: syncDto.clerkId,
         email: syncDto.email || '',
         firstName: syncDto.firstName || '',
         lastName: syncDto.lastName || '',
         profilePictureUrl: syncDto.profilePictureUrl,
-        role: UserRole.SPECTATOR, // Default role
+        role: UserRole.PENDING,
       });
 
       return await this.userRepository.save(user);
@@ -90,6 +90,36 @@ export class UsersService {
   }
 
   /**
+   * Get or create user by Clerk ID
+   * Creates user with PENDING role if doesn't exist (auto-sync on first API call)
+   */
+  async getOrCreateByClerkId(clerkPayload: {
+    clerkId: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    profilePictureUrl?: string;
+  }): Promise<User> {
+    let user = await this.userRepository.findByClerkId(clerkPayload.clerkId);
+
+    if (!user) {
+      // Auto-create user with PENDING role
+      user = this.userRepository.create({
+        clerkId: clerkPayload.clerkId,
+        email: clerkPayload.email || '',
+        firstName: clerkPayload.firstName || '',
+        lastName: clerkPayload.lastName || '',
+        profilePictureUrl: clerkPayload.profilePictureUrl,
+        role: UserRole.PENDING,
+      });
+
+      user = await this.userRepository.save(user);
+    }
+
+    return user;
+  }
+
+  /**
    * Update user
    */
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
@@ -107,11 +137,9 @@ export class UsersService {
   async linkCompetitor(userId: string, competitorId: string): Promise<User> {
     const user = await this.findOne(userId);
 
-    // Update role if currently spectator
-    if (user.role === UserRole.SPECTATOR) {
-      user.role = UserRole.BOTH;
-    } else if (user.role === UserRole.COMPETITOR) {
-      user.role = UserRole.BOTH;
+    // Update role if currently bettor
+    if (user.role === UserRole.BETTOR) {
+      user.role = UserRole.PLAYER;
     }
 
     user.competitorId = competitorId;
@@ -135,8 +163,8 @@ export class UsersService {
     user.competitorId = null as any; // TypeORM accepts null for nullable columns
 
     // Update role
-    if (user.role === UserRole.BOTH) {
-      user.role = UserRole.SPECTATOR;
+    if (user.role === UserRole.PLAYER) {
+      user.role = UserRole.BETTOR;
     }
 
     return await this.userRepository.save(user);

@@ -14,9 +14,9 @@ import { Bet } from '../betting/entities/bet.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 
 export enum UserRole {
-  SPECTATOR = 'spectator',
-  COMPETITOR = 'competitor',
-  BOTH = 'both',
+  PENDING = 'pending', // New user, onboarding not completed
+  BETTOR = 'bettor', // Bettor only (watches and bets, doesn't compete)
+  PLAYER = 'player', // Player (competes, and can also bet)
 }
 
 @Entity('users')
@@ -43,7 +43,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.SPECTATOR,
+    default: UserRole.PENDING,
   })
   role: UserRole;
 
@@ -91,24 +91,23 @@ export class User {
   updatedAt: Date;
 
   /**
-   * Getter dynamique : vérifie si l'utilisateur a complété l'onboarding
-   * basé sur l'état réel des données (rôle + competitorId)
+   * Dynamic getter: checks if user has completed onboarding
+   * based on actual data state (role + competitorId)
+   *
+   * - PENDING = onboarding not completed (new user)
+   * - BETTOR = onboarding completed (bettor only, no competitorId)
+   * - PLAYER = onboarding completed if competitorId is set
    */
   get hasCompletedOnboarding(): boolean {
-    // Spectateur : doit avoir le rôle SPECTATOR et pas de competitorId
-    if (this.role === UserRole.SPECTATOR && !this.competitorId) {
+    if (this.role === UserRole.PENDING) {
+      return false;
+    }
+    if (this.role === UserRole.BETTOR) {
       return true;
     }
-
-    // Compétiteur (BOTH ou COMPETITOR) : doit avoir un competitorId
-    if (
-      (this.role === UserRole.BOTH || this.role === UserRole.COMPETITOR) &&
-      this.competitorId
-    ) {
+    if (this.role === UserRole.PLAYER && this.competitorId) {
       return true;
     }
-
-    // Sinon, onboarding incomplet
     return false;
   }
 }
