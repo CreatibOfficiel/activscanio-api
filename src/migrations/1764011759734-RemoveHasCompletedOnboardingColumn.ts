@@ -1,9 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RemoveHasCompletedOnboardingColumn1734855600000
+export class RemoveHasCompletedOnboardingColumn1764011759734
   implements MigrationInterface
 {
-  name = 'RemoveHasCompletedOnboardingColumn1734855600000';
+  name = 'RemoveHasCompletedOnboardingColumn1764011759734';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Remove hasCompletedOnboarding column from users table

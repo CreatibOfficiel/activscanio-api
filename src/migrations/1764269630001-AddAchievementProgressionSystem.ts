@@ -1,9 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddAchievementProgressionSystem1735171200000
+export class AddAchievementProgressionSystem1764269630001
   implements MigrationInterface
 {
-  name = 'AddAchievementProgressionSystem1735171200000';
+  name = 'AddAchievementProgressionSystem1764269630001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ====================
