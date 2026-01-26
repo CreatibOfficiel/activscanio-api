@@ -185,10 +185,9 @@ export class OnboardingService {
         );
       }
 
-      // Link character variant to competitor
-      await queryRunner.manager.update(Competitor, competitorId, {
-        characterVariant: characterVariant,
-      });
+      // Link character variant to competitor (FK is on CharacterVariant side)
+      characterVariant.competitor = { id: competitorId } as Competitor;
+      await queryRunner.manager.save(characterVariant);
 
       // Update user
       user.competitorId = competitorId;

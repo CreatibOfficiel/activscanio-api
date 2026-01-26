@@ -24,11 +24,14 @@ export class TvDisplayService {
   private readonly retryDelay = 1000; // ms
 
   constructor(private readonly configService: ConfigService) {
-    this.tvDisplayUrl = this.configService.get<string>('TV_DISPLAY_URL') || null;
+    this.tvDisplayUrl =
+      this.configService.get<string>('TV_DISPLAY_URL') || null;
     this.enabled = !!this.tvDisplayUrl;
 
     if (!this.tvDisplayUrl) {
-      this.logger.warn('⚠️  TV_DISPLAY_URL not configured - TV display disabled');
+      this.logger.warn(
+        '⚠️  TV_DISPLAY_URL not configured - TV display disabled',
+      );
     } else {
       this.logger.log(`📺 TV Display configured: ${this.tvDisplayUrl}`);
     }
@@ -91,7 +94,9 @@ export class TvDisplayService {
       const axiosError = error as AxiosError;
 
       if (axiosError.code === 'ECONNREFUSED') {
-        this.logger.error('❌ TV display is unreachable - check if service is running');
+        this.logger.error(
+          '❌ TV display is unreachable - check if service is running',
+        );
       } else if (axiosError.code === 'ETIMEDOUT') {
         this.logger.error('❌ TV display request timed out');
       } else {
@@ -132,7 +137,9 @@ export class TvDisplayService {
       if (isHealthy) {
         this.logger.log('✅ TV display health check passed');
       } else {
-        this.logger.warn(`⚠️  TV display health check returned ${response.status}`);
+        this.logger.warn(
+          `⚠️  TV display health check returned ${response.status}`,
+        );
       }
 
       return isHealthy;
@@ -151,13 +158,16 @@ export class TvDisplayService {
       return false;
     }
 
-    return this.sendImageToTv('https://via.placeholder.com/1920x1080/FFD700/000000?text=TEST', {
-      type: 'notification',
-      duration: 5,
-      priority: 5,
-      title: 'Test Image',
-      subtitle: 'This is a test from ActivScanIO API',
-    });
+    return this.sendImageToTv(
+      'https://via.placeholder.com/1920x1080/FFD700/000000?text=TEST',
+      {
+        type: 'notification',
+        duration: 5,
+        priority: 5,
+        title: 'Test Image',
+        subtitle: 'This is a test from ActivScanIO API',
+      },
+    );
   }
 
   /**

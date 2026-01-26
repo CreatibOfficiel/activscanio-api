@@ -97,12 +97,15 @@ describe('ShareImageService', () => {
     });
 
     it('should handle special characters in user names', async () => {
-      const buffer = await service.generateAchievementShareImage('Tëst Üsér™', {
-        name: 'Achievement',
-        icon: '🎯',
-        rarity: 'COMMON',
-        description: 'Description',
-      });
+      const buffer = await service.generateAchievementShareImage(
+        'Tëst Üsér™',
+        {
+          name: 'Achievement',
+          icon: '🎯',
+          rarity: 'COMMON',
+          description: 'Description',
+        },
+      );
 
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.length).toBeGreaterThan(0);

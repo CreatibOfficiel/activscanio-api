@@ -40,7 +40,6 @@ export class ShareController {
     @CurrentUser('userId') userId: string,
   ): Promise<StreamableFile> {
     try {
-
       // Find the user achievement
       const userAchievement = await this.userAchievementRepository.findOne({
         where: { id: achievementId, userId },
@@ -48,10 +47,7 @@ export class ShareController {
       });
 
       if (!userAchievement) {
-        throw new HttpException(
-          'Achievement not found',
-          HttpStatus.NOT_FOUND,
-        );
+        throw new HttpException('Achievement not found', HttpStatus.NOT_FOUND);
       }
 
       // Get user info
@@ -93,7 +89,9 @@ export class ShareController {
    */
   @Get('stats')
   @Header('Content-Type', 'image/png')
-  async shareStats(@CurrentUser('userId') userId: string): Promise<StreamableFile> {
+  async shareStats(
+    @CurrentUser('userId') userId: string,
+  ): Promise<StreamableFile> {
     try {
       // Get user
       const user = await this.userRepository.findOne({
@@ -120,16 +118,25 @@ export class ShareController {
       });
 
       const finalizedBets = bets.filter((b) => b.isFinalized);
-      const betsWon = finalizedBets.filter((b) => b.pointsEarned && b.pointsEarned > 0).length;
-      const totalPoints = finalizedBets.reduce((sum, b) => sum + (b.pointsEarned || 0), 0);
-      const winRate = finalizedBets.length > 0 ? (betsWon / finalizedBets.length) * 100 : 0;
+      const betsWon = finalizedBets.filter(
+        (b) => b.pointsEarned && b.pointsEarned > 0,
+      ).length;
+      const totalPoints = finalizedBets.reduce(
+        (sum, b) => sum + (b.pointsEarned || 0),
+        0,
+      );
+      const winRate =
+        finalizedBets.length > 0 ? (betsWon / finalizedBets.length) * 100 : 0;
 
       // Get current ranking (if available)
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
-      const ranking = await this.userRepository.manager.findOne('bettor_rankings', {
-        where: { userId, month: currentMonth, year: currentYear },
-      }) as any;
+      const ranking = (await this.userRepository.manager.findOne(
+        'bettor_rankings',
+        {
+          where: { userId, month: currentMonth, year: currentYear },
+        },
+      )) as any;
 
       // Generate the image
       const imageBuffer = await this.shareImageService.generateStatsShareImage(

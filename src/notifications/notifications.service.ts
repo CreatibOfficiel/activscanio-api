@@ -26,14 +26,18 @@ export class NotificationsService {
       webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
       this.logger.log('Web Push configured with VAPID keys');
     } else {
-      this.logger.warn('VAPID keys not configured - push notifications disabled');
+      this.logger.warn(
+        'VAPID keys not configured - push notifications disabled',
+      );
     }
   }
 
   /**
    * Get or create notification preferences for a user
    */
-  async getOrCreatePreferences(userId: string): Promise<NotificationPreferences> {
+  async getOrCreatePreferences(
+    userId: string,
+  ): Promise<NotificationPreferences> {
     let preferences = await this.notificationPreferencesRepository.findOne({
       where: { userId },
     });
@@ -51,7 +55,8 @@ export class NotificationsService {
           special: true,
         },
       });
-      preferences = await this.notificationPreferencesRepository.save(preferences);
+      preferences =
+        await this.notificationPreferencesRepository.save(preferences);
     }
 
     return preferences;
@@ -117,7 +122,18 @@ export class NotificationsService {
    * Send a notification to one or multiple users
    */
   async sendNotification(dto: SendNotificationDto): Promise<void> {
-    const { userIds, title, body, category, url, icon, badge, tag, requireInteraction, data } = dto;
+    const {
+      userIds,
+      title,
+      body,
+      category,
+      url,
+      icon,
+      badge,
+      tag,
+      requireInteraction,
+      data,
+    } = dto;
 
     for (const userId of userIds) {
       const preferences = await this.notificationPreferencesRepository.findOne({
@@ -161,7 +177,9 @@ export class NotificationsService {
 
           // If subscription is invalid, remove it
           if (error.statusCode === 410 || error.statusCode === 404) {
-            this.logger.warn(`Removing invalid subscription for user ${userId}`);
+            this.logger.warn(
+              `Removing invalid subscription for user ${userId}`,
+            );
             preferences.pushSubscription = null;
             preferences.enablePush = false;
             await this.notificationPreferencesRepository.save(preferences);

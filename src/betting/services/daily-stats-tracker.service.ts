@@ -24,7 +24,12 @@ export class DailyStatsTrackerService {
   async incrementDailyStat(
     userId: string,
     date: Date,
-    field: 'betsPlaced' | 'betsWon' | 'pointsEarned' | 'xpEarned' | 'achievementsUnlocked',
+    field:
+      | 'betsPlaced'
+      | 'betsWon'
+      | 'pointsEarned'
+      | 'xpEarned'
+      | 'achievementsUnlocked',
     value: number,
   ): Promise<void> {
     const dateStr = date.toISOString().split('T')[0]; // Format YYYY-MM-DD
@@ -64,11 +69,14 @@ export class DailyStatsTrackerService {
       },
     });
 
-    const userMap = new Map<string, {
-      betsPlaced: number;
-      betsWon: number;
-      pointsEarned: number;
-    }>();
+    const userMap = new Map<
+      string,
+      {
+        betsPlaced: number;
+        betsWon: number;
+        pointsEarned: number;
+      }
+    >();
 
     // Compter les paris par utilisateur
     for (const bet of bets) {
@@ -167,7 +175,10 @@ export class DailyStatsTrackerService {
   /**
    * Get stats for a specific date
    */
-  async getStatsForDate(userId: string, date: Date): Promise<DailyUserStats | null> {
+  async getStatsForDate(
+    userId: string,
+    date: Date,
+  ): Promise<DailyUserStats | null> {
     const dateStr = date.toISOString().split('T')[0];
     return await this.dailyStatsRepository.findOne({
       where: { userId, date: new Date(dateStr) },

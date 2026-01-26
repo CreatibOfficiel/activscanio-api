@@ -43,7 +43,17 @@ export class ExportService {
     }));
 
     const parser = new Parser({
-      fields: ['Name', 'Description', 'Category', 'Rarity', 'XP Reward', 'Unlocked At', 'Tier Level', 'Chain Name', 'Temporary'],
+      fields: [
+        'Name',
+        'Description',
+        'Category',
+        'Rarity',
+        'XP Reward',
+        'Unlocked At',
+        'Tier Level',
+        'Chain Name',
+        'Temporary',
+      ],
     });
     return parser.parse(data);
   }
@@ -110,9 +120,15 @@ export class ExportService {
     // Calculate stats from bets
     const totalBetsPlaced = bets.length;
     const finalizedBets = bets.filter((b) => b.isFinalized);
-    const betsWon = finalizedBets.filter((b) => b.pointsEarned && b.pointsEarned > 0).length;
-    const totalPoints = finalizedBets.reduce((sum, b) => sum + (b.pointsEarned || 0), 0);
-    const winRate = finalizedBets.length > 0 ? (betsWon / finalizedBets.length) * 100 : 0;
+    const betsWon = finalizedBets.filter(
+      (b) => b.pointsEarned && b.pointsEarned > 0,
+    ).length;
+    const totalPoints = finalizedBets.reduce(
+      (sum, b) => sum + (b.pointsEarned || 0),
+      0,
+    );
+    const winRate =
+      finalizedBets.length > 0 ? (betsWon / finalizedBets.length) * 100 : 0;
 
     return {
       user: {
@@ -132,8 +148,9 @@ export class ExportService {
         achievements: {
           total: achievements.length,
           byRarity: {
-            common: achievements.filter((a) => a.achievement.rarity === 'COMMON')
-              .length,
+            common: achievements.filter(
+              (a) => a.achievement.rarity === 'COMMON',
+            ).length,
             rare: achievements.filter((a) => a.achievement.rarity === 'RARE')
               .length,
             epic: achievements.filter((a) => a.achievement.rarity === 'EPIC')
@@ -142,11 +159,14 @@ export class ExportService {
               (a) => a.achievement.rarity === 'LEGENDARY',
             ).length,
           },
-          byCategory: achievements.reduce((acc, a) => {
-            acc[a.achievement.category] =
-              (acc[a.achievement.category] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>),
+          byCategory: achievements.reduce(
+            (acc, a) => {
+              acc[a.achievement.category] =
+                (acc[a.achievement.category] || 0) + 1;
+              return acc;
+            },
+            {} as Record<string, number>,
+          ),
         },
       },
       recentBets: bets.map((bet) => ({
@@ -199,14 +219,22 @@ export class ExportService {
       'User ID': ranking.userId,
       Points: ranking.totalPoints,
       'Bets Placed': ranking.betsPlaced || 0,
-      'Win Rate': ranking.betsPlaced > 0
-        ? `${((ranking.betsWon / ranking.betsPlaced) * 100).toFixed(2)}%`
-        : '-',
+      'Win Rate':
+        ranking.betsPlaced > 0
+          ? `${((ranking.betsWon / ranking.betsPlaced) * 100).toFixed(2)}%`
+          : '-',
       'Perfect Bets': ranking.perfectBets || 0,
     }));
 
     const parser = new Parser({
-      fields: ['Rank', 'User ID', 'Points', 'Bets Placed', 'Win Rate', 'Perfect Bets'],
+      fields: [
+        'Rank',
+        'User ID',
+        'Points',
+        'Bets Placed',
+        'Win Rate',
+        'Perfect Bets',
+      ],
     });
     return parser.parse(data);
   }

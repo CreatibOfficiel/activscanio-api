@@ -55,13 +55,18 @@ export class UsersController {
    */
   @Get('me')
   async getMe(@CurrentUser() user: any) {
-    return await this.usersService.getOrCreateByClerkId({
+    const dbUser = await this.usersService.getOrCreateByClerkId({
       clerkId: user.clerkId,
       email: user.email,
       firstName: user.first_name || user.firstName,
       lastName: user.last_name || user.lastName,
       profilePictureUrl: user.image_url || user.profilePictureUrl,
     });
+    // Include the computed getter in the response
+    return {
+      ...dbUser,
+      hasCompletedOnboarding: dbUser.hasCompletedOnboarding,
+    };
   }
 
   /**

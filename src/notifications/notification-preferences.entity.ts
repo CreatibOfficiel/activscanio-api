@@ -38,13 +38,16 @@ export class NotificationPreferences {
   @Column({ type: 'boolean', default: true })
   enableInApp: boolean;
 
-  @Column({ type: 'jsonb', default: {
-    betting: true,
-    achievements: true,
-    rankings: true,
-    races: true,
-    special: true,
-  }})
+  @Column({
+    type: 'jsonb',
+    default: {
+      betting: true,
+      achievements: true,
+      rankings: true,
+      races: true,
+      special: true,
+    },
+  })
   categories: NotificationCategories;
 
   @Column({ type: 'jsonb', nullable: true })

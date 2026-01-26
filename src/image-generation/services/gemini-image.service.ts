@@ -20,7 +20,9 @@ export class GeminiImageService {
     this.apiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
 
     if (!this.apiKey) {
-      this.logger.warn('⚠️  GEMINI_API_KEY not configured - AI image generation will be disabled');
+      this.logger.warn(
+        '⚠️  GEMINI_API_KEY not configured - AI image generation will be disabled',
+      );
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.logger.log('✅ Gemini AI configured for image generation');
@@ -37,10 +39,14 @@ export class GeminiImageService {
     options: PerfectScoreCelebrationOptions,
   ): Promise<Buffer> {
     if (!this.apiKey) {
-      throw new Error('GEMINI_API_KEY not configured. Cannot generate AI images.');
+      throw new Error(
+        'GEMINI_API_KEY not configured. Cannot generate AI images.',
+      );
     }
 
-    this.logger.log(`🎨 Generating AI perfect score celebration for ${options.userName}`);
+    this.logger.log(
+      `🎨 Generating AI perfect score celebration for ${options.userName}`,
+    );
 
     const prompt = this.buildPerfectScorePrompt(options);
 
@@ -53,10 +59,12 @@ export class GeminiImageService {
       });
 
       const result = await model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [{ text: prompt }],
-        }],
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
       });
 
       const response = await result.response;
@@ -65,8 +73,14 @@ export class GeminiImageService {
       // Note: Gemini API currently doesn't directly generate images
       // This is a placeholder for when Imagen 3 integration is available
       // For now, we'll return a fallback response
-      this.logger.warn('⚠️  Direct image generation not yet available via Gemini API');
-      this.logger.log('📝 Generated celebration description: ' + text.substring(0, 100) + '...');
+      this.logger.warn(
+        '⚠️  Direct image generation not yet available via Gemini API',
+      );
+      this.logger.log(
+        '📝 Generated celebration description: ' +
+          text.substring(0, 100) +
+          '...',
+      );
 
       // Return empty buffer as placeholder
       // TODO: Integrate with Imagen 3 API when available
@@ -80,7 +94,9 @@ export class GeminiImageService {
   /**
    * Build the prompt for perfect score celebration
    */
-  private buildPerfectScorePrompt(options: PerfectScoreCelebrationOptions): string {
+  private buildPerfectScorePrompt(
+    options: PerfectScoreCelebrationOptions,
+  ): string {
     return `
 Create a dramatic bowling-style celebration image description for a perfect prediction score.
 
@@ -156,10 +172,12 @@ Describe this image in vivid detail for rendering.
       });
 
       const result = await model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [{ text: 'Hello' }],
-        }],
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Hello' }],
+          },
+        ],
       });
 
       await result.response;

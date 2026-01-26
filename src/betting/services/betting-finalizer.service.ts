@@ -406,13 +406,12 @@ export class BettingFinalizerService {
       // 🎉 PERFECT SCORE CELEBRATION (60 points)
       if (calculation.finalPoints === 60) {
         // Fire and forget - don't block bet finalization
-        this.handlePerfectScoreCelebration(bet, calculation)
-          .catch((error) => {
-            this.logger.error(
-              `Perfect score celebration failed for bet ${bet.id} but bet finalized successfully`,
-              error,
-            );
-          });
+        this.handlePerfectScoreCelebration(bet, calculation).catch((error) => {
+          this.logger.error(
+            `Perfect score celebration failed for bet ${bet.id} but bet finalized successfully`,
+            error,
+          );
+        });
       }
 
       if (SCORING_LOGGER_CONFIG.logFinalPoints) {
@@ -662,10 +661,10 @@ export class BettingFinalizerService {
       );
 
       // Get user and betting week info for celebration
-      const user = await this.betRepository.manager.findOne('users', {
+      const user = (await this.betRepository.manager.findOne('users', {
         where: { id: bet.userId },
         relations: ['characterVariant', 'characterVariant.baseCharacter'],
-      }) as any; // Type cast as User entity isn't fully typed here
+      })) as any; // Type cast as User entity isn't fully typed here
 
       const bettingWeek = await this.bettingWeekRepository.findOne({
         where: { id: bet.bettingWeekId },
@@ -681,24 +680,29 @@ export class BettingFinalizerService {
         return;
       }
 
-      const characterName = user.characterVariant?.baseCharacter?.name || 'Champion';
+      const characterName =
+        user.characterVariant?.baseCharacter?.name || 'Champion';
       const characterImageUrl = user.characterVariant?.iconUrl || null;
       const raceTitle = `Week ${bettingWeek.weekNumber} - ${bettingWeek.year}`;
 
       // 1. Generate celebration image using canvas
-      const imageBuffer = await this.canvasImageService.generatePerfectScoreCelebration({
-        userName: user.username,
-        characterName,
-        characterImageUrl,
-        score: 60,
-        raceTitle,
-        date: new Date(),
-      });
+      const imageBuffer =
+        await this.canvasImageService.generatePerfectScoreCelebration({
+          userName: user.username,
+          characterName,
+          characterImageUrl,
+          score: 60,
+          raceTitle,
+          date: new Date(),
+        });
 
       this.logger.log('✅ Celebration image generated successfully');
 
       // 2. Upload image to storage
-      const imageUrl = await this.imageStorageService.uploadImage(imageBuffer, 'celebration');
+      const imageUrl = await this.imageStorageService.uploadImage(
+        imageBuffer,
+        'celebration',
+      );
 
       this.logger.log(`✅ Image uploaded: ${imageUrl}`);
 
@@ -712,9 +716,13 @@ export class BettingFinalizerService {
       });
 
       if (sentToTv) {
-        this.logger.log('🎉 Perfect score celebration sent to TV display successfully!');
+        this.logger.log(
+          '🎉 Perfect score celebration sent to TV display successfully!',
+        );
       } else {
-        this.logger.warn('⚠️  Failed to send celebration to TV display (TV may be disabled)');
+        this.logger.warn(
+          '⚠️  Failed to send celebration to TV display (TV may be disabled)',
+        );
       }
 
       // 4. Emit event for other systems (e.g., notifications, social sharing)

@@ -19,8 +19,12 @@ async function bootstrap() {
     await cronService.triggerManualAggregation();
 
     console.log('\n✅ Daily stats cron job test completed successfully!');
-    console.log('\n💡 The cron job is scheduled to run automatically every day at 3:00 AM (Europe/Paris timezone)');
-    console.log('💡 To verify the data, check the daily_user_stats table in your database\n');
+    console.log(
+      '\n💡 The cron job is scheduled to run automatically every day at 3:00 AM (Europe/Paris timezone)',
+    );
+    console.log(
+      '💡 To verify the data, check the daily_user_stats table in your database\n',
+    );
 
     // Close the application
     await app.close();

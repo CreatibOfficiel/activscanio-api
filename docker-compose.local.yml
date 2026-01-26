@@ -18,12 +18,12 @@ services:
       context: .
     depends_on:
       - db
+    env_file:
+      - .env
     environment:
       # Inside Docker, use the service name 'db' as hostname
       DATABASE_URL: postgresql://postgres:secret@db:5432/activscanio
       NODE_ENV: development
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      SEED: ${SEED}
     ports:
       - '3000:3000'
 

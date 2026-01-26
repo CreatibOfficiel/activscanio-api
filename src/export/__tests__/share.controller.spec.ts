@@ -138,15 +138,14 @@ describe('ShareController', () => {
       const result = await controller.shareAchievement('ua-123', 'user-123');
 
       expect(result).toBeInstanceOf(StreamableFile);
-      expect(shareImageService.generateAchievementShareImage).toHaveBeenCalledWith(
-        'John Doe',
-        {
-          name: 'Perfect Podium',
-          icon: '🏆',
-          rarity: 'RARE',
-          description: 'Get a perfect score',
-        },
-      );
+      expect(
+        shareImageService.generateAchievementShareImage,
+      ).toHaveBeenCalledWith('John Doe', {
+        name: 'Perfect Podium',
+        icon: '🏆',
+        rarity: 'RARE',
+        description: 'Get a perfect score',
+      });
     });
 
     it('should throw 404 if achievement not found', async () => {
@@ -309,7 +308,9 @@ describe('ShareController', () => {
 
     it('should throw 400 if bet is not a perfect score', async () => {
       const notPerfectBet = { ...mockBet, pointsEarned: 45 };
-      jest.spyOn(betRepository, 'findOne').mockResolvedValue(notPerfectBet as any);
+      jest
+        .spyOn(betRepository, 'findOne')
+        .mockResolvedValue(notPerfectBet as any);
 
       await expect(
         controller.sharePerfectScore('bet-123', 'user-123'),

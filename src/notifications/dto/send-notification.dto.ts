@@ -1,4 +1,11 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsArray, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  IsObject,
+} from 'class-validator';
 
 export enum NotificationCategory {
   BETTING = 'betting',

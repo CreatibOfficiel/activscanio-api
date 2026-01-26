@@ -70,23 +70,30 @@ export class ImageGenerationController {
    */
   @Post('celebration')
   @ApiOperation({ summary: 'Generate a perfect score celebration image' })
-  @ApiResponse({ status: 201, description: 'Image generated and stored successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Image generated and stored successfully',
+  })
   async generateCelebration(
     @Body() dto: GenerateCelebrationDto,
   ): Promise<{ imageUrl: string; sentToTv: boolean }> {
     try {
       // Generate image using canvas
-      const imageBuffer = await this.canvasImageService.generatePerfectScoreCelebration({
-        userName: dto.userName,
-        characterName: dto.characterName,
-        characterImageUrl: dto.characterImageUrl,
-        score: dto.score,
-        raceTitle: dto.raceTitle,
-        date: new Date(),
-      });
+      const imageBuffer =
+        await this.canvasImageService.generatePerfectScoreCelebration({
+          userName: dto.userName,
+          characterName: dto.characterName,
+          characterImageUrl: dto.characterImageUrl,
+          score: dto.score,
+          raceTitle: dto.raceTitle,
+          date: new Date(),
+        });
 
       // Upload to storage
-      const imageUrl = await this.imageStorageService.uploadImage(imageBuffer, 'celebration');
+      const imageUrl = await this.imageStorageService.uploadImage(
+        imageBuffer,
+        'celebration',
+      );
 
       // Send to TV display
       const sentToTv = await this.tvDisplayService.sendImageToTv(imageUrl, {
@@ -119,11 +126,12 @@ export class ImageGenerationController {
     @Body() dto: GenerateRaceAnnouncementDto,
   ): Promise<{ imageUrl: string; sentToTv: boolean }> {
     try {
-      const imageBuffer = await this.canvasImageService.generateRaceAnnouncement({
-        raceTitle: dto.raceTitle,
-        scheduledTime: new Date(dto.scheduledTime),
-        podiumCompetitors: dto.podiumCompetitors,
-      });
+      const imageBuffer =
+        await this.canvasImageService.generateRaceAnnouncement({
+          raceTitle: dto.raceTitle,
+          scheduledTime: new Date(dto.scheduledTime),
+          podiumCompetitors: dto.podiumCompetitors,
+        });
 
       const imageUrl = await this.imageStorageService.uploadImage(
         imageBuffer,
@@ -242,22 +250,35 @@ export class ImageGenerationController {
    */
   @Public()
   @Get('test-celebration')
-  @ApiOperation({ summary: 'Generate a test celebration image (public endpoint for testing)' })
-  @ApiResponse({ status: 200, description: 'Test image generated successfully' })
-  async testCelebration(): Promise<{ imageUrl: string; sentToTv: boolean; message: string }> {
+  @ApiOperation({
+    summary: 'Generate a test celebration image (public endpoint for testing)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Test image generated successfully',
+  })
+  async testCelebration(): Promise<{
+    imageUrl: string;
+    sentToTv: boolean;
+    message: string;
+  }> {
     try {
       // Generate test image
-      const imageBuffer = await this.canvasImageService.generatePerfectScoreCelebration({
-        userName: 'TestUser',
-        characterName: 'Mario',
-        characterImageUrl: undefined,
-        score: 60,
-        raceTitle: 'Test Race - Week 1',
-        date: new Date(),
-      });
+      const imageBuffer =
+        await this.canvasImageService.generatePerfectScoreCelebration({
+          userName: 'TestUser',
+          characterName: 'Mario',
+          characterImageUrl: undefined,
+          score: 60,
+          raceTitle: 'Test Race - Week 1',
+          date: new Date(),
+        });
 
       // Upload to storage
-      const imageUrl = await this.imageStorageService.uploadImage(imageBuffer, 'celebration');
+      const imageUrl = await this.imageStorageService.uploadImage(
+        imageBuffer,
+        'celebration',
+      );
 
       // Try to send to TV display (won't fail if TV is not configured)
       const sentToTv = await this.tvDisplayService.sendImageToTv(imageUrl, {
@@ -271,7 +292,8 @@ export class ImageGenerationController {
       return {
         imageUrl,
         sentToTv,
-        message: 'Test celebration image generated successfully! Visit the imageUrl to view it.',
+        message:
+          'Test celebration image generated successfully! Visit the imageUrl to view it.',
       };
     } catch (error) {
       throw new HttpException(

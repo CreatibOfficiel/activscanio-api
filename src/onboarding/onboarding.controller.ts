@@ -24,13 +24,22 @@ export class OnboardingController {
   ) {}
 
   /**
-   * Helper method to get userId from clerkId
+   * Helper method to get or create user from clerkId
+   * Auto-creates the user if they don't exist (first API call)
    */
-  private async getUserIdFromClerkId(clerkId: string): Promise<string> {
-    const user = await this.usersService.findByClerkId(clerkId);
-    if (!user) {
-      throw new Error(`User with clerkId ${clerkId} not found`);
-    }
+  private async getOrCreateUserFromClerkId(
+    clerkId: string,
+    clerkPayload?: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      profilePictureUrl?: string;
+    },
+  ): Promise<string> {
+    const user = await this.usersService.getOrCreateByClerkId({
+      clerkId,
+      ...clerkPayload,
+    });
     return user.id;
   }
 
@@ -85,7 +94,7 @@ export class OnboardingController {
     @CurrentUser('clerkId') clerkId: string,
     @Body() dto: CompleteOnboardingDto,
   ) {
-    const userId = await this.getUserIdFromClerkId(clerkId);
+    const userId = await this.getOrCreateUserFromClerkId(clerkId);
     return await this.onboardingService.completeOnboarding(userId, dto);
   }
 }

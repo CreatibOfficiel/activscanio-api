@@ -17,9 +17,7 @@ import { Logger } from '@nestjs/common';
   },
   namespace: '/events',
 })
-export class EventsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -76,7 +74,9 @@ export class EventsGateway
     const socketId = this.userSockets.get(userId);
     if (socketId) {
       this.server.to(socketId).emit('level:up', data);
-      this.logger.log(`Sent level up to user ${userId}: Level ${data.newLevel}`);
+      this.logger.log(
+        `Sent level up to user ${userId}: Level ${data.newLevel}`,
+      );
     }
   }
 

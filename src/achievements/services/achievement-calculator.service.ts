@@ -391,7 +391,8 @@ export class AchievementCalculatorService {
 
     // Calculate comeback bets (winning after 3+ consecutive losses)
     const sortedBets = [...allBets].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
     let comebackBets = 0;
     let consecutiveLosses = 0;

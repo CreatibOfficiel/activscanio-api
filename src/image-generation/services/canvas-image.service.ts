@@ -1,5 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createCanvas, loadImage, registerFont, CanvasRenderingContext2D } from 'canvas';
+import {
+  createCanvas,
+  loadImage,
+  registerFont,
+  CanvasRenderingContext2D,
+} from 'canvas';
 
 export interface CelebrationImageOptions {
   userName: string;
@@ -31,7 +36,9 @@ export class CanvasImageService {
   async generatePerfectScoreCelebration(
     options: CelebrationImageOptions,
   ): Promise<Buffer> {
-    this.logger.log(`🎨 Generating canvas perfect score celebration for ${options.userName}`);
+    this.logger.log(
+      `🎨 Generating canvas perfect score celebration for ${options.userName}`,
+    );
 
     const width = 1920; // TV HD resolution
     const height = 1080;
@@ -104,7 +111,13 @@ export class CanvasImageService {
         // Draw circular avatar
         ctx.save();
         ctx.beginPath();
-        ctx.arc(width / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+        ctx.arc(
+          width / 2,
+          avatarY + avatarSize / 2,
+          avatarSize / 2,
+          0,
+          Math.PI * 2,
+        );
         ctx.closePath();
         ctx.clip();
         ctx.drawImage(characterImg, avatarX, avatarY, avatarSize, avatarSize);
@@ -114,7 +127,13 @@ export class CanvasImageService {
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.arc(width / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+        ctx.arc(
+          width / 2,
+          avatarY + avatarSize / 2,
+          avatarSize / 2,
+          0,
+          Math.PI * 2,
+        );
         ctx.stroke();
       } catch (error) {
         this.logger.warn('Failed to load character image', error);
@@ -272,13 +291,27 @@ export class CanvasImageService {
     // Podium visualization
     const podiumY = 500;
     const podiumPositions = [
-      { x: width / 2 - 400, height: 200, rank: 2, color: '#C0C0C0', label: '2ème' },
+      {
+        x: width / 2 - 400,
+        height: 200,
+        rank: 2,
+        color: '#C0C0C0',
+        label: '2ème',
+      },
       { x: width / 2, height: 280, rank: 1, color: '#FFD700', label: '1er' },
-      { x: width / 2 + 400, height: 150, rank: 3, color: '#CD7F32', label: '3ème' },
+      {
+        x: width / 2 + 400,
+        height: 150,
+        rank: 3,
+        color: '#CD7F32',
+        label: '3ème',
+      },
     ];
 
     for (const pos of podiumPositions) {
-      const competitor = options.podiumCompetitors.find((c) => c.position === pos.rank);
+      const competitor = options.podiumCompetitors.find(
+        (c) => c.position === pos.rank,
+      );
 
       // Podium rectangle
       ctx.fillStyle = pos.color;

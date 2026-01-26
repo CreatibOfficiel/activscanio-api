@@ -248,7 +248,13 @@ export class XPLevelService {
     description: string | null = null,
   ): Promise<User> {
     const amount = customAmount ?? XP_SOURCES[source] ?? 0;
-    return await this.addXP(userId, amount, source, relatedEntityId, description);
+    return await this.addXP(
+      userId,
+      amount,
+      source,
+      relatedEntityId,
+      description,
+    );
   }
 
   /**

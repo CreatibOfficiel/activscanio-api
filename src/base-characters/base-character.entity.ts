@@ -9,6 +9,9 @@ export class BaseCharacter {
   @Column()
   name: string; // e.g., "Inkling", "Mario", "Luigi"
 
+  @Column({ nullable: true })
+  imageUrl: string; // Default image for the character (used when showing character selection)
+
   // One BaseCharacter can have many CharacterVariants
   @OneToMany(() => CharacterVariant, (variant) => variant.baseCharacter, {
     cascade: true,

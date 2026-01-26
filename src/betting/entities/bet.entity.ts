@@ -12,6 +12,13 @@ import { User } from '../../users/user.entity';
 import { BettingWeek } from './betting-week.entity';
 import { BetPick } from './bet-pick.entity';
 
+export enum BetStatus {
+  PENDING = 'pending', // En attente des résultats
+  WON = 'won', // Gagné (au moins 1 prono correct)
+  LOST = 'lost', // Perdu (aucun prono correct)
+  CANCELLED = 'cancelled', // Annulé
+}
+
 @Entity('bets')
 @Index(['userId', 'bettingWeekId'], { unique: true })
 export class Bet {
@@ -37,6 +44,13 @@ export class Bet {
 
   @Column({ type: 'boolean', default: false })
   isFinalized: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: BetStatus,
+    default: BetStatus.PENDING,
+  })
+  status: BetStatus;
 
   @Column({ type: 'float', nullable: true })
   pointsEarned: number;

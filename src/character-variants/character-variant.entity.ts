@@ -17,6 +17,9 @@ export class CharacterVariant {
   @Column()
   label: string; // e.g. "Red", "Blue", "Green"
 
+  @Column({ nullable: true })
+  imageUrl: string; // Image for this specific variant
+
   // Many CharacterVariants belong to one BaseCharacter
   @ManyToOne(() => BaseCharacter, (base) => base.variants, {
     onDelete: 'CASCADE',

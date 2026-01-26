@@ -12,13 +12,21 @@ export class ImageStorageService {
   private readonly uploadDir: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.storageType = this.configService.get<'local' | 's3'>('IMAGE_STORAGE_TYPE', 'local');
+    this.storageType = this.configService.get<'local' | 's3'>(
+      'IMAGE_STORAGE_TYPE',
+      'local',
+    );
     this.publicUrl = this.configService.get<string>(
       'PUBLIC_IMAGE_URL',
       'http://localhost:3002/images',
     );
 
-    this.uploadDir = path.join(process.cwd(), 'public', 'images', 'celebrations');
+    this.uploadDir = path.join(
+      process.cwd(),
+      'public',
+      'images',
+      'celebrations',
+    );
 
     if (this.storageType === 'local') {
       this.logger.log(`📁 Using local storage: ${this.uploadDir}`);
@@ -64,7 +72,10 @@ export class ImageStorageService {
   /**
    * Upload to local filesystem
    */
-  private async uploadToLocal(imageBuffer: Buffer, filename: string): Promise<string> {
+  private async uploadToLocal(
+    imageBuffer: Buffer,
+    filename: string,
+  ): Promise<string> {
     try {
       const filePath = path.join(this.uploadDir, filename);
       await fs.writeFile(filePath, imageBuffer);
@@ -82,10 +93,15 @@ export class ImageStorageService {
   /**
    * Upload to S3 (placeholder for future implementation)
    */
-  private async uploadToS3(imageBuffer: Buffer, filename: string): Promise<string> {
+  private async uploadToS3(
+    imageBuffer: Buffer,
+    filename: string,
+  ): Promise<string> {
     // TODO: Implement S3 upload when needed
     // Will require @aws-sdk/client-s3
-    this.logger.warn('⚠️  S3 upload not yet implemented, falling back to local');
+    this.logger.warn(
+      '⚠️  S3 upload not yet implemented, falling back to local',
+    );
     return this.uploadToLocal(imageBuffer, filename);
   }
 
@@ -129,7 +145,9 @@ export class ImageStorageService {
           filteredFiles = files.filter((file) => file.startsWith(`${type}-`));
         }
 
-        return filteredFiles.map((file) => `${this.publicUrl}/celebrations/${file}`);
+        return filteredFiles.map(
+          (file) => `${this.publicUrl}/celebrations/${file}`,
+        );
       }
 
       // TODO: Implement S3 list

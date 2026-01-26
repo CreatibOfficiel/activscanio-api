@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { Public } from './auth/decorators/public.decorator';
 
 @Controller()
 export class AppController {
@@ -19,6 +20,7 @@ export class AppController {
    * Health check endpoint for monitoring
    * Checks API status and database connectivity
    */
+  @Public()
   @Get('health')
   async health() {
     const timestamp = new Date().toISOString();
@@ -48,6 +50,7 @@ export class AppController {
   /**
    * Readiness check for Kubernetes/Docker
    */
+  @Public()
   @Get('ready')
   async ready() {
     try {

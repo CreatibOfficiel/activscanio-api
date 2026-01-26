@@ -77,7 +77,6 @@ export class AchievementsController {
   /**
    * Get all achievements with optional filters
    */
-  @Public()
   @Get()
   @ApiOperation({ summary: 'Get all achievements with optional filters' })
   @ApiQuery({ name: 'category', required: false, enum: AchievementCategory })
@@ -218,7 +217,6 @@ export class AchievementsController {
   /**
    * Get user stats (can view others' stats or own)
    */
-  @Public()
   @Get('stats/:userId')
   @ApiOperation({ summary: 'Get user achievement and betting stats' })
   @ApiParam({
@@ -400,7 +398,6 @@ export class AchievementsController {
   /**
    * Get stats history for graphs
    */
-  @Public()
   @Get('stats/:userId/history')
   @ApiOperation({ summary: 'Get user stats history for graphs' })
   @ApiParam({
@@ -433,7 +430,6 @@ export class AchievementsController {
   /**
    * Get comparison stats (user vs average)
    */
-  @Public()
   @Get('stats/:userId/comparison')
   @ApiOperation({ summary: 'Compare user stats with average' })
   @ApiParam({
@@ -460,7 +456,6 @@ export class AchievementsController {
   /**
    * Get advanced stats (best day, patterns, etc.)
    */
-  @Public()
   @Get('stats/:userId/advanced')
   @ApiOperation({ summary: 'Get advanced user stats' })
   @ApiParam({
@@ -500,7 +495,6 @@ export class AchievementsController {
   /**
    * Get XP history
    */
-  @Public()
   @Get('xp-history/:userId')
   @ApiOperation({ summary: 'Get user XP history' })
   @ApiParam({
@@ -529,7 +523,6 @@ export class AchievementsController {
   /**
    * Get all level rewards
    */
-  @Public()
   @Get('level-rewards')
   @ApiOperation({ summary: 'Get all level rewards' })
   @ApiResponse({ status: 200, description: 'List of all level rewards' })
@@ -540,7 +533,6 @@ export class AchievementsController {
   /**
    * Get unlocked rewards for a user
    */
-  @Public()
   @Get('level-rewards/:userId')
   @ApiOperation({ summary: 'Get unlocked rewards for a user' })
   @ApiParam({

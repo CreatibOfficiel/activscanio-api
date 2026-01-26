@@ -197,9 +197,8 @@ export class AdvancedStatsService {
 
     // Get competitor names
     const competitorIds = Array.from(competitorStats.keys());
-    const competitors = await this.competitorRepository.findByIds(
-      competitorIds,
-    );
+    const competitors =
+      await this.competitorRepository.findByIds(competitorIds);
 
     const competitorNameMap = new Map<string, string>();
     for (const competitor of competitors) {
@@ -443,13 +442,15 @@ export class AdvancedStatsService {
     const totalWins = allBets.filter((bet) =>
       bet.picks.some((pick) => pick.isCorrect),
     ).length;
-    const avgWinRate = allBets.length > 0 ? (totalWins / allBets.length) * 100 : 0;
+    const avgWinRate =
+      allBets.length > 0 ? (totalWins / allBets.length) * 100 : 0;
 
     const totalPoints = allBets.reduce(
       (sum, bet) => sum + (bet.pointsEarned || 0),
       0,
     );
-    const avgPointsPerBet = allBets.length > 0 ? totalPoints / allBets.length : 0;
+    const avgPointsPerBet =
+      allBets.length > 0 ? totalPoints / allBets.length : 0;
 
     // Get all daily stats for average XP
     const allDailyStats = await this.dailyStatsRepository.find();

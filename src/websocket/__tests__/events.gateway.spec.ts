@@ -32,9 +32,7 @@ describe('EventsGateway', () => {
 
       gateway.handleConnection(mockSocket as Socket);
 
-      expect(logSpy).toHaveBeenCalledWith(
-        `Client connected: ${mockSocket.id}`,
-      );
+      expect(logSpy).toHaveBeenCalledWith(`Client connected: ${mockSocket.id}`);
     });
   });
 

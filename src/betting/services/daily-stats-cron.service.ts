@@ -6,9 +6,7 @@ import { DailyStatsTrackerService } from './daily-stats-tracker.service';
 export class DailyStatsCronService {
   private readonly logger = new Logger(DailyStatsCronService.name);
 
-  constructor(
-    private readonly dailyStatsTracker: DailyStatsTrackerService,
-  ) {}
+  constructor(private readonly dailyStatsTracker: DailyStatsTrackerService) {}
 
   /**
    * Exécuté chaque jour à 3h du matin (Europe/Paris)
@@ -39,14 +37,18 @@ export class DailyStatsCronService {
    * Peut être appelée via un endpoint admin pour tests
    */
   async triggerManualAggregation(date?: Date): Promise<void> {
-    this.logger.log(`📊 Manual aggregation triggered for ${date ? date.toISOString() : 'yesterday'}`);
+    this.logger.log(
+      `📊 Manual aggregation triggered for ${date ? date.toISOString() : 'yesterday'}`,
+    );
 
-    const targetDate = date || (() => {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      return yesterday;
-    })();
+    const targetDate =
+      date ||
+      (() => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        return yesterday;
+      })();
 
     await this.dailyStatsTracker.aggregateStatsForDate(targetDate);
 
@@ -57,7 +59,9 @@ export class DailyStatsCronService {
    * Backfill pour plusieurs jours (optionnel)
    */
   async backfillRange(startDate: Date, endDate: Date): Promise<void> {
-    this.logger.log(`🔄 Backfilling stats from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    this.logger.log(
+      `🔄 Backfilling stats from ${startDate.toISOString()} to ${endDate.toISOString()}`,
+    );
 
     await this.dailyStatsTracker.backfillHistoricalStats(startDate, endDate);
 

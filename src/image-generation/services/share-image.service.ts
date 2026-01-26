@@ -103,7 +103,11 @@ export class ShareImageService {
     // Footer branding
     ctx.font = '24px Arial';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillText('ActivScanIO - Mario Kart Fantasy Racing', width / 2, height - 20);
+    ctx.fillText(
+      'ActivScanIO - Mario Kart Fantasy Racing',
+      width / 2,
+      height - 20,
+    );
 
     return canvas.toBuffer('image/png');
   }
@@ -161,7 +165,12 @@ export class ShareImageService {
 
     // Stats grid (2x2)
     const statItems = [
-      { label: 'LEVEL', value: stats.level.toString(), emoji: '📈', color: '#48BB78' },
+      {
+        label: 'LEVEL',
+        value: stats.level.toString(),
+        emoji: '📈',
+        color: '#48BB78',
+      },
       {
         label: 'ACHIEVEMENTS',
         value: `${stats.unlockedAchievements}/${stats.totalAchievements}`,
@@ -217,7 +226,11 @@ export class ShareImageService {
     // Footer
     ctx.font = '24px Arial';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillText('ActivScanIO - Mario Kart Fantasy Racing', width / 2, height - 20);
+    ctx.fillText(
+      'ActivScanIO - Mario Kart Fantasy Racing',
+      width / 2,
+      height - 20,
+    );
 
     return canvas.toBuffer('image/png');
   }

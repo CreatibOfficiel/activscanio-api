@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
@@ -13,18 +14,31 @@ import { PushSubscriptionDto } from './dto/push-subscription.dto';
 import { SendNotificationDto } from './dto/send-notification.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClerkGuard } from '../auth/clerk.guard';
+import { UsersService } from '../users/users.service';
 
 @Controller('notifications')
 @UseGuards(ClerkGuard)
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
+  ) {}
+
+  private async getUserIdFromClerkId(clerkId: string): Promise<string> {
+    const user = await this.usersService.findByClerkId(clerkId);
+    if (!user) {
+      throw new NotFoundException(`User with clerkId ${clerkId} not found`);
+    }
+    return user.id;
+  }
 
   /**
    * GET /api/notifications/preferences
    * Get current user's notification preferences
    */
   @Get('preferences')
-  async getPreferences(@CurrentUser('userId') userId: string) {
+  async getPreferences(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
     return await this.notificationsService.getOrCreatePreferences(userId);
   }
 
@@ -34,9 +48,10 @@ export class NotificationsController {
    */
   @Put('preferences')
   async updatePreferences(
-    @CurrentUser('userId') userId: string,
+    @CurrentUser('clerkId') clerkId: string,
     @Body() updateDto: UpdatePreferencesDto,
   ) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
     return await this.notificationsService.updatePreferences(userId, updateDto);
   }
 
@@ -46,9 +61,10 @@ export class NotificationsController {
    */
   @Post('subscribe')
   async subscribe(
-    @CurrentUser('userId') userId: string,
+    @CurrentUser('clerkId') clerkId: string,
     @Body() subscription: PushSubscriptionDto,
   ) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
     return await this.notificationsService.subscribe(userId, subscription);
   }
 
@@ -57,7 +73,8 @@ export class NotificationsController {
    * Remove push notification subscription
    */
   @Delete('unsubscribe')
-  async unsubscribe(@CurrentUser('userId') userId: string) {
+  async unsubscribe(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
     await this.notificationsService.unsubscribe(userId);
     return { message: 'Successfully unsubscribed from push notifications' };
   }
@@ -67,7 +84,8 @@ export class NotificationsController {
    * Send a test notification to the current user
    */
   @Post('test')
-  async sendTest(@CurrentUser('userId') userId: string) {
+  async sendTest(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
     await this.notificationsService.sendTestNotification(userId);
     return { message: 'Test notification sent' };
   }
@@ -80,6 +98,8 @@ export class NotificationsController {
   @Post('send')
   async send(@Body() sendDto: SendNotificationDto) {
     await this.notificationsService.sendNotification(sendDto);
-    return { message: `Notification sent to ${sendDto.userIds.length} user(s)` };
+    return {
+      message: `Notification sent to ${sendDto.userIds.length} user(s)`,
+    };
   }
 }
