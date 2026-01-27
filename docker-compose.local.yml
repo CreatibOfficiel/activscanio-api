@@ -1,6 +1,6 @@
 services:
   db:
-    container_name: activscanio-db
+    container_name: mushroombet-db
     image: postgres:15-alpine
     # Expose the port to access it locally
     ports:
@@ -12,8 +12,8 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
 
-  activscanio-api:
-    container_name: activscanio-api
+  mushroombet-api:
+    container_name: mushroombet-api
     build:
       context: .
     depends_on:

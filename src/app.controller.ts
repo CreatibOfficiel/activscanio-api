@@ -37,12 +37,14 @@ export class AppController {
         uptime: process.uptime(),
       };
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       return {
         status: 'error',
         timestamp,
         service: 'activscanio-api',
         database: 'disconnected',
-        error: error.message,
+        error: errorMessage,
       };
     }
   }

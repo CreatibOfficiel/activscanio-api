@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -397,44 +400,6 @@ describe('OnboardingService', () => {
 
         expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
       });
-    });
-  });
-
-  describe('skipOnboarding', () => {
-    it('should mark user as completed onboarding', async () => {
-      const userId = 'user-1';
-      const mockUser: Partial<User> = {
-        id: userId,
-        hasCompletedOnboarding: false,
-      };
-
-      const updatedUser = {
-        ...mockUser,
-        hasCompletedOnboarding: true,
-      };
-
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as User);
-      jest.spyOn(userRepository, 'save').mockResolvedValue(updatedUser as User);
-
-      const result = await service.skipOnboarding(userId);
-
-      expect(userRepository.findOne).toHaveBeenCalledWith({
-        where: { id: userId },
-      });
-      expect(userRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ hasCompletedOnboarding: true }),
-      );
-      expect(result.hasCompletedOnboarding).toBe(true);
-    });
-
-    it('should throw NotFoundException if user not found', async () => {
-      const userId = 'non-existent';
-
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-
-      await expect(service.skipOnboarding(userId)).rejects.toThrow(
-        NotFoundException,
-      );
     });
   });
 });

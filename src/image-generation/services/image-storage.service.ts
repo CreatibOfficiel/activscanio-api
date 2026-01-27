@@ -31,7 +31,7 @@ export class ImageStorageService {
     if (this.storageType === 'local') {
       this.logger.log(`📁 Using local storage: ${this.uploadDir}`);
       this.logger.log(`🌐 Public URL: ${this.publicUrl}`);
-      this.ensureUploadDirExists();
+      void this.ensureUploadDirExists();
     } else {
       this.logger.log('☁️  Using S3 storage (not yet implemented)');
     }

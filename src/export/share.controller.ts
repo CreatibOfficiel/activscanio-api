@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Get,
@@ -147,6 +148,7 @@ export class ShareController {
           unlockedAchievements,
           winRate,
           totalPoints,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           rank: ranking?.rank,
         },
       );

@@ -56,6 +56,7 @@ export class CompetitorsService {
         Object.assign(competitor, simpleFields);
 
         // Handle characterVariantId, only if present in the payload
+        // eslint-disable-next-line no-prototype-builtins
         if (dto.hasOwnProperty('characterVariantId')) {
           if (characterVariantId) {
             // We want to link

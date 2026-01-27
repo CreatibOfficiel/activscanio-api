@@ -24,7 +24,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Competitor } from '../../competitors/competitor.entity';
 import { RaceEvent } from '../../races/race-event.entity';
 import { RaceResult } from '../../races/race-result.entity';
@@ -35,7 +35,6 @@ import {
   OddsCalculationStep,
   OddsCalculationResult,
   CompetitorOdd,
-  OddMetadata,
   RecentRacePerformance,
 } from '../types/odds-calculator.types';
 import {
@@ -181,9 +180,12 @@ export class OddsCalculatorService {
           .getRawMany();
 
         const recentRacePerformances: RecentRacePerformance[] = recentRaces.map(
-          (r) => ({
+          (r: any) => ({
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             rank12: r.result_rank12,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             date: r.race_date,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             raceId: r.race_id,
           }),
         );

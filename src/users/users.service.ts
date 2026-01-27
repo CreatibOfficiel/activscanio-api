@@ -1,9 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { User, UserRole } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SyncClerkUserDto } from './dto/sync-clerk-user.dto';
 import { UserRepository } from './repositories/user.repository';
+import { CharacterVariant } from '../character-variants/character-variant.entity';
 import {
   UserNotFoundException,
   UserAlreadyExistsException,
@@ -12,7 +20,12 @@ import {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly userRepository: UserRepository,
+    @InjectRepository(CharacterVariant)
+    private readonly characterVariantRepository: Repository<CharacterVariant>,
+    private readonly dataSource: DataSource,
+  ) {}
 
   /**
    * Create a new user
@@ -160,6 +173,7 @@ export class UsersService {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     user.competitorId = null as any; // TypeORM accepts null for nullable columns
 
     // Update role
@@ -175,5 +189,90 @@ export class UsersService {
    */
   async remove(id: string): Promise<void> {
     await this.userRepository.delete(id);
+  }
+
+  /**
+   * Change the character variant for a user's competitor
+   * Validates that the variant is available (not taken by another competitor)
+   */
+  async changeCharacterVariant(
+    userId: string,
+    newVariantId: string,
+  ): Promise<User> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Get user with competitor
+      const user = await queryRunner.manager.findOne(User, {
+        where: { id: userId },
+        relations: ['competitor', 'competitor.characterVariant'],
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (!user.competitor) {
+        throw new BadRequestException('User is not linked to a competitor');
+      }
+
+      // Get the new character variant
+      const newVariant = await queryRunner.manager.findOne(CharacterVariant, {
+        where: { id: newVariantId },
+        relations: ['competitor', 'baseCharacter'],
+      });
+
+      if (!newVariant) {
+        throw new NotFoundException('Character variant not found');
+      }
+
+      // Check if the new variant is already taken by another competitor
+      if (
+        newVariant.competitor &&
+        newVariant.competitor.id !== user.competitor.id
+      ) {
+        throw new ConflictException(
+          `Ce personnage est déjà pris par ${newVariant.competitor.firstName}`,
+        );
+      }
+
+      // If same variant, no change needed
+      if (user.competitor.characterVariant?.id === newVariantId) {
+        await queryRunner.commitTransaction();
+        return user;
+      }
+
+      // Remove the old variant link (if any)
+      if (user.competitor.characterVariant) {
+        const oldVariant = await queryRunner.manager.findOne(CharacterVariant, {
+          where: { id: user.competitor.characterVariant.id },
+        });
+        if (oldVariant) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          oldVariant.competitor = null as any;
+          await queryRunner.manager.save(oldVariant);
+        }
+      }
+
+      // Link the new variant to the competitor
+      newVariant.competitor = user.competitor;
+      await queryRunner.manager.save(newVariant);
+
+      await queryRunner.commitTransaction();
+
+      // Return updated user with new character variant
+      return (await this.userRepository.findOne(userId, [
+        'competitor',
+        'competitor.characterVariant',
+        'competitor.characterVariant.baseCharacter',
+      ])) as User;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

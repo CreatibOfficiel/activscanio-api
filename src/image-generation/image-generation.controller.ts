@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Controller,
   Post,
@@ -126,12 +127,11 @@ export class ImageGenerationController {
     @Body() dto: GenerateRaceAnnouncementDto,
   ): Promise<{ imageUrl: string; sentToTv: boolean }> {
     try {
-      const imageBuffer =
-        await this.canvasImageService.generateRaceAnnouncement({
-          raceTitle: dto.raceTitle,
-          scheduledTime: new Date(dto.scheduledTime),
-          podiumCompetitors: dto.podiumCompetitors,
-        });
+      const imageBuffer = this.canvasImageService.generateRaceAnnouncement({
+        raceTitle: dto.raceTitle,
+        scheduledTime: new Date(dto.scheduledTime),
+        podiumCompetitors: dto.podiumCompetitors,
+      });
 
       const imageUrl = await this.imageStorageService.uploadImage(
         imageBuffer,
@@ -297,6 +297,7 @@ export class ImageGenerationController {
       };
     } catch (error) {
       throw new HttpException(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         `Failed to generate test celebration: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

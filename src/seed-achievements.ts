@@ -15,7 +15,7 @@ async function bootstrap() {
     const seedService = app.get(AchievementSeedService);
 
     // Run the seeding
-    const count = await seedService.seedAchievements();
+    await seedService.seedAchievements();
 
     // Get stats
     const stats = await seedService.getAchievementStats();
@@ -43,4 +43,4 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+void bootstrap();

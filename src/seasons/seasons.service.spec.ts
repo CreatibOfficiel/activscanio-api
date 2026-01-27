@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unused-vars */
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, QueryRunner, DataSource } from 'typeorm';
+import { Repository, QueryRunner } from 'typeorm';
 import { SeasonsService } from './seasons.service';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';

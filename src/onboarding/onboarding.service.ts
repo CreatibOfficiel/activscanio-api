@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   BadRequestException,
@@ -6,12 +7,30 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { User, UserRole } from '../users/user.entity';
 import { Competitor } from '../competitors/competitor.entity';
 import { CharacterVariant } from '../character-variants/character-variant.entity';
 import { SearchCompetitorDto } from './dto/search-competitor.dto';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
+
+export interface CompetitorWithAvailability {
+  id: string;
+  firstName: string;
+  lastName: string;
+  profilePictureUrl: string;
+  characterVariant?: {
+    id: string;
+    label: string;
+    imageUrl: string;
+    baseCharacter: {
+      id: string;
+      name: string;
+      imageUrl?: string;
+    };
+  } | null;
+  isAvailable: boolean;
+}
 
 @Injectable()
 export class OnboardingService {
@@ -30,6 +49,7 @@ export class OnboardingService {
   /**
    * Search competitors by name (firstName or lastName)
    * If query is empty, returns all competitors
+   * @deprecated Use searchCompetitorsWithAvailability instead
    */
   async searchCompetitors(query: string): Promise<Competitor[]> {
     const qb = this.competitorRepository
@@ -54,6 +74,77 @@ export class OnboardingService {
       .orWhere('LOWER(c.lastName) LIKE LOWER(:query)', { query: `%${query}%` })
       .limit(20)
       .getMany();
+  }
+
+  /**
+   * Search competitors with availability status
+   * Returns all competitors with isAvailable flag indicating if already linked to a user
+   */
+  async searchCompetitorsWithAvailability(
+    query: string,
+  ): Promise<CompetitorWithAvailability[]> {
+    const qb = this.competitorRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.characterVariant', 'variant')
+      .leftJoinAndSelect('variant.baseCharacter', 'base')
+      .orderBy('c.firstName', 'ASC');
+
+    let competitors: Competitor[];
+
+    // If query is empty, return all competitors
+    if (!query || query.trim().length === 0) {
+      competitors = await qb.getMany();
+    } else {
+      // Otherwise, filter by name
+      competitors = await qb
+        .where("LOWER(c.firstName || ' ' || c.lastName) LIKE LOWER(:query)", {
+          query: `%${query}%`,
+        })
+        .orWhere('LOWER(c.firstName) LIKE LOWER(:query)', {
+          query: `%${query}%`,
+        })
+        .orWhere('LOWER(c.lastName) LIKE LOWER(:query)', {
+          query: `%${query}%`,
+        })
+        .limit(20)
+        .getMany();
+    }
+
+    // Get all competitor IDs that are linked to users
+    const competitorIds = competitors.map((c) => c.id);
+    if (competitorIds.length === 0) {
+      return [];
+    }
+
+    const linkedUsers = await this.userRepository.find({
+      where: { competitorId: In(competitorIds) },
+      select: ['competitorId'],
+    });
+
+    const linkedCompetitorIds = new Set(
+      linkedUsers.map((u) => u.competitorId).filter(Boolean),
+    );
+
+    // Map to response with availability
+    return competitors.map((c) => ({
+      id: c.id,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      profilePictureUrl: c.profilePictureUrl,
+      characterVariant: c.characterVariant
+        ? {
+            id: c.characterVariant.id,
+            label: c.characterVariant.label,
+            imageUrl: c.characterVariant.imageUrl,
+            baseCharacter: {
+              id: c.characterVariant.baseCharacter.id,
+              name: c.characterVariant.baseCharacter.name,
+              imageUrl: c.characterVariant.baseCharacter.imageUrl,
+            },
+          }
+        : null,
+      isAvailable: !linkedCompetitorIds.has(c.id),
+    }));
   }
 
   /**

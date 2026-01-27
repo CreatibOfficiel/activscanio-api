@@ -61,8 +61,10 @@ export class AchievementSeedService {
           this.logger.debug(`Created achievement: ${definition.key}`);
         }
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(
-          `Failed to seed achievement ${definition.key}: ${error.message}`,
+          `Failed to seed achievement ${definition.key}: ${errorMessage}`,
         );
         throw error;
       }

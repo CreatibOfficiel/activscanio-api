@@ -3,6 +3,25 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BaseCharacter } from './base-character.entity';
 
+export interface CharacterVariantWithAvailability {
+  id: string;
+  label: string;
+  imageUrl: string;
+  isAvailable: boolean;
+  takenBy?: {
+    firstName: string;
+    profilePictureUrl?: string;
+  };
+}
+
+export interface BaseCharacterWithAvailability {
+  id: string;
+  name: string;
+  imageUrl: string;
+  variants: CharacterVariantWithAvailability[];
+  hasAvailableVariants: boolean;
+}
+
 @Injectable()
 export class BaseCharactersService {
   constructor(
@@ -43,6 +62,47 @@ export class BaseCharactersService {
 
     // Return only the base characters that have at least one available variant
     return baseCharacters.filter((baseChar) => baseChar.variants.length > 0);
+  }
+
+  /**
+   * Get all base characters with availability status for each variant.
+   * Shows ALL characters (available and taken) with info about who took them.
+   */
+  async findAllWithAvailabilityStatus(): Promise<
+    BaseCharacterWithAvailability[]
+  > {
+    const baseCharacters = await this.baseCharacterRepo.find({
+      relations: ['variants', 'variants.competitor'],
+      order: { name: 'ASC' },
+    });
+
+    return baseCharacters.map((baseChar) => {
+      const variantsWithStatus: CharacterVariantWithAvailability[] =
+        baseChar.variants.map((variant) => ({
+          id: variant.id,
+          label: variant.label,
+          imageUrl: variant.imageUrl,
+          isAvailable: !variant.competitor,
+          takenBy: variant.competitor
+            ? {
+                firstName: variant.competitor.firstName,
+                profilePictureUrl: variant.competitor.profilePictureUrl,
+              }
+            : undefined,
+        }));
+
+      const hasAvailableVariants = variantsWithStatus.some(
+        (v) => v.isAvailable,
+      );
+
+      return {
+        id: baseChar.id,
+        name: baseChar.name,
+        imageUrl: baseChar.imageUrl,
+        variants: variantsWithStatus,
+        hasAvailableVariants,
+      };
+    });
   }
 
   async findVariants(baseCharacterId: string) {

@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { CharacterVariantsService } from './character-variants.service';
 import { CharacterVariant } from './character-variant.entity';
 

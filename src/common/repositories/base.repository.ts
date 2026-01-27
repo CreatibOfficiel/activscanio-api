@@ -34,7 +34,10 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     try {
       return await this.repository.find(options);
     } catch (error) {
-      this.logger.error(`Error finding all ${this.entityName}:`, error.stack);
+      this.logger.error(
+        `Error finding all ${this.entityName}:`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }
@@ -42,13 +45,14 @@ export abstract class BaseRepository<T extends ObjectLiteral>
   async findOne(id: string, relations?: string[]): Promise<T | null> {
     try {
       return await this.repository.findOne({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         where: { id } as any,
         relations,
       });
     } catch (error) {
       this.logger.error(
         `Error finding ${this.entityName} with ID ${id}:`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -63,7 +67,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     } catch (error) {
       this.logger.error(
         `Error finding ${this.entityName} by condition:`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
         { where },
       );
       throw error;
@@ -76,7 +80,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     } catch (error) {
       this.logger.error(
         `Error creating ${this.entityName} instance:`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -88,7 +92,10 @@ export abstract class BaseRepository<T extends ObjectLiteral>
       this.logger.log(`${this.entityName} saved successfully`);
       return saved;
     } catch (error) {
-      this.logger.error(`Error saving ${this.entityName}:`, error.stack);
+      this.logger.error(
+        `Error saving ${this.entityName}:`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }
@@ -103,7 +110,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     } catch (error) {
       this.logger.error(
         `Error saving multiple ${this.entityName}:`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -111,6 +118,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
 
   async update(id: string, data: DeepPartial<T>): Promise<T> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await this.repository.update(id, data as any);
       const updated = await this.findOne(id);
       if (!updated) {
@@ -123,7 +131,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     } catch (error) {
       this.logger.error(
         `Error updating ${this.entityName} with ID ${id}:`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -136,7 +144,7 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     } catch (error) {
       this.logger.error(
         `Error deleting ${this.entityName} with ID ${id}:`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
       throw error;
     }
@@ -146,7 +154,10 @@ export abstract class BaseRepository<T extends ObjectLiteral>
     try {
       return await this.repository.count({ where });
     } catch (error) {
-      this.logger.error(`Error counting ${this.entityName}:`, error.stack);
+      this.logger.error(
+        `Error counting ${this.entityName}:`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }

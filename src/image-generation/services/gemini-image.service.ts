@@ -67,7 +67,7 @@ export class GeminiImageService {
         ],
       });
 
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       // Note: Gemini API currently doesn't directly generate images
@@ -154,7 +154,7 @@ Describe this image in vivid detail for rendering.
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
 
-    const response = await result.response;
+    const response = result.response;
     return response.text();
   }
 
@@ -171,7 +171,7 @@ Describe this image in vivid detail for rendering.
         model: 'gemini-2.0-flash-exp',
       });
 
-      const result = await model.generateContent({
+      await model.generateContent({
         contents: [
           {
             role: 'user',
@@ -180,7 +180,6 @@ Describe this image in vivid detail for rendering.
         ],
       });
 
-      await result.response;
       return true;
     } catch (error) {
       this.logger.error('Gemini API health check failed', error);

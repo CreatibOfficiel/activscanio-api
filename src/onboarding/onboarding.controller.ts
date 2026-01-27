@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -50,20 +51,27 @@ export class OnboardingController {
    */
   @Get('search')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @ApiOperation({ summary: 'Search competitors by name' })
+  @ApiOperation({
+    summary: 'Search competitors by name with availability status',
+  })
   @ApiQuery({
     name: 'query',
     description: 'Search query (min 2 characters)',
     example: 'john',
   })
-  @ApiResponse({ status: 200, description: 'List of matching competitors' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of matching competitors with availability',
+  })
   @ApiResponse({ status: 400, description: 'Invalid query' })
   @ApiResponse({
     status: 429,
     description: 'Too many requests (rate limit exceeded)',
   })
   async searchCompetitors(@Query() dto: SearchCompetitorDto) {
-    return await this.onboardingService.searchCompetitors(dto.query);
+    return await this.onboardingService.searchCompetitorsWithAvailability(
+      dto.query,
+    );
   }
 
   /**

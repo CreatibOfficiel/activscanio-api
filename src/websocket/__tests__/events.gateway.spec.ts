@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventsGateway } from '../events.gateway';
 import { Socket } from 'socket.io';

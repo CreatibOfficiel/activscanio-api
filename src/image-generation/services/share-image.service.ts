@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/require-await, @typescript-eslint/no-unsafe-argument */
 import { Injectable } from '@nestjs/common';
-import { createCanvas, registerFont } from 'canvas';
+import { createCanvas } from 'canvas';
 
 @Injectable()
 export class ShareImageService {

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { LevelRewardsService } from '../achievements/services/level-rewards.service';

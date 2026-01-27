@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ShareController } from '../share.controller';
 import { ShareImageService } from '../../image-generation/services/share-image.service';
@@ -17,7 +18,6 @@ jest.mock('uuid', () => ({
 describe('ShareController', () => {
   let controller: ShareController;
   let shareImageService: ShareImageService;
-  let imageStorageService: ImageStorageService;
   let userAchievementRepository: Repository<UserAchievement>;
   let userRepository: Repository<User>;
   let betRepository: Repository<Bet>;
@@ -113,7 +113,6 @@ describe('ShareController', () => {
 
     controller = module.get<ShareController>(ShareController);
     shareImageService = module.get<ShareImageService>(ShareImageService);
-    imageStorageService = module.get<ImageStorageService>(ImageStorageService);
     userAchievementRepository = module.get<Repository<UserAchievement>>(
       getRepositoryToken(UserAchievement),
     );

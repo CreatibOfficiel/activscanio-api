@@ -24,7 +24,6 @@ import { LevelRewardsService } from './services/level-rewards.service';
 import { AdvancedStatsService } from '../betting/services/advanced-stats.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Public } from '../auth/decorators/public.decorator';
 import { UsersService } from '../users/users.service';
 import { AchievementQueryDto } from './dto/achievement-query.dto';
 import { EquipTitleDto, EquipTitleResponseDto } from './dto/equip-title.dto';
@@ -34,7 +33,7 @@ import {
   UserStatsResponseDto,
 } from './dto/achievement-response.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import {
   Achievement,
   AchievementCategory,
@@ -93,7 +92,7 @@ export class AchievementsController {
     @CurrentUser('clerkId') clerkId?: string,
   ): Promise<AchievementResponseDto[]> {
     // Build query
-    const where: any = {};
+    const where: FindOptionsWhere<Achievement> = {};
     if (query.category) {
       where.category = query.category;
     }

@@ -6,6 +6,7 @@ import { UserAchievement } from '../achievements/entities/user-achievement.entit
 import { User } from '../users/user.entity';
 import { Bet } from '../betting/entities/bet.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
+import { AchievementRarity } from '../achievements/entities/achievement.entity';
 
 @Injectable()
 export class ExportService {
@@ -149,14 +150,16 @@ export class ExportService {
           total: achievements.length,
           byRarity: {
             common: achievements.filter(
-              (a) => a.achievement.rarity === 'COMMON',
+              (a) => a.achievement.rarity === AchievementRarity.COMMON,
             ).length,
-            rare: achievements.filter((a) => a.achievement.rarity === 'RARE')
-              .length,
-            epic: achievements.filter((a) => a.achievement.rarity === 'EPIC')
-              .length,
+            rare: achievements.filter(
+              (a) => a.achievement.rarity === AchievementRarity.RARE,
+            ).length,
+            epic: achievements.filter(
+              (a) => a.achievement.rarity === AchievementRarity.EPIC,
+            ).length,
             legendary: achievements.filter(
-              (a) => a.achievement.rarity === 'LEGENDARY',
+              (a) => a.achievement.rarity === AchievementRarity.LEGENDARY,
             ).length,
           },
           byCategory: achievements.reduce(

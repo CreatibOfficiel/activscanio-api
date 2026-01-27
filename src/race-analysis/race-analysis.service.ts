@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OpenAIService } from 'src/openai/openai.service';
 import { CharacterVariantsService } from 'src/character-variants/character-variants.service';
@@ -32,6 +33,7 @@ export class RaceAnalysisService {
     }
 
     /* 1 – Préparer les libellés exacts et les maps rapides */
+
     const labelForVariant = (v: any) =>
       v.baseCharacter.variants.length <= 1 || v.label === 'Default'
         ? v.baseCharacter.name
@@ -42,6 +44,7 @@ export class RaceAnalysisService {
     const whitelist = [...nameToVariant.keys()];
 
     /* 2 – Appeler OpenAI */
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const aiRows = await this.openai.analyzeRaceImage(base64, whitelist);
 
     /* 3 – Conversion directe */

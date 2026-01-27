@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class PopulateCharacterImageUrls1764350000001
@@ -26,7 +27,9 @@ export class PopulateCharacterImageUrls1764350000001
     `);
 
     for (const bc of baseCharacters) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const characterSlug = this.toSlug(bc.name);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const hasMultipleVariants = parseInt(bc.variant_count) > 1;
 
       // Get all variants for this character
@@ -38,6 +41,7 @@ export class PopulateCharacterImageUrls1764350000001
       if (hasMultipleVariants) {
         // Character with multiple variants - use first variant as default image
         const firstVariant = variants[0];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const firstVariantSlug = this.toSlug(firstVariant.label);
         const defaultImageUrl = `/characters/${characterSlug}/${firstVariantSlug}.png`;
 
@@ -49,10 +53,12 @@ export class PopulateCharacterImageUrls1764350000001
 
         // Update each variant image
         for (const variant of variants) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           const variantSlug = this.toSlug(variant.label);
           const variantImageUrl = `/characters/${characterSlug}/${variantSlug}.png`;
           await queryRunner.query(
             `UPDATE character_variants SET "imageUrl" = $1 WHERE id = $2`,
+
             [variantImageUrl, variant.id],
           );
         }

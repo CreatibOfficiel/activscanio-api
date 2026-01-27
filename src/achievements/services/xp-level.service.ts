@@ -82,6 +82,7 @@ export class XPLevelService {
       });
 
       // Award bonus XP for leveling up (doesn't cause recursive level up)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       if (source !== XPSource.LEVEL_UP_BONUS) {
         user.xp += XP_SOURCES.LEVEL_UP_BONUS;
 

@@ -1,10 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  createCanvas,
-  loadImage,
-  registerFont,
-  CanvasRenderingContext2D,
-} from 'canvas';
+import { createCanvas, loadImage, CanvasRenderingContext2D } from 'canvas';
 
 export interface CelebrationImageOptions {
   userName: string;
@@ -247,9 +242,7 @@ export class CanvasImageService {
   /**
    * Generate a race announcement image with podium
    */
-  async generateRaceAnnouncement(
-    options: RaceAnnouncementOptions,
-  ): Promise<Buffer> {
+  generateRaceAnnouncement(options: RaceAnnouncementOptions): Buffer {
     this.logger.log(`🏁 Generating race announcement for ${options.raceTitle}`);
 
     const width = 1920;

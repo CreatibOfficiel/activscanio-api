@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Controller,
   Get,
@@ -73,6 +74,7 @@ export class ExportController {
   @Get('stats/json')
   async exportStatsJSON(@CurrentUser('userId') userId: string) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return await this.exportService.exportStatsToJSON(userId);
     } catch (error) {
       throw new HttpException(

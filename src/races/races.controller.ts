@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Controller,
   Post,
@@ -27,7 +28,9 @@ export class RacesController {
     } catch (error) {
       this.logger.error('Error creating race:', error.stack);
       throw new HttpException(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.message || 'Error creating race',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -42,7 +45,9 @@ export class RacesController {
     } catch (error) {
       this.logger.error('Error finding races:', error.stack);
       throw new HttpException(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.message || 'Error finding races',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -56,7 +61,9 @@ export class RacesController {
     } catch (error) {
       this.logger.error('Error finding similar races:', error.stack);
       throw new HttpException(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.message || 'Error finding similar races',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -70,7 +77,9 @@ export class RacesController {
     } catch (error) {
       this.logger.error('Error finding race:', error.stack);
       throw new HttpException(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.message || 'Error finding race',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

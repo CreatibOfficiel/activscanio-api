@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   NotFoundException,
@@ -80,9 +81,11 @@ export class BettingService {
     const where: any = {};
 
     if (month) where.month = month;
+
     if (year) where.year = year;
 
     return await this.bettingWeekRepository.find({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       where,
       relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
       order: { year: 'DESC', weekNumber: 'DESC' },
@@ -109,7 +112,7 @@ export class BettingService {
    * Get current odds for a week
    */
   async getCurrentOdds(weekId: string): Promise<CompetitorOdds[]> {
-    const week = await this.getWeekById(weekId);
+    await this.getWeekById(weekId);
 
     // Get latest odds for each competitor in this week
     const odds = await this.competitorOddsRepository

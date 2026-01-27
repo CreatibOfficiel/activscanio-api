@@ -1,4 +1,4 @@
-import { IsString, IsUrl, IsInt, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsUrl, IsInt, IsNumber } from 'class-validator';
 
 export class CreateCompetitorDto {
   @IsString()

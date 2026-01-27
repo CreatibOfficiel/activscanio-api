@@ -6,14 +6,13 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LinkCompetitorDto } from './dto/link-competitor.dto';
 import { SyncClerkUserDto } from './dto/sync-clerk-user.dto';
-import { ClerkGuard } from '../auth/clerk.guard';
+import { ChangeCharacterDto } from './dto/change-character.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
@@ -56,10 +55,15 @@ export class UsersController {
   @Get('me')
   async getMe(@CurrentUser() user: any) {
     const dbUser = await this.usersService.getOrCreateByClerkId({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       clerkId: user.clerkId,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       email: user.email,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       firstName: user.first_name || user.firstName,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       lastName: user.last_name || user.lastName,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       profilePictureUrl: user.image_url || user.profilePictureUrl,
     });
     // Include the computed getter in the response
@@ -114,5 +118,24 @@ export class UsersController {
   async remove(@Param('id') id: string) {
     await this.usersService.remove(id);
     return { message: 'User deleted successfully' };
+  }
+
+  /**
+   * Change character variant for current user
+   * Only available for users with a linked competitor (players)
+   */
+  @Patch('me/character')
+  async changeCharacter(
+    @CurrentUser() user: any,
+    @Body() changeCharacterDto: ChangeCharacterDto,
+  ) {
+    const dbUser = await this.usersService.getOrCreateByClerkId({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      clerkId: user.clerkId,
+    });
+    return await this.usersService.changeCharacterVariant(
+      dbUser.id,
+      changeCharacterDto.characterVariantId,
+    );
   }
 }

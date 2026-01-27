@@ -5,7 +5,7 @@ import { User } from '../../users/user.entity';
 import { DailyUserStats } from '../../betting/entities/daily-user-stats.entity';
 import { XPLevelService } from './xp-level.service';
 import { XPSource } from '../enums/xp-source.enum';
-import { startOfDay, subDays, format } from 'date-fns';
+import { startOfDay, subDays } from 'date-fns';
 
 @Injectable()
 export class DailyBonusService {

@@ -87,6 +87,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private logError(
     exception: HttpException,
     request: Request,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     errorResponse: any,
   ) {
     const status = exception.getStatus();

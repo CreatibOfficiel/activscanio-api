@@ -287,8 +287,11 @@ export class AdvancedStatsService {
         totalPicks += 1;
         totalOdds += pick.oddAtBet;
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
         if (pick.position === 'first') positionCounts.first += 1;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
         else if (pick.position === 'second') positionCounts.second += 1;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
         else if (pick.position === 'third') positionCounts.third += 1;
       });
     });

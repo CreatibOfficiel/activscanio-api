@@ -1,9 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { AchievementCalculatorService } from '../achievement-calculator.service';
 import { Repository } from 'typeorm';
-import { Achievement } from '../../entities/achievement.entity';
+import {
+  Achievement,
+  AchievementCategory,
+  AchievementRarity,
+} from '../../entities/achievement.entity';
 import { UserAchievement } from '../../entities/user-achievement.entity';
-import { UserStats } from '../../entities/user-stats.entity';
 import { Bet } from '../../../betting/entities/bet.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -12,7 +17,6 @@ describe('AchievementCalculatorService', () => {
   let service: AchievementCalculatorService;
   let achievementRepository: Repository<Achievement>;
   let userAchievementRepository: Repository<UserAchievement>;
-  let userStatsRepository: Repository<UserStats>;
   let betRepository: Repository<Bet>;
   let eventEmitter: EventEmitter2;
 
@@ -22,8 +26,8 @@ describe('AchievementCalculatorService', () => {
       key: 'first_bet',
       name: 'First Bet',
       description: 'Place your first bet',
-      category: 'PARTICIPATION',
-      rarity: 'COMMON',
+      category: AchievementCategory.PRECISION,
+      rarity: AchievementRarity.COMMON,
       xpReward: 10,
       prerequisiteAchievementKey: null,
       tierLevel: 1,
@@ -36,8 +40,8 @@ describe('AchievementCalculatorService', () => {
       key: 'tier2_achievement',
       name: 'Tier 2',
       description: 'Second tier achievement',
-      category: 'PARTICIPATION',
-      rarity: 'RARE',
+      category: AchievementCategory.PRECISION,
+      rarity: AchievementRarity.RARE,
       xpReward: 50,
       prerequisiteAchievementKey: 'first_bet',
       tierLevel: 2,
@@ -50,8 +54,8 @@ describe('AchievementCalculatorService', () => {
       key: 'tier3_achievement',
       name: 'Tier 3',
       description: 'Third tier achievement',
-      category: 'PARTICIPATION',
-      rarity: 'EPIC',
+      category: AchievementCategory.PRECISION,
+      rarity: AchievementRarity.EPIC,
       xpReward: 100,
       prerequisiteAchievementKey: 'tier2_achievement',
       tierLevel: 3,
@@ -66,22 +70,16 @@ describe('AchievementCalculatorService', () => {
       providers: [
         AchievementCalculatorService,
         {
-          provide: getRepositoryToken(Achievement),
+          provide: getRepositoryToken(Achievement) as string,
           useValue: {
             find: jest.fn(),
           },
         },
         {
-          provide: getRepositoryToken(UserAchievement),
+          provide: getRepositoryToken(UserAchievement) as string,
           useValue: {
             find: jest.fn(),
             save: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(UserStats),
-          useValue: {
-            findOne: jest.fn(),
           },
         },
         {
@@ -107,9 +105,6 @@ describe('AchievementCalculatorService', () => {
     );
     userAchievementRepository = module.get<Repository<UserAchievement>>(
       getRepositoryToken(UserAchievement),
-    );
-    userStatsRepository = module.get<Repository<UserStats>>(
-      getRepositoryToken(UserStats),
     );
     betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
@@ -137,7 +132,7 @@ describe('AchievementCalculatorService', () => {
 
       // Tier 2 should NOT be unlocked because tier 1 is not unlocked
       const tier2Unlocked = result.some(
-        (ua) => ua.achievement.key === 'tier2_achievement',
+        (ua) => ua.achievementKey === 'tier2_achievement',
       );
       expect(tier2Unlocked).toBe(false);
     });
@@ -163,18 +158,10 @@ describe('AchievementCalculatorService', () => {
 
       // Mock: user stats show they qualify for tier 2
       jest.spyOn(betRepository, 'count').mockResolvedValue(10);
-      jest.spyOn(userStatsRepository, 'findOne').mockResolvedValue({
-        userId: 'user-123',
-        betsPlaced: 10,
-      } as UserStats);
 
       // Try to check achievements
       const result = await service.checkAchievements('user-123');
 
-      // Tier 2 SHOULD be unlocked now because tier 1 is already unlocked
-      const tier2Unlocked = result.some(
-        (ua) => ua.achievement.key === 'tier2_achievement',
-      );
       // Note: This depends on the actual implementation checking progress
       // For now, we just verify the service ran without errors
       expect(result).toBeDefined();
@@ -207,7 +194,7 @@ describe('AchievementCalculatorService', () => {
 
       // Tier 3 should NOT be unlocked because tier 2 is missing
       const tier3Unlocked = result.some(
-        (ua) => ua.achievement.key === 'tier3_achievement',
+        (ua) => ua.achievementKey === 'tier3_achievement',
       );
       expect(tier3Unlocked).toBe(false);
     });
@@ -227,10 +214,15 @@ describe('AchievementCalculatorService', () => {
         .mockResolvedValue(mockUserAchievement);
 
       // Unlock achievement manually (simulating the unlock process)
-      await service['unlockAchievement'](
-        'user-123',
-        mockAchievements[0] as Achievement,
-      );
+
+      await (
+        service as unknown as {
+          unlockAchievement: (
+            userId: string,
+            achievement: Achievement,
+          ) => Promise<void>;
+        }
+      ).unlockAchievement('user-123', mockAchievements[0] as Achievement);
 
       // Verify event was emitted
       expect(eventEmitter.emit).toHaveBeenCalledWith(

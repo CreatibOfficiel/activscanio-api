@@ -4,7 +4,7 @@ import { Repository, IsNull } from 'typeorm';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   Achievement,
-  AchievementConditionType,
+  AchievementCondition,
   AchievementConditionOperator,
   AchievementScope,
 } from '../entities/achievement.entity';
@@ -72,7 +72,7 @@ export class AchievementCalculatorService {
       }
     } catch (error) {
       this.logger.error(
-        `Failed to check achievements for user ${context.userId}: ${error.message}`,
+        `Failed to check achievements for user ${context.userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
   }
@@ -84,9 +84,11 @@ export class AchievementCalculatorService {
    * @param context - Bet finalized context (optional, for optimization)
    * @returns List of newly unlocked achievements
    */
+
   async checkAchievements(
     userId: string,
-    context?: BetFinalizedContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _context?: BetFinalizedContext,
   ): Promise<AchievementUnlockResult[]> {
     // Get user stats
     const userStats = await this.getUserStats(userId);
@@ -188,7 +190,10 @@ export class AchievementCalculatorService {
    * @param userStats - User statistics
    * @returns True if condition is met
    */
-  private evaluateCondition(condition: any, userStats: UserStats): boolean {
+  private evaluateCondition(
+    condition: AchievementCondition,
+    userStats: UserStats,
+  ): boolean {
     const actualValue = this.getMetricValue(
       userStats,
       condition.metric,
@@ -203,7 +208,7 @@ export class AchievementCalculatorService {
       case AchievementConditionOperator.EQ:
         return actualValue === condition.value;
       default:
-        this.logger.warn(`Unknown operator: ${condition.operator}`);
+        this.logger.warn(`Unknown operator: ${String(condition.operator)}`);
         return false;
     }
   }

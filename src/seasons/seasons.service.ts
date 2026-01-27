@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryRunner } from 'typeorm';
 import { SeasonArchive } from './entities/season-archive.entity';
@@ -47,9 +47,6 @@ export class SeasonsService {
 
       // Gather statistics
       const competitors = await queryRunner.manager.find(Competitor);
-      const bettingWeeks = await queryRunner.manager.find(BettingWeek, {
-        where: { month, year },
-      });
 
       // Note: totalRaces is set to 0 as there is currently no direct relation
       // between BettingWeek and Race entities in the database schema.

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { TemporaryAchievementService } from './temporary-achievement.service';
 
 /**
@@ -44,9 +44,12 @@ export class AchievementCronService {
         `Daily temporary achievements check completed in ${duration}ms`,
       );
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Error during daily temporary achievements check: ${error.message}`,
-        error.stack,
+        `Error during daily temporary achievements check: ${errorMessage}`,
+        errorStack,
       );
     }
   }
@@ -81,9 +84,12 @@ export class AchievementCronService {
         `Monthly ranking achievements check completed in ${duration}ms`,
       );
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
-        `Error during monthly ranking achievements check: ${error.message}`,
-        error.stack,
+        `Error during monthly ranking achievements check: ${errorMessage}`,
+        errorStack,
       );
     }
   }

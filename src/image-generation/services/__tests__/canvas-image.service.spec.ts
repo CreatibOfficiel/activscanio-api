@@ -97,7 +97,7 @@ describe('CanvasImageService', () => {
   });
 
   describe('generateRaceAnnouncement', () => {
-    it('should generate race announcement image', async () => {
+    it('should generate race announcement image', () => {
       const options = {
         raceTitle: 'Grand Prix Finals',
         scheduledTime: new Date(),
@@ -108,13 +108,13 @@ describe('CanvasImageService', () => {
         ],
       };
 
-      const buffer = await service.generateRaceAnnouncement(options);
+      const buffer = service.generateRaceAnnouncement(options);
 
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.length).toBeGreaterThan(0);
     });
 
-    it('should generate PNG for race announcement', async () => {
+    it('should generate PNG for race announcement', () => {
       const options = {
         raceTitle: 'Test Race',
         scheduledTime: new Date(),
@@ -125,21 +125,21 @@ describe('CanvasImageService', () => {
         ],
       };
 
-      const buffer = await service.generateRaceAnnouncement(options);
+      const buffer = service.generateRaceAnnouncement(options);
 
       // Check PNG signature
       const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
       expect(buffer.subarray(0, 8)).toEqual(pngSignature);
     });
 
-    it('should handle empty podium list', async () => {
+    it('should handle empty podium list', () => {
       const options = {
         raceTitle: 'Test Race',
         scheduledTime: new Date(),
         podiumCompetitors: [],
       };
 
-      const buffer = await service.generateRaceAnnouncement(options);
+      const buffer = service.generateRaceAnnouncement(options);
 
       expect(buffer).toBeInstanceOf(Buffer);
       expect(buffer.length).toBeGreaterThan(0);

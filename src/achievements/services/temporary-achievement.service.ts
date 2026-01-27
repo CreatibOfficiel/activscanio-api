@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual, Between, IsNull } from 'typeorm';
+import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Achievement } from '../entities/achievement.entity';
 import { UserAchievement } from '../entities/user-achievement.entity';
@@ -444,13 +444,17 @@ export class TemporaryAchievementService {
     let processedCount = 0;
     let errorCount = 0;
 
-    for (const { bet_userId } of userIds) {
+    for (const row of userIds) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const bet_userId = row.bet_userId as string;
       try {
         await this.checkTemporaryAchievements(bet_userId);
         processedCount++;
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(
-          `Error checking temporary achievements for user ${bet_userId}: ${error.message}`,
+          `Error checking temporary achievements for user ${bet_userId}: ${errorMessage}`,
         );
         errorCount++;
       }

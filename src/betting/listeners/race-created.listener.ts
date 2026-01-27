@@ -29,9 +29,10 @@ export class RaceCreatedListener {
       await this.oddsCalculator.calculateOddsForWeek(event.bettingWeekId);
       this.logger.log(`Odds recalculated for week ${event.bettingWeekId}`);
     } catch (error) {
+      const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
         `Failed to recalculate odds for week ${event.bettingWeekId}:`,
-        error.stack,
+        errorStack,
       );
       // Don't throw - this is a side effect and shouldn't fail race creation
     }

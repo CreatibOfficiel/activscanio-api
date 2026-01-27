@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unused-vars */
 /**
  * WeekManagerService
  *

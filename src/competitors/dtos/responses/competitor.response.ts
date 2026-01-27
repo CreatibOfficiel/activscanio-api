@@ -15,6 +15,7 @@ export class CompetitorResponse {
   lastName: string;
 
   @Expose()
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Transform(({ obj }) => `${obj.firstName} ${obj.lastName}`)
   fullName: string;
 
@@ -35,6 +36,7 @@ export class CompetitorResponse {
    * Used for more reliable skill estimation
    */
   @Expose()
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   @Transform(({ obj }) => obj.rating - 2 * obj.rd)
   conservativeScore: number;
 
