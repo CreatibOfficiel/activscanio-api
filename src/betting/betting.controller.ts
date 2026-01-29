@@ -26,6 +26,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { UsersService } from '../users/users.service';
 import { OddsCalculatorService } from './services/odds-calculator.service';
 import { RankingsService } from './services/rankings.service';
+import { PaginationQueryDto } from '../common';
 
 @ApiTags('betting')
 @ApiBearerAuth()
@@ -166,23 +167,42 @@ export class BettingController {
    * Get my bets
    */
   @Get('bets/my-bets')
-  @ApiOperation({ summary: 'Get all my bets or filter by week' })
+  @ApiOperation({
+    summary: 'Get all my bets with pagination or filter by week',
+  })
   @ApiQuery({
     name: 'weekId',
     required: false,
     description: 'Filter by betting week UUID',
   })
-  @ApiResponse({ status: 200, description: 'User bets' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items to return (1-50)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of items to skip',
+    example: 0,
+  })
+  @ApiResponse({ status: 200, description: 'Paginated user bets' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getMyBets(
     @CurrentUser('clerkId') clerkId: string,
     @Query('weekId') weekId?: string,
+    @Query() pagination?: PaginationQueryDto,
   ) {
     const userId = await this.getUserIdFromClerkId(clerkId);
     if (weekId) {
       return await this.bettingService.getUserBet(userId, weekId);
     }
-    return await this.bettingService.getUserBets(userId);
+    return await this.bettingService.getUserBets(
+      userId,
+      pagination?.limit ?? 10,
+      pagination?.offset ?? 0,
+    );
   }
 
   /**

@@ -1,0 +1,184 @@
+import { DataSource } from 'typeorm';
+import { Logger } from '@nestjs/common';
+import { RaceEvent } from 'src/races/race-event.entity';
+import { RaceResult } from 'src/races/race-result.entity';
+import { Competitor } from 'src/competitors/competitor.entity';
+import { BettingWeek } from 'src/betting/entities/betting-week.entity';
+import {
+  seededRandom,
+  getScoreForRank,
+  addDays,
+  subtractWeeks,
+} from '../utils/seed-helpers';
+
+const logger = new Logger('RaceSeed');
+
+const RACES_PER_WEEK = 5; // Average races per week
+const PLAYERS_PER_RACE = 4; // 4 players per race (as in Mario Kart 4-player mode)
+
+export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
+  const raceRepository = dataSource.getRepository(RaceEvent);
+  const raceResultRepository = dataSource.getRepository(RaceResult);
+  const competitorRepository = dataSource.getRepository(Competitor);
+  const bettingWeekRepository = dataSource.getRepository(BettingWeek);
+
+  // Check if we already have races
+  const existingCount = await raceRepository.count();
+  if (existingCount > 0) {
+    logger.log('🟡 Races already exist. Skipping...');
+    return raceRepository.find({ relations: ['results'] });
+  }
+
+  const competitors = await competitorRepository.find();
+  const bettingWeeks = await bettingWeekRepository.find({
+    order: { startDate: 'ASC' },
+  });
+
+  if (competitors.length === 0) {
+    logger.warn('⚠️ No competitors found. Please seed competitors first.');
+    return [];
+  }
+
+  if (bettingWeeks.length === 0) {
+    logger.warn('⚠️ No betting weeks found. Please seed betting weeks first.');
+    return [];
+  }
+
+  const racesToCreate: RaceEvent[] = [];
+  const resultsToCreate: RaceResult[] = [];
+
+  // Track competitor stats for updating
+  const competitorStats = new Map<
+    string,
+    {
+      raceCount: number;
+      totalRank: number;
+      rating: number;
+      lastRaceDate: Date | null;
+      winStreak: number;
+    }
+  >();
+
+  // Initialize stats from current competitor data
+  for (const competitor of competitors) {
+    competitorStats.set(competitor.id, {
+      raceCount: 0,
+      totalRank: 0,
+      rating: competitor.rating,
+      lastRaceDate: null,
+      winStreak: 0,
+    });
+  }
+
+  // Generate races for each betting week (except the open one)
+  for (const week of bettingWeeks) {
+    // Skip open weeks - no races yet
+    if (week.status === 'open') continue;
+
+    // Generate 3-7 races per week
+    const numRaces = seededRandom.int(3, 7);
+
+    for (let r = 0; r < numRaces; r++) {
+      // Random date within the week
+      const raceDate = addDays(
+        new Date(week.startDate),
+        seededRandom.int(0, 6),
+      );
+      raceDate.setHours(
+        seededRandom.int(18, 22),
+        seededRandom.int(0, 59),
+        0,
+        0,
+      );
+
+      // Create race event
+      const race = new RaceEvent();
+      race.date = raceDate;
+      race.month = raceDate.getMonth() + 1;
+      race.year = raceDate.getFullYear();
+      race.bettingWeekId = week.id;
+
+      // Select 4 random participants
+      const participants = seededRandom.pickMultiple(
+        competitors,
+        PLAYERS_PER_RACE,
+      );
+
+      // Generate rankings (1-4) based on ratings with some randomness
+      const sortedParticipants = [...participants].sort((a, b) => {
+        const aRating = competitorStats.get(a.id)?.rating || a.rating;
+        const bRating = competitorStats.get(b.id)?.rating || b.rating;
+        // Add randomness factor (30% weight)
+        const aScore = aRating * 0.7 + seededRandom.float(0, 500) * 0.3;
+        const bScore = bRating * 0.7 + seededRandom.float(0, 500) * 0.3;
+        return bScore - aScore;
+      });
+
+      racesToCreate.push(race);
+
+      // Create results for each participant
+      for (let rank = 0; rank < sortedParticipants.length; rank++) {
+        const competitor = sortedParticipants[rank];
+        const actualRank = rank + 1; // 1-based rank
+        const score = getScoreForRank(actualRank);
+
+        const result = new RaceResult();
+        result.competitorId = competitor.id;
+        result.rank12 = actualRank;
+        result.score = score;
+        result.race = race;
+
+        resultsToCreate.push(result);
+
+        // Update competitor stats
+        const stats = competitorStats.get(competitor.id)!;
+        stats.raceCount++;
+        stats.totalRank += actualRank;
+        stats.lastRaceDate = raceDate;
+
+        // Update win streak
+        if (actualRank === 1) {
+          stats.winStreak++;
+        } else {
+          stats.winStreak = 0;
+        }
+
+        // Update rating (simplified Glicko-like adjustment)
+        const kFactor = 32;
+        const expectedRank = PLAYERS_PER_RACE / 2; // Middle rank
+        const performance = expectedRank - actualRank;
+        stats.rating = Math.max(
+          1000,
+          Math.min(2500, stats.rating + performance * kFactor),
+        );
+      }
+    }
+  }
+
+  // Save races and results
+  const savedRaces = await raceRepository.save(racesToCreate);
+  await raceResultRepository.save(resultsToCreate);
+
+  logger.log(`✅ ${savedRaces.length} races seeded successfully!`);
+  logger.log(`✅ ${resultsToCreate.length} race results seeded successfully!`);
+
+  // Update competitor stats in database
+  for (const competitor of competitors) {
+    const stats = competitorStats.get(competitor.id)!;
+    if (stats.raceCount > 0) {
+      await competitorRepository.update(competitor.id, {
+        raceCount: stats.raceCount,
+        avgRank12: Math.round((stats.totalRank / stats.raceCount) * 100) / 100,
+        rating: Math.round(stats.rating * 100) / 100,
+        lastRaceDate: stats.lastRaceDate,
+        winStreak: stats.winStreak,
+        currentMonthRaceCount: seededRandom.int(0, stats.raceCount),
+        isActiveThisWeek: seededRandom.bool(0.6),
+      });
+    }
+  }
+
+  logger.log('✅ Competitor stats updated successfully!');
+
+  return savedRaces;
+}

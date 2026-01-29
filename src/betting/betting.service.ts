@@ -16,6 +16,7 @@ import { CompetitorOdds } from './entities/competitor-odds.entity';
 import { User } from '../users/user.entity';
 import { UserAchievement } from '../achievements/entities/user-achievement.entity';
 import { Achievement } from '../achievements/entities/achievement.entity';
+import { PaginatedResponse } from '../common';
 
 @Injectable()
 export class BettingService {
@@ -273,13 +274,19 @@ export class BettingService {
   }
 
   /**
-   * Get all user's bets
+   * Get all user's bets with pagination
    */
-  async getUserBets(userId: string): Promise<Bet[]> {
-    const bets = await this.betRepository.find({
+  async getUserBets(
+    userId: string,
+    limit = 10,
+    offset = 0,
+  ): Promise<PaginatedResponse<Bet>> {
+    const [bets, total] = await this.betRepository.findAndCount({
       where: { userId },
       relations: ['picks', 'picks.competitor', 'bettingWeek'],
       order: { placedAt: 'DESC' },
+      take: limit,
+      skip: offset,
     });
 
     // For each finalized bet, fetch achievements unlocked around the betting week's finalization time
@@ -320,7 +327,12 @@ export class BettingService {
       }),
     );
 
-    return betsWithAchievements as Bet[];
+    return PaginatedResponse.create(
+      betsWithAchievements as Bet[],
+      total,
+      limit,
+      offset,
+    );
   }
 
   /**
