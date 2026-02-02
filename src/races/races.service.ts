@@ -101,11 +101,14 @@ export class RacesService {
   }
 
   // GET /competitors/:competitorId/recent-races (via CompetitorsController)
-  async getRecentRacesForCompetitor(competitorId: string): Promise<any[]> {
+  async getRecentRacesForCompetitor(
+    competitorId: string,
+    limit = 3,
+  ): Promise<any[]> {
     // Use repository method to get races for competitor
     const races = await this.raceEventRepository.findForCompetitor(
       competitorId,
-      3,
+      limit,
     );
 
     // Extract info

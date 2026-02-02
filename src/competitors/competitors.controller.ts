@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
 } from '@nestjs/common';
 import { CompetitorsService } from './competitors.service';
 import { RacesService } from 'src/races/races.service';
@@ -72,7 +73,12 @@ export class CompetitorsController {
   /* ───────── RÉCENTES COURSES ───────── */
 
   @Get(':competitorId/recent-races')
-  getRecentRaces(@Param('competitorId') competitorId: string) {
-    return this.racesService.getRecentRacesForCompetitor(competitorId);
+  getRecentRaces(
+    @Param('competitorId') competitorId: string,
+    @Query('limit') limitStr?: string,
+  ) {
+    // Parse limit with default 3, max 10
+    const limit = Math.min(Math.max(parseInt(limitStr || '3', 10) || 3, 1), 10);
+    return this.racesService.getRecentRacesForCompetitor(competitorId, limit);
   }
 }
