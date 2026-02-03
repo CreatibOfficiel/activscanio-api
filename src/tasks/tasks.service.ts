@@ -27,7 +27,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WeekManagerService } from '../betting/services/week-manager.service';
 import { BettingFinalizerService } from '../betting/services/betting-finalizer.service';
+import { RankingsService } from '../betting/services/rankings.service';
 import { CompetitorsService } from '../competitors/competitors.service';
+import { CompetitorRepository } from '../competitors/repositories/competitor.repository';
 import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
@@ -48,7 +50,9 @@ export class TasksService {
   constructor(
     private readonly weekManagerService: WeekManagerService,
     private readonly bettingFinalizerService: BettingFinalizerService,
+    private readonly rankingsService: RankingsService,
     private readonly competitorsService: CompetitorsService,
+    private readonly competitorRepo: CompetitorRepository,
     private readonly seasonsService: SeasonsService,
     private readonly streakTrackerService: StreakTrackerService,
     @InjectRepository(Competitor)
@@ -410,6 +414,68 @@ export class TasksService {
     } catch (error) {
       this.logger.error(
         `❌ Failed to archive monthly stats: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /* ==================== RANK SNAPSHOT TASKS ==================== */
+
+  /**
+   * Snapshot competitor ranks (daily)
+   * Runs every weekday (Mon-Fri) at 00:00 UTC
+   * Saves current rank based on conservativeScore for trend calculation
+   */
+  @Cron(BETTING_CRON_SCHEDULES.SNAPSHOT_COMPETITOR_RANKS, {
+    name: 'snapshot-competitor-ranks',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleSnapshotCompetitorRanks(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.snapshotCompetitorRanks) {
+      this.logger.warn('Task "snapshot-competitor-ranks" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.snapshotCompetitorRanks}`,
+    );
+
+    try {
+      await this.competitorRepo.snapshotDailyRanks();
+      this.logger.log('✅ Competitor ranks snapshotted successfully');
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to snapshot competitor ranks: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * Snapshot bettor ranks (weekly)
+   * Runs every Sunday at 23:59 UTC (after RECALCULATE_RANKINGS at 23:58)
+   * Saves current rank based on totalPoints for trend calculation
+   */
+  @Cron(BETTING_CRON_SCHEDULES.SNAPSHOT_BETTOR_RANKS, {
+    name: 'snapshot-bettor-ranks',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleSnapshotBettorRanks(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.snapshotBettorRanks) {
+      this.logger.warn('Task "snapshot-bettor-ranks" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.snapshotBettorRanks}`,
+    );
+
+    try {
+      await this.rankingsService.snapshotWeeklyRanks();
+      this.logger.log('✅ Bettor ranks snapshotted successfully');
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to snapshot bettor ranks: ${error.message}`,
         error.stack,
       );
     }

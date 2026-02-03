@@ -58,6 +58,14 @@ export class BettorRanking {
   @Column({ type: 'int', default: 0 })
   consecutivePerfectBets: number;
 
+  /**
+   * Previous week rank for trend calculation.
+   * Snapshot taken every Sunday at 23:58 (after finalize).
+   * Used to show if bettor is rising/falling in rankings.
+   */
+  @Column({ type: 'int', nullable: true })
+  previousWeekRank: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -130,4 +130,34 @@ export class RankingsService {
       rankings: result.rankings,
     };
   }
+
+  /**
+   * Snapshot weekly ranks for all bettors.
+   * Called by cron every Sunday at 23:58 (after RECALCULATE_RANKINGS).
+   *
+   * Calculates current rank based on totalPoints for the current month
+   * and stores it in previousWeekRank for trend calculation.
+   */
+  async snapshotWeeklyRanks(): Promise<void> {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    // Get all bettor rankings for current month, sorted by totalPoints
+    const rankings = await this.bettorRankingRepository.find({
+      where: { month, year },
+      order: { totalPoints: 'DESC' },
+    });
+
+    // Update previousWeekRank for each bettor (1-indexed)
+    for (let i = 0; i < rankings.length; i++) {
+      await this.bettorRankingRepository.update(rankings[i].id, {
+        previousWeekRank: i + 1,
+      });
+    }
+
+    this.logger.log(
+      `Snapshotted weekly ranks for ${rankings.length} bettors (${month}/${year})`,
+    );
+  }
 }
