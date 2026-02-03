@@ -30,8 +30,18 @@ export class CompetitorOdds {
   @JoinColumn({ name: 'bettingWeekId' })
   bettingWeek: BettingWeek;
 
+  /** @deprecated Use oddFirst, oddSecond, oddThird instead */
   @Column({ type: 'float' })
   odd: number;
+
+  @Column({ type: 'float', nullable: true })
+  oddFirst: number;
+
+  @Column({ type: 'float', nullable: true })
+  oddSecond: number;
+
+  @Column({ type: 'float', nullable: true })
+  oddThird: number;
 
   @Column({ type: 'timestamptz' })
   calculatedAt: Date;

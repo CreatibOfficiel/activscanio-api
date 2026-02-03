@@ -19,11 +19,18 @@ export class CompetitorOddsResponse {
   @Type(() => CompetitorResponse)
   competitor?: CompetitorResponse;
 
+  /** @deprecated Use oddFirst, oddSecond, oddThird instead */
   @Expose()
-  winOdds: number;
+  odd: number;
 
   @Expose()
-  podiumOdds: number;
+  oddFirst: number;
+
+  @Expose()
+  oddSecond: number;
+
+  @Expose()
+  oddThird: number;
 
   @Expose()
   @Type(() => Date)

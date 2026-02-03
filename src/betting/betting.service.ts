@@ -230,13 +230,26 @@ export class BettingService {
     ];
 
     const picks = placeBetDto.picks.map((pickDto, index) => {
-      const odd = oddsArray[index];
+      const odd = oddsArray[index]!; // Already checked that odd exists above
+      const position = positions[index];
+
+      // Use position-specific odds when available, fallback to legacy 'odd' field
+      let oddAtBet: number;
+      if (position === BetPosition.FIRST && odd.oddFirst) {
+        oddAtBet = odd.oddFirst;
+      } else if (position === BetPosition.SECOND && odd.oddSecond) {
+        oddAtBet = odd.oddSecond;
+      } else if (position === BetPosition.THIRD && odd.oddThird) {
+        oddAtBet = odd.oddThird;
+      } else {
+        oddAtBet = odd.odd; // Fallback to legacy field
+      }
 
       return this.betPickRepository.create({
         betId: bet.id,
         competitorId: pickDto.competitorId,
-        position: positions[index],
-        oddAtBet: odd!.odd, // Already checked that odd exists above
+        position,
+        oddAtBet,
         hasBoost: pickDto.hasBoost || false,
       });
     });

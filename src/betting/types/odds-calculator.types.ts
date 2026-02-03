@@ -8,12 +8,24 @@
 import { Competitor } from '../../competitors/competitor.entity';
 
 /**
+ * Reason why a competitor is not eligible for betting
+ */
+export type IneligibilityReason =
+  | 'calibrating' // Less than MIN_LIFETIME_RACES total races
+  | 'inactive' // Less than MIN_RECENT_RACES in rolling window
+  | 'no_races_this_week' // No races in current betting week
+  | null; // Eligible
+
+/**
  * Raw competitor data needed for odds calculation
  */
 export interface CompetitorWithStats {
   competitor: Competitor;
   recentRaces: RecentRacePerformance[];
-  isEligible: boolean; // Has at least 1 race this week
+  isEligible: boolean; // Has at least 1 race this week AND meets other criteria
+  ineligibilityReason?: IneligibilityReason;
+  calibrationProgress?: number; // X out of MIN_LIFETIME_RACES
+  recentRacesIn14Days?: number; // Count of races in rolling window
 }
 
 /**
@@ -52,6 +64,11 @@ export interface OddsCalculationStep {
   odd: number;
   cappedOdd: number; // After min/max bounds
 
+  // Position-specific odds
+  oddFirst: number;
+  oddSecond: number;
+  oddThird: number;
+
   // Metadata
   isEligible: boolean;
   calculatedAt: Date;
@@ -75,7 +92,11 @@ export interface OddsCalculationResult {
 export interface CompetitorOdd {
   competitorId: string;
   competitorName: string;
+  /** @deprecated Use oddFirst, oddSecond, oddThird instead */
   odd: number;
+  oddFirst: number;
+  oddSecond: number;
+  oddThird: number;
   probability: number;
   formFactor: number;
   isEligible: boolean;
