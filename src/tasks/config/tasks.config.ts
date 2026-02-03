@@ -33,21 +33,23 @@ export const BETTING_CRON_SCHEDULES = {
 
   /**
    * Close current betting week
-   * Every Sunday at 23:50 UTC (before finalization)
+   * Every Thursday at 23:59 UTC
+   * This gives 3 days of uncertainty (Friday, Saturday, Sunday)
+   * before the podium is determined on Sunday 23:55
    */
-  CLOSE_WEEK: '0 50 23 * * 0',
+  CLOSE_WEEK: '0 59 23 * * 4',
 
   /**
    * Finalize betting week (determine podium + calculate points)
-   * Every Sunday at 23:55 UTC (after closing)
+   * Every Sunday at 20:00 UTC (after closing)
    */
-  FINALIZE_WEEK: '0 55 23 * * 0',
+  FINALIZE_WEEK: '0 0 20 * * 0',
 
   /**
    * Recalculate monthly rankings
-   * Every Sunday at 23:58 UTC (after all finalization)
+   * Every Sunday at 20:03 UTC (after all finalization)
    */
-  RECALCULATE_RANKINGS: '0 58 23 * * 0',
+  RECALCULATE_RANKINGS: '0 3 20 * * 0',
 
   /**
    * Archive previous season (BEFORE reset)
@@ -78,6 +80,20 @@ export const BETTING_CRON_SCHEDULES = {
    * 1st of every month at 00:05 UTC (AFTER archiving)
    */
   RESET_MONTHLY_STATS: '0 5 0 1 * *',
+
+  /**
+   * Snapshot competitor ranks (daily)
+   * Every weekday (Mon-Fri) at 00:00 UTC
+   * Saves current rank based on conservativeScore for trend calculation
+   */
+  SNAPSHOT_COMPETITOR_RANKS: '0 0 0 * * 1-5',
+
+  /**
+   * Snapshot bettor ranks (weekly)
+   * Every Sunday at 20:05 UTC (after RECALCULATE_RANKINGS at 20:03)
+   * Saves current rank based on totalPoints for trend calculation
+   */
+  SNAPSHOT_BETTOR_RANKS: '0 5 20 * * 0',
 };
 
 /**
@@ -99,6 +115,8 @@ export const TASK_EXECUTION_CONFIG = {
     resetMonthlyStreaks: true,
     resetMonthlyStats: true,
     archiveMonthlyStats: true,
+    snapshotCompetitorRanks: true,
+    snapshotBettorRanks: true,
   },
 
   /**
@@ -122,14 +140,16 @@ export const TASK_EXECUTION_CONFIG = {
 export const TASK_DESCRIPTIONS = {
   createWeek: 'Create new betting week (Monday 00:00)',
   resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:05)',
-  closeWeek: 'Close betting week (Sunday 23:50)',
-  finalizeWeek: 'Finalize betting week and calculate points (Sunday 23:55)',
-  recalculateRankings: 'Recalculate monthly rankings (Sunday 23:58)',
+  closeWeek: 'Close betting week (Thursday 23:59)',
+  finalizeWeek: 'Finalize betting week and calculate points (Sunday 20:00)',
+  recalculateRankings: 'Recalculate monthly rankings (Sunday 20:03)',
   archiveSeason: 'Archive previous season (1st 00:01)',
   resetBoostAvailability: 'Reset boost availability for all users (1st 00:03)',
   resetMonthlyStreaks: 'Reset monthly streaks for all users (1st 00:04)',
   resetMonthlyStats: 'Reset monthly ELO and race counts (1st 00:05)',
   archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:02)',
+  snapshotCompetitorRanks: 'Snapshot competitor ranks for trends (Mon-Fri 00:00)',
+  snapshotBettorRanks: 'Snapshot bettor ranks for trends (Sunday 20:05)',
 };
 
 /**
