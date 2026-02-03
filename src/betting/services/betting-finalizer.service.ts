@@ -31,8 +31,9 @@ import {
   BettingWeekStatus,
 } from '../entities/betting-week.entity';
 import { Bet } from '../entities/bet.entity';
-import { BetPick } from '../entities/bet-pick.entity';
+import { BetPick, BetPosition } from '../entities/bet-pick.entity';
 import { BettorRanking } from '../entities/bettor-ranking.entity';
+import { CompetitorOdds } from '../entities/competitor-odds.entity';
 import {
   DEFAULT_SCORING_PARAMS,
   SCORING_LOGGER_CONFIG,
@@ -57,6 +58,15 @@ interface PodiumResult {
 }
 
 /**
+ * Position odds for BOG calculation
+ */
+interface PositionOdds {
+  first: number;
+  second: number;
+  third: number;
+}
+
+/**
  * Calculation result for a single pick
  */
 interface PickCalculation {
@@ -67,6 +77,8 @@ interface PickCalculation {
   oddAtBet: number;
   hasBoost: boolean;
   pointsEarned: number;
+  finalOdd: number | null;
+  usedBogOdd: boolean;
 }
 
 /**
@@ -110,6 +122,8 @@ export class BettingFinalizerService {
     private readonly betPickRepository: Repository<BetPick>,
     @InjectRepository(BettorRanking)
     private readonly bettorRankingRepository: Repository<BettorRanking>,
+    @InjectRepository(CompetitorOdds)
+    private readonly competitorOddsRepository: Repository<CompetitorOdds>,
     private readonly eventEmitter: EventEmitter2,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly xpLevelService: XPLevelService,
@@ -172,13 +186,16 @@ export class BettingFinalizerService {
 
     this.logger.log(`Processing ${bets.length} bets...`);
 
-    // 4. Calculate points for all bets
-    const calculations = await this.processBets(bets, podium);
+    // 4. Fetch final odds for BOG calculation
+    const finalOddsMap = await this.fetchFinalOdds(weekId);
 
-    // 5. Update bettor rankings
+    // 5. Calculate points for all bets with BOG
+    const calculations = await this.processBets(bets, podium, finalOddsMap);
+
+    // 6. Update bettor rankings
     await this.updateBettorRankings(week.month, week.year, calculations);
 
-    // 6. Calculate stats
+    // 7. Calculate stats
     const totalPointsDistributed = calculations.reduce(
       (sum, calc) => sum + calc.finalPoints,
       0,
@@ -234,17 +251,61 @@ export class BettingFinalizerService {
   }
 
   /**
+   * Fetch final odds for all competitors in a betting week
+   * Used for Best Odds Guaranteed (BOG) calculation
+   *
+   * @param weekId - The betting week ID
+   * @returns Map of competitorId to their final position odds
+   */
+  private async fetchFinalOdds(
+    weekId: string,
+  ): Promise<Map<string, PositionOdds>> {
+    // Fetch the latest odds for each competitor in this week
+    // Using a subquery to get the most recent calculatedAt per competitor
+    const latestOdds = await this.competitorOddsRepository
+      .createQueryBuilder('odds')
+      .where('odds.bettingWeekId = :weekId', { weekId })
+      .andWhere(
+        `odds.calculatedAt = (
+          SELECT MAX(o2."calculatedAt")
+          FROM competitor_odds o2
+          WHERE o2."competitorId" = odds."competitorId"
+          AND o2."bettingWeekId" = :weekId
+        )`,
+      )
+      .getMany();
+
+    const map = new Map<string, PositionOdds>();
+    for (const odd of latestOdds) {
+      if (odd.oddFirst && odd.oddSecond && odd.oddThird) {
+        map.set(odd.competitorId, {
+          first: odd.oddFirst,
+          second: odd.oddSecond,
+          third: odd.oddThird,
+        });
+      }
+    }
+
+    this.logger.log(
+      `Fetched final odds for ${map.size} competitors for BOG calculation`,
+    );
+
+    return map;
+  }
+
+  /**
    * Process all bets and calculate points
    */
   private async processBets(
     bets: Bet[],
     podium: PodiumResult,
+    finalOddsMap: Map<string, PositionOdds>,
   ): Promise<BetCalculation[]> {
     const calculations: BetCalculation[] = [];
 
     // Process each bet in a transaction
     for (const bet of bets) {
-      const calculation = this.calculateBetPoints(bet, podium);
+      const calculation = this.calculateBetPoints(bet, podium, finalOddsMap);
       calculations.push(calculation);
 
       // Update bet record
@@ -432,18 +493,40 @@ export class BettingFinalizerService {
 
   /**
    * Calculate points for a single bet
+   * Implements Best Odds Guaranteed (BOG): uses the better of oddAtBet or finalOdd
    */
-  private calculateBetPoints(bet: Bet, podium: PodiumResult): BetCalculation {
+  private calculateBetPoints(
+    bet: Bet,
+    podium: PodiumResult,
+    finalOddsMap: Map<string, PositionOdds>,
+  ): BetCalculation {
     const pickCalculations: PickCalculation[] = [];
 
     // Check each pick
     for (const pick of bet.picks) {
       const isCorrect = this.isPickCorrect(pick, podium);
 
+      // Get final odds for this competitor
+      const competitorFinalOdds = finalOddsMap.get(pick.competitorId);
+      let finalOdd: number | null = null;
+      let usedBogOdd = false;
+
+      if (competitorFinalOdds) {
+        // Get the final odd for the specific position
+        finalOdd = competitorFinalOdds[pick.position as BetPosition];
+      }
+
       // Calculate points for this pick
       let pointsEarned = 0;
       if (isCorrect) {
-        pointsEarned = pick.oddAtBet;
+        // BOG: Use the better odd between oddAtBet and finalOdd
+        let effectiveOdd = pick.oddAtBet;
+        if (finalOdd !== null && finalOdd > pick.oddAtBet) {
+          effectiveOdd = finalOdd;
+          usedBogOdd = true;
+        }
+
+        pointsEarned = effectiveOdd;
 
         // Apply boost if enabled
         if (pick.hasBoost) {
@@ -467,6 +550,8 @@ export class BettingFinalizerService {
         oddAtBet: pick.oddAtBet,
         hasBoost: pick.hasBoost,
         pointsEarned,
+        finalOdd,
+        usedBogOdd,
       });
     }
 
@@ -539,6 +624,9 @@ export class BettingFinalizerService {
       if (pick) {
         pick.isCorrect = pickCalc.isCorrect;
         pick.pointsEarned = pickCalc.pointsEarned;
+        // BOG fields
+        pick.finalOdd = pickCalc.finalOdd;
+        pick.usedBogOdd = pickCalc.usedBogOdd;
         await this.betPickRepository.save(pick);
       }
     }

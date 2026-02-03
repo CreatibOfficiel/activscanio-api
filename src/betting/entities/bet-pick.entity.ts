@@ -52,6 +52,14 @@ export class BetPick {
   @Column({ type: 'float', nullable: true })
   pointsEarned: number;
 
+  /** Final odd at the moment of bet resolution (for BOG calculation) */
+  @Column({ type: 'float', nullable: true })
+  finalOdd: number | null;
+
+  /** True if the final odd was better than oddAtBet (BOG applied) */
+  @Column({ type: 'boolean', default: false })
+  usedBogOdd: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }
