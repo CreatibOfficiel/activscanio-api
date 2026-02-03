@@ -13,6 +13,7 @@ import { Bet } from './bet.entity';
 import { CompetitorOdds } from './competitor-odds.entity';
 
 export enum BettingWeekStatus {
+  CALIBRATION = 'calibration', // First week of month - no betting allowed
   OPEN = 'open',
   CLOSED = 'closed',
   FINALIZED = 'finalized',
@@ -45,6 +46,14 @@ export class BettingWeek {
     default: BettingWeekStatus.OPEN,
   })
   status: BettingWeekStatus;
+
+  /**
+   * Indicates if this is the first ISO week of the month (calibration week).
+   * During calibration weeks, betting is blocked to allow ELO ratings to stabilize
+   * after the monthly soft reset.
+   */
+  @Column({ type: 'boolean', default: false })
+  isCalibrationWeek: boolean;
 
   @Column({ nullable: true })
   podiumFirstId: string;

@@ -87,6 +87,9 @@ export class WeekManagerService {
    * This method is idempotent - it will not create duplicates.
    * Intended to be called by a cron job every Monday 00:00.
    *
+   * If it's the first ISO week of the month, the week is created in
+   * CALIBRATION status (betting blocked for ELO stabilization).
+   *
    * @returns The created or existing week
    */
   async createCurrentWeek(): Promise<BettingWeek> {
@@ -113,25 +116,54 @@ export class WeekManagerService {
     const endDate = WeekUtils.getSundayOfWeek(year, weekNumber);
     const month = WeekUtils.getWeekMonth(year, weekNumber);
 
+    // Check if this is the first ISO week of the month (calibration week)
+    const isCalibrationWeek = this.isFirstWeekOfMonth(startDate);
+
+    // Set status based on whether it's a calibration week
+    const status = isCalibrationWeek
+      ? BettingWeekStatus.CALIBRATION
+      : BettingWeekStatus.OPEN;
+
     const week = this.bettingWeekRepository.create({
       weekNumber,
       year,
       month,
       startDate,
       endDate,
-      status: BettingWeekStatus.OPEN,
+      status,
+      isCalibrationWeek,
     });
 
     const savedWeek = await this.bettingWeekRepository.save(week);
 
-    this.logger.log(
-      `Created betting week ${year}-W${weekNumber}: ${startDate.toISOString()} to ${endDate.toISOString()}`,
-    );
+    if (isCalibrationWeek) {
+      this.logger.log(
+        `Created CALIBRATION week ${year}-W${weekNumber} (first week of month ${month}): betting blocked`,
+      );
+    } else {
+      this.logger.log(
+        `Created betting week ${year}-W${weekNumber}: ${startDate.toISOString()} to ${endDate.toISOString()}`,
+      );
+    }
 
-    // Calculate initial odds (async, don't wait)
+    // Calculate initial odds (async, don't wait) - even for calibration weeks for data tracking
     this.calculateInitialOdds(savedWeek.id);
 
     return savedWeek;
+  }
+
+  /**
+   * Check if a date falls in the first ISO week of its month
+   *
+   * A week is considered the "first week of the month" if its Monday
+   * is on or before the 7th day of the month.
+   *
+   * @param mondayOfWeek - The Monday of the week to check
+   * @returns true if this is the first ISO week of the month
+   */
+  private isFirstWeekOfMonth(mondayOfWeek: Date): boolean {
+    const dayOfMonth = mondayOfWeek.getDate();
+    return dayOfMonth <= 7;
   }
 
   /**
