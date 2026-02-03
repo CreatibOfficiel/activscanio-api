@@ -113,14 +113,15 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
 
   /**
    * Mark competitor as active this week (for betting eligibility)
-   * Also increments the current month race count
+   * Also increments the current month race count and totalLifetimeRaces
    *
    * @param competitorId - Competitor UUID
    */
   async markAsActiveThisWeek(competitorId: string): Promise<void> {
     await this.repository.update(competitorId, {
       isActiveThisWeek: true,
-      currentMonthRaceCount: () => 'current_month_race_count + 1',
+      currentMonthRaceCount: () => '"currentMonthRaceCount" + 1',
+      totalLifetimeRaces: () => '"totalLifetimeRaces" + 1',
     });
   }
 
@@ -134,22 +135,184 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
   }
 
   /**
-   * Reset monthly stats for all competitors
+   * Reset monthly stats for all competitors using soft reset (75/25)
    * Called by cron on the 1st of each month
+   *
+   * Soft reset formula:
+   * - rating = 0.75 × oldRating + 0.25 × 1500
+   * - rd = min(oldRd + 50, 350)
+   * - vol, raceCount, currentMonthRaceCount, winStreak, avgRank12 reset to defaults
+   * - totalLifetimeRaces is NEVER reset (tracks all-time races)
+   * - recentPositions and formFactor are preserved (based on actual race history)
    */
   async resetMonthlyStats(): Promise<void> {
-    await this.repository.update(
-      {},
-      {
-        rating: 1500,
-        rd: 350,
+    await this.repository
+      .createQueryBuilder()
+      .update(Competitor)
+      .set({
+        rating: () => '0.75 * "rating" + 0.25 * 1500',
+        rd: () => 'LEAST("rd" + 50, 350)',
         vol: 0.06,
         raceCount: 0,
         currentMonthRaceCount: 0,
         winStreak: 0,
         avgRank12: 0,
-      },
+        // Note: totalLifetimeRaces is intentionally NOT reset
+        // Note: recentPositions and formFactor are preserved
+      })
+      .execute();
+    this.logger.log('Soft reset (75/25) monthly stats for all competitors');
+  }
+
+  /**
+   * Update form after a race for a competitor
+   * - Adds new position to recentPositions (keeps last 5)
+   * - Recalculates formFactor based on weighted positions
+   *
+   * @param competitorId - Competitor UUID
+   * @param newPosition - Position in the new race (1-12)
+   */
+  async updateFormAfterRace(
+    competitorId: string,
+    newPosition: number,
+  ): Promise<void> {
+    const competitor = await this.repository.findOne({
+      where: { id: competitorId },
+    });
+
+    if (!competitor) {
+      this.logger.warn(
+        `Competitor ${competitorId} not found for form update`,
+      );
+      return;
+    }
+
+    // Update recent positions (prepend new position, keep max 5)
+    const currentPositions = competitor.recentPositions ?? [];
+    const newPositions = [newPosition, ...currentPositions].slice(0, 5);
+
+    // Calculate new form factor using weighted formula
+    const formFactor = this.calculateFormFactor(newPositions);
+
+    await this.repository.update(competitorId, {
+      recentPositions: newPositions,
+      formFactor,
+    });
+
+    this.logger.log(
+      `Updated form for competitor ${competitorId}: positions=${newPositions.join(',')}, formFactor=${formFactor.toFixed(2)}`,
     );
-    this.logger.log('Reset monthly stats for all competitors');
+  }
+
+  /**
+   * Calculate form factor from recent positions
+   *
+   * Uses weighted formula where more recent races have higher impact:
+   * - Weights: [0.35, 0.25, 0.20, 0.12, 0.08] for positions 1-5
+   * - Score = sum((13 - position) * weight)
+   * - formFactor = 0.7 + (score / 12) * 0.6
+   * - Range: [0.7, 1.3]
+   *
+   * @param positions - Array of recent positions (most recent first)
+   * @returns Form factor between 0.7 and 1.3
+   */
+  private calculateFormFactor(positions: number[]): number {
+    if (positions.length === 0) {
+      return 1.0; // Neutral form if no history
+    }
+
+    const weights = [0.35, 0.25, 0.2, 0.12, 0.08];
+    let weightedScore = 0;
+    let totalWeight = 0;
+
+    for (let i = 0; i < Math.min(positions.length, 5); i++) {
+      const position = positions[i];
+      const weight = weights[i];
+      // 13 - position: rank 1 = 12 points, rank 12 = 1 point
+      weightedScore += (13 - position) * weight;
+      totalWeight += weight;
+    }
+
+    // Normalize if we have fewer than 5 positions
+    if (totalWeight > 0 && totalWeight < 1) {
+      weightedScore = weightedScore / totalWeight;
+    }
+
+    // Convert to form factor: 0.7 + (score/12) * 0.6
+    // Max score = 12 (all 1st places) → formFactor = 1.3
+    // Min score = 1 (all 12th places) → formFactor ≈ 0.75
+    const formFactor = 0.7 + (weightedScore / 12) * 0.6;
+
+    // Clamp to [0.7, 1.3]
+    return Math.max(0.7, Math.min(1.3, formFactor));
+  }
+
+  /**
+   * Batch update form for multiple competitors after a race
+   *
+   * @param raceResults - Array of race results with competitorId and rank12
+   */
+  async updateFormForRaceResults(
+    raceResults: { competitorId: string; rank12: number }[],
+  ): Promise<void> {
+    await this.repository.manager.transaction(async (em) => {
+      for (const result of raceResults) {
+        const competitor = await em.findOne(Competitor, {
+          where: { id: result.competitorId },
+        });
+
+        if (!competitor) {
+          continue;
+        }
+
+        const currentPositions = competitor.recentPositions ?? [];
+        const newPositions = [result.rank12, ...currentPositions].slice(0, 5);
+        const formFactor = this.calculateFormFactor(newPositions);
+
+        competitor.recentPositions = newPositions;
+        competitor.formFactor = formFactor;
+        await em.save(competitor);
+      }
+    });
+
+    this.logger.log(
+      `Updated form for ${raceResults.length} competitors after race`,
+    );
+  }
+
+  /**
+   * Snapshot daily ranks for all competitors.
+   * Called by cron Mon-Fri at midnight.
+   *
+   * Calculates current rank based on conservativeScore (rating - 2*rd)
+   * and stores it in previousDayRank for trend calculation.
+   */
+  async snapshotDailyRanks(): Promise<void> {
+    // Get all competitors with at least one race, sorted by conservativeScore
+    const competitors = await this.repository.find({
+      order: {},
+    });
+
+    // Calculate conservative scores and sort
+    const scoredCompetitors = competitors
+      .filter((c) => c.raceCount > 0)
+      .map((c) => ({
+        id: c.id,
+        conservativeScore: c.rating - 2 * c.rd,
+      }))
+      .sort((a, b) => b.conservativeScore - a.conservativeScore);
+
+    // Update previousDayRank for each competitor (1-indexed)
+    await this.repository.manager.transaction(async (em) => {
+      for (let i = 0; i < scoredCompetitors.length; i++) {
+        await em.update(Competitor, scoredCompetitors[i].id, {
+          previousDayRank: i + 1,
+        });
+      }
+    });
+
+    this.logger.log(
+      `Snapshotted daily ranks for ${scoredCompetitors.length} competitors`,
+    );
   }
 }

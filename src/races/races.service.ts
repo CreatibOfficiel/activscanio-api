@@ -65,6 +65,14 @@ export class RacesService {
       // Mark competitors as active this week
       await this.markCompetitorsActive(savedRace.results);
 
+      // Update competitor form (recentPositions + formFactor)
+      try {
+        await this.updateCompetitorsForm(savedRace.results);
+      } catch (error) {
+        this.logger.error('Error updating competitor form:', error.stack);
+        // Non-critical, don't fail the race creation
+      }
+
       // Emit race.created event for other modules to react
       this.eventEmitter.emit(
         'race.created',
@@ -165,5 +173,23 @@ export class RacesService {
       this.logger.error('Error marking competitors as active:', error.message);
       // Don't throw - this is not critical
     }
+  }
+
+  /**
+   * Update competitor form after a race
+   * This updates recentPositions and recalculates formFactor
+   */
+  private async updateCompetitorsForm(
+    raceResults: RaceResult[],
+  ): Promise<void> {
+    const formData = raceResults.map((r) => ({
+      competitorId: r.competitorId,
+      rank12: r.rank12,
+    }));
+
+    await this.competitorsService.updateFormForRaceResults(formData);
+    this.logger.log(
+      `Updated form for ${formData.length} competitors after race`,
+    );
   }
 }

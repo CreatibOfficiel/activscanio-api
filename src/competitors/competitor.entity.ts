@@ -50,6 +50,24 @@ export class Competitor {
   @Column({ default: 0 })
   winStreak: number;
 
+  /**
+   * Recent race positions (last 5 races).
+   * Used for form display and calculation.
+   * Format: [most_recent, ..., oldest]
+   * Example: [1, 4, 2, 3, 1] means last race was 1st place
+   */
+  @Column('simple-array', { nullable: true })
+  recentPositions: number[] | null;
+
+  /**
+   * Form factor based on recent performance.
+   * Range: 0.7 (poor form) to 1.3 (excellent form)
+   * Default: 1.0 (neutral)
+   * Calculated automatically after each race.
+   */
+  @Column('float', { default: 1.0 })
+  formFactor: number;
+
   // Current month race count (reset monthly)
   @Column({ default: 0 })
   currentMonthRaceCount: number;
@@ -57,6 +75,21 @@ export class Competitor {
   // Active this week flag (reset every Monday)
   @Column({ default: false })
   isActiveThisWeek: boolean;
+
+  /**
+   * Total lifetime races count (never resets).
+   * Used for calibration eligibility: need 5 races minimum to be pariable.
+   */
+  @Column({ type: 'int', default: 0 })
+  totalLifetimeRaces: number;
+
+  /**
+   * Previous day rank for trend calculation.
+   * Snapshot taken Mon-Fri at midnight.
+   * Used to show if competitor is rising/falling in rankings.
+   */
+  @Column({ type: 'int', nullable: true })
+  previousDayRank: number | null;
 
   @OneToOne(() => CharacterVariant, (variant) => variant.competitor, {
     nullable: true,

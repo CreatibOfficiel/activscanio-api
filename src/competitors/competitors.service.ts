@@ -146,4 +146,16 @@ export class CompetitorsService {
   async resetMonthlyStats(): Promise<void> {
     await this.competitorRepository.resetMonthlyStats();
   }
+
+  /**
+   * Update form for all competitors in a race
+   * Called after each race creation
+   *
+   * @param raceResults - Array of race results with competitorId and rank12
+   */
+  async updateFormForRaceResults(
+    raceResults: { competitorId: string; rank12: number }[],
+  ): Promise<void> {
+    await this.competitorRepository.updateFormForRaceResults(raceResults);
+  }
 }

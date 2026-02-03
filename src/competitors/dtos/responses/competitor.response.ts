@@ -58,4 +58,32 @@ export class CompetitorResponse {
 
   @Expose()
   isActiveThisWeek: boolean;
+
+  /**
+   * Total lifetime races count (never resets).
+   * Used for calibration eligibility.
+   */
+  @Expose()
+  totalLifetimeRaces: number;
+
+  /**
+   * Recent race positions (last 5 races).
+   * Format: [most_recent, ..., oldest]
+   */
+  @Expose()
+  recentPositions: number[] | null;
+
+  /**
+   * Form factor based on recent performance.
+   * Range: 0.7 (poor form) to 1.3 (excellent form)
+   */
+  @Expose()
+  formFactor: number;
+
+  /**
+   * Previous day rank for trend calculation.
+   * Used to show if competitor is rising/falling in rankings.
+   */
+  @Expose()
+  previousDayRank: number | null;
 }
