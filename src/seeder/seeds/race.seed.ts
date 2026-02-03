@@ -3,17 +3,14 @@ import { Logger } from '@nestjs/common';
 import { RaceEvent } from 'src/races/race-event.entity';
 import { RaceResult } from 'src/races/race-result.entity';
 import { Competitor } from 'src/competitors/competitor.entity';
-import { BettingWeek } from 'src/betting/entities/betting-week.entity';
 import {
-  seededRandom,
-  getScoreForRank,
-  addDays,
-  subtractWeeks,
-} from '../utils/seed-helpers';
+  BettingWeek,
+  BettingWeekStatus,
+} from 'src/betting/entities/betting-week.entity';
+import { seededRandom, getScoreForRank, addDays } from '../utils/seed-helpers';
 
 const logger = new Logger('RaceSeed');
 
-const RACES_PER_WEEK = 5; // Average races per week
 const PLAYERS_PER_RACE = 4; // 4 players per race (as in Mario Kart 4-player mode)
 
 export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
@@ -70,19 +67,40 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
     });
   }
 
-  // Generate races for each betting week (except the open one)
-  for (const week of bettingWeeks) {
-    // Skip open weeks - no races yet
-    if (week.status === 'open') continue;
+  // Generate races for each betting week
+  const today = new Date();
+  today.setHours(23, 59, 59, 999); // End of today
 
-    // Generate 3-7 races per week
-    const numRaces = seededRandom.int(3, 7);
+  for (const week of bettingWeeks) {
+    const isOpenWeek = week.status === BettingWeekStatus.OPEN;
+
+    // For open weeks, generate fewer races (2-4) only for past days
+    // For closed weeks, generate 3-7 races
+    const numRaces = isOpenWeek
+      ? seededRandom.int(2, 4)
+      : seededRandom.int(3, 7);
+
+    // Calculate max days for race generation
+    let maxDayOffset: number;
+    if (isOpenWeek) {
+      // For open week: only generate races for days that have passed
+      const weekStart = new Date(week.startDate);
+      const daysSinceWeekStart = Math.floor(
+        (today.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      maxDayOffset = Math.max(0, Math.min(daysSinceWeekStart - 1, 6)); // At least 1 day ago, max 6
+
+      // Skip if week just started (no past days yet)
+      if (maxDayOffset < 0) continue;
+    } else {
+      maxDayOffset = 6; // Full week for closed weeks
+    }
 
     for (let r = 0; r < numRaces; r++) {
-      // Random date within the week
+      // Random date within the allowed range
       const raceDate = addDays(
         new Date(week.startDate),
-        seededRandom.int(0, 6),
+        seededRandom.int(0, maxDayOffset),
       );
       raceDate.setHours(
         seededRandom.int(18, 22),

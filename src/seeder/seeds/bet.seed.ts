@@ -85,7 +85,8 @@ export async function seedBets(dataSource: DataSource): Promise<Bet[]> {
     // Skip open weeks - betting still in progress
     if (week.status === BettingWeekStatus.OPEN) continue;
 
-    const weekOdds = oddsByWeek.get(week.id) || new Map();
+    const weekOdds: Map<string, number> =
+      oddsByWeek.get(week.id) || new Map<string, number>();
 
     // Randomly select users who will bet this week
     for (const user of users) {
@@ -117,13 +118,13 @@ export async function seedBets(dataSource: DataSource): Promise<Bet[]> {
       for (let i = 0; i < 3; i++) {
         const competitor = selectedCompetitors[i];
         const position = positions[i];
-        const odd = weekOdds.get(competitor.id) || 2.5;
+        const odd: number = weekOdds.get(competitor.id) ?? 2.5;
         const hasBoost = i === boostPosition;
 
         const pick = new BetPick();
         pick.competitorId = competitor.id;
         pick.position = position;
-        pick.oddAtBet = odd;
+        pick.oddAtBet = Number(odd);
         pick.hasBoost = hasBoost;
         pick.bet = bet;
 
@@ -138,7 +139,7 @@ export async function seedBets(dataSource: DataSource): Promise<Bet[]> {
               week.podiumThirdId === competitor.id);
 
           pick.isCorrect = isCorrect;
-          const points = calculateBetPoints(isCorrect, odd, hasBoost);
+          const points = calculateBetPoints(isCorrect, Number(odd), hasBoost);
           pick.pointsEarned = points;
           totalBetPoints += points;
 
@@ -162,7 +163,7 @@ export async function seedBets(dataSource: DataSource): Promise<Bet[]> {
       picksToCreate.push(...picks);
 
       // Track user rankings
-      const rankingKey = `${user.id}-${week.month}-${week.year}`;
+      const rankingKey = `${user.id}|${week.month}|${week.year}`;
       if (!rankingsToUpdate.has(rankingKey)) {
         rankingsToUpdate.set(rankingKey, {
           totalPoints: 0,
@@ -244,14 +245,14 @@ async function seedBettorRankings(
   // Get unique months from weeks
   const monthsSet = new Set<string>();
   for (const week of weeks) {
-    if (week.status === 'finalized') {
+    if (week.status === BettingWeekStatus.FINALIZED) {
       monthsSet.add(`${week.month}-${week.year}`);
     }
   }
 
   // Create rankings for each user/month combination
   for (const [key, data] of rankingsData.entries()) {
-    const [userId, monthStr, yearStr] = key.split('-');
+    const [userId, monthStr, yearStr] = key.split('|');
     const month = parseInt(monthStr);
     const year = parseInt(yearStr);
 

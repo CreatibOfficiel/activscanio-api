@@ -202,12 +202,6 @@ export async function seedUsers(dataSource: DataSource): Promise<User[]> {
     return [];
   }
 
-  // Get competitors already linked to existing users
-  const usersWithCompetitors = await userRepository.find({
-    where: { competitorId: undefined },
-    select: ['competitorId'],
-  });
-
   // Get all existing users to find used competitor IDs
   const allExistingUsers = await userRepository.find();
   const usedCompetitorIds = new Set(

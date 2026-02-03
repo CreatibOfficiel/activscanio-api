@@ -35,7 +35,7 @@ export async function seedSeasonArchives(
   const users = await userRepository.find({
     where: [{ role: UserRole.BETTOR }, { role: UserRole.PLAYER }],
   });
-  const betsCount = await betRepository.count();
+  await betRepository.count(); // Ensure bets exist
 
   if (competitors.length === 0) {
     logger.warn('⚠️ No competitors found. Please seed competitors first.');
