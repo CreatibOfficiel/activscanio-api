@@ -28,22 +28,10 @@ export async function seedCompetitors(dataSource: DataSource) {
         'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/668d115cd5514da29dbe157b_Aurel.webp',
     },
     {
-      firstName: 'Benjamin',
-      lastName: 'Couvreux',
-      profilePictureUrl:
-        'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/6671428d28cf7883360ec491_Benjamin.webp',
-    },
-    {
       firstName: 'Camille',
       lastName: 'Beck',
       profilePictureUrl:
         'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/667142863f678524e8cbcf86_Camille.webp',
-    },
-    {
-      firstName: 'Chloé',
-      lastName: 'David',
-      profilePictureUrl:
-        'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/6671ac61e6b472f69b2ecc21_Chloe%CC%81.webp',
     },
     {
       firstName: 'Clément',
@@ -98,12 +86,6 @@ export async function seedCompetitors(dataSource: DataSource) {
       lastName: 'Lafranceschina',
       profilePictureUrl:
         'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/675ac4356c208d3b58312306_Guillaume_1000.webp',
-    },
-    {
-      firstName: 'Jean-Michel',
-      lastName: 'Arouete',
-      profilePictureUrl:
-        'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/677d097e4d60590d84b314af_JM.png',
     },
     {
       firstName: 'Joran',
