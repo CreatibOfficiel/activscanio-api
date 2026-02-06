@@ -85,10 +85,6 @@ export class AddOnboardingAndSeasons1764184949000
             ALTER TABLE "users" ADD COLUMN "lastBoostUsedYear" integer
         `);
 
-    await queryRunner.query(`
-            ALTER TABLE "users" ADD COLUMN "hasCompletedOnboarding" boolean NOT NULL DEFAULT false
-        `);
-
     // Index for boost tracking queries
     await queryRunner.query(`
             CREATE INDEX "IDX_users_boost_tracking" ON "users" ("lastBoostUsedMonth", "lastBoostUsedYear")
@@ -164,9 +160,6 @@ export class AddOnboardingAndSeasons1764184949000
     );
     await queryRunner.query(
       `DROP INDEX IF EXISTS "public"."IDX_users_boost_tracking"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "users" DROP COLUMN "hasCompletedOnboarding"`,
     );
     await queryRunner.query(
       `ALTER TABLE "users" DROP COLUMN "lastBoostUsedYear"`,
