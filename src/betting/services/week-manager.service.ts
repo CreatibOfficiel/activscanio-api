@@ -16,7 +16,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import {
   BettingWeek,
   BettingWeekStatus,
@@ -146,8 +146,8 @@ export class WeekManagerService {
       );
     }
 
-    // Calculate initial odds (async, don't wait) - even for calibration weeks for data tracking
-    this.calculateInitialOdds(savedWeek.id);
+    // Calculate initial odds - await to ensure they're computed before week is used
+    await this.calculateInitialOdds(savedWeek.id);
 
     return savedWeek;
   }
@@ -197,9 +197,18 @@ export class WeekManagerService {
     const now = new Date();
 
     return await this.bettingWeekRepository.findOne({
-      where: {
-        status: BettingWeekStatus.OPEN,
-      },
+      where: [
+        {
+          status: BettingWeekStatus.OPEN,
+          startDate: LessThanOrEqual(now),
+          endDate: MoreThanOrEqual(now),
+        },
+        {
+          status: BettingWeekStatus.CLOSED,
+          startDate: LessThanOrEqual(now),
+          endDate: MoreThanOrEqual(now),
+        },
+      ],
       order: { startDate: 'DESC' },
     });
   }
@@ -293,6 +302,36 @@ export class WeekManagerService {
     this.logger.log(
       `Week ${weekId} finalized with podium: ${podiumIds.join(', ')}`,
     );
+  }
+
+  /**
+   * Cancel a week when no podium can be determined.
+   * Marks all bets as finalized with 0 points so they don't stay stuck in pending.
+   */
+  async cancelWeek(weekId: string): Promise<void> {
+    const week = await this.getWeekById(weekId);
+    if (!week) {
+      throw new Error(`Week ${weekId} not found`);
+    }
+
+    // Mark week as FINALIZED (no podium)
+    week.status = BettingWeekStatus.FINALIZED;
+    week.finalizedAt = new Date();
+    await this.bettingWeekRepository.save(week);
+
+    // Cancel all pending bets: mark as finalized with 0 points
+    await this.bettingWeekRepository.manager
+      .createQueryBuilder()
+      .update('bets')
+      .set({
+        isFinalized: true,
+        pointsEarned: 0,
+        status: 'cancelled',
+      })
+      .where('"bettingWeekId" = :weekId AND "isFinalized" = false', { weekId })
+      .execute();
+
+    this.logger.log(`Week ${weekId} cancelled — all pending bets set to 0 points`);
   }
 
   /**

@@ -302,28 +302,51 @@ export class BettingService {
       skip: offset,
     });
 
-    // For each finalized bet, fetch achievements unlocked around the betting week's finalization time
-    const betsWithAchievements = await Promise.all(
-      bets.map(async (bet) => {
-        if (!bet.isFinalized || !bet.bettingWeek.finalizedAt) {
-          return { ...bet, achievementsUnlocked: [] };
-        }
+    // Batch-load achievements for all finalized bets in a single query
+    const finalizedBets = bets.filter(
+      (b) => b.isFinalized && b.bettingWeek?.finalizedAt,
+    );
 
-        // Query achievements unlocked within 1 hour after the betting week was finalized
-        const finalizedAt = bet.bettingWeek.finalizedAt;
-        const timeWindowEnd = new Date(finalizedAt.getTime() + 60 * 60 * 1000); // +1 hour
+    // Compute the overall time range across all finalized bets
+    let allAchievements: UserAchievement[] = [];
+    if (finalizedBets.length > 0) {
+      const earliest = new Date(
+        Math.min(
+          ...finalizedBets.map((b) => b.bettingWeek.finalizedAt.getTime()),
+        ),
+      );
+      const latest = new Date(
+        Math.max(
+          ...finalizedBets.map(
+            (b) => b.bettingWeek.finalizedAt.getTime() + 60 * 60 * 1000,
+          ),
+        ),
+      );
 
-        const achievements = await this.userAchievementRepository.find({
-          where: {
-            userId,
-            unlockedAt: Between(finalizedAt, timeWindowEnd),
-          },
-          relations: ['achievement'],
-          order: { unlockedAt: 'ASC' },
-        });
+      allAchievements = await this.userAchievementRepository.find({
+        where: {
+          userId,
+          unlockedAt: Between(earliest, latest),
+        },
+        relations: ['achievement'],
+        order: { unlockedAt: 'ASC' },
+      });
+    }
 
-        // Map to the expected format
-        const achievementsUnlocked = achievements.map((ua) => ({
+    // Map achievements to the corresponding bet based on finalizedAt window
+    const betsWithAchievements = bets.map((bet) => {
+      if (!bet.isFinalized || !bet.bettingWeek?.finalizedAt) {
+        return { ...bet, achievementsUnlocked: [] };
+      }
+
+      const finalizedAt = bet.bettingWeek.finalizedAt;
+      const timeWindowEnd = new Date(finalizedAt.getTime() + 60 * 60 * 1000);
+
+      const achievementsUnlocked = allAchievements
+        .filter(
+          (ua) => ua.unlockedAt >= finalizedAt && ua.unlockedAt <= timeWindowEnd,
+        )
+        .map((ua) => ({
           id: ua.achievement.id,
           key: ua.achievement.key,
           name: ua.achievement.name,
@@ -336,9 +359,8 @@ export class BettingService {
           unlockedAt: ua.unlockedAt,
         }));
 
-        return { ...bet, achievementsUnlocked };
-      }),
-    );
+      return { ...bet, achievementsUnlocked };
+    });
 
     return PaginatedResponse.create(
       betsWithAchievements as Bet[],

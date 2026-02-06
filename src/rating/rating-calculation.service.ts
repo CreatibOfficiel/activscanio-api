@@ -108,7 +108,7 @@ export class RatingCalculationService {
    * @param rd - Rating deviation
    */
   calculateConservativeScore(rating: number, rd: number): number {
-    return rating - 2 * rd;
+    return Math.max(0, rating - 2 * rd);
   }
 
   /**

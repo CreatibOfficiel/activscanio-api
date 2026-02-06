@@ -65,7 +65,20 @@ export class RaceCreatedListener {
         `Failed to recalculate odds for week ${event.bettingWeekId}:`,
         errorStack,
       );
-      // Don't throw - this is a side effect and shouldn't fail race creation
+
+      // Retry once after 5s delay
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        this.logger.log(`Retrying odds calculation for week ${event.bettingWeekId}...`);
+        await this.oddsCalculator.calculateOddsForWeek(event.bettingWeekId);
+        this.logger.log(`Retry succeeded for week ${event.bettingWeekId}`);
+      } catch (retryError) {
+        const retryStack = retryError instanceof Error ? retryError.stack : undefined;
+        this.logger.error(
+          `Retry also failed for week ${event.bettingWeekId} — odds may be stale:`,
+          retryStack,
+        );
+      }
     }
   }
 }
