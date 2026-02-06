@@ -117,7 +117,20 @@ export class WeekManagerService {
     const month = WeekUtils.getWeekMonth(year, weekNumber);
 
     // Check if this is the first ISO week of the month (calibration week)
-    const isCalibrationWeek = this.isFirstWeekOfMonth(startDate);
+    let isCalibrationWeek = this.isFirstWeekOfMonth(startDate);
+
+    // If no finalized week exists yet, this is the very first season launch → force calibration
+    if (!isCalibrationWeek) {
+      const anyFinalized = await this.bettingWeekRepository.findOne({
+        where: { status: BettingWeekStatus.FINALIZED },
+      });
+      if (!anyFinalized) {
+        this.logger.log(
+          'No finalized week found — first ever launch, forcing CALIBRATION',
+        );
+        isCalibrationWeek = true;
+      }
+    }
 
     // Set status based on whether it's a calibration week
     const status = isCalibrationWeek
