@@ -61,16 +61,19 @@ export class UsersService {
 
       return await this.userRepository.save(user);
     } else {
-      // Create new user with PENDING role
-      // Use insert() + findByClerkId() instead of save() to avoid TypeORM enum cast issue
-      await this.userRepository.repository.insert({
-        clerkId: syncDto.clerkId,
-        email: syncDto.email || '',
-        firstName: syncDto.firstName || '',
-        lastName: syncDto.lastName || '',
-        profilePictureUrl: syncDto.profilePictureUrl,
-        role: UserRole.PENDING,
-      });
+      // Raw SQL to avoid TypeORM enum cast issue with users_role_enum
+      await this.dataSource.query(
+        `INSERT INTO "users" ("clerkId", "email", "firstName", "lastName", "profilePictureUrl", "role")
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          syncDto.clerkId,
+          syncDto.email || '',
+          syncDto.firstName || '',
+          syncDto.lastName || '',
+          syncDto.profilePictureUrl || null,
+          'pending',
+        ],
+      );
 
       return (await this.userRepository.findByClerkId(syncDto.clerkId))!;
     }
@@ -117,16 +120,19 @@ export class UsersService {
     let user = await this.userRepository.findByClerkId(clerkPayload.clerkId);
 
     if (!user) {
-      // Auto-create user with PENDING role
-      // Use insert() + findByClerkId() instead of save() to avoid TypeORM enum cast issue
-      await this.userRepository.repository.insert({
-        clerkId: clerkPayload.clerkId,
-        email: clerkPayload.email || '',
-        firstName: clerkPayload.firstName || '',
-        lastName: clerkPayload.lastName || '',
-        profilePictureUrl: clerkPayload.profilePictureUrl,
-        role: UserRole.PENDING,
-      });
+      // Raw SQL to avoid TypeORM enum cast issue with users_role_enum
+      await this.dataSource.query(
+        `INSERT INTO "users" ("clerkId", "email", "firstName", "lastName", "profilePictureUrl", "role")
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          clerkPayload.clerkId,
+          clerkPayload.email || '',
+          clerkPayload.firstName || '',
+          clerkPayload.lastName || '',
+          clerkPayload.profilePictureUrl || null,
+          'pending',
+        ],
+      );
 
       user = (await this.userRepository.findByClerkId(clerkPayload.clerkId))!;
     }
