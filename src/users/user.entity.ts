@@ -48,7 +48,7 @@ export class User {
   role: UserRole;
 
   @Column({ nullable: true })
-  competitorId: string;
+  competitorId: string | null;
 
   @Column({ type: 'int', nullable: true })
   lastBoostUsedMonth: number | null;

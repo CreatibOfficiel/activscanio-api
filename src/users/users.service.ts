@@ -173,8 +173,7 @@ export class UsersService {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    user.competitorId = null as any; // TypeORM accepts null for nullable columns
+    user.competitorId = null;
 
     // Update role
     if (user.role === UserRole.PLAYER) {
@@ -250,8 +249,7 @@ export class UsersService {
           where: { id: user.competitor.characterVariant.id },
         });
         if (oldVariant) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          oldVariant.competitor = null as any;
+          oldVariant.competitor = null!;
           await queryRunner.manager.save(oldVariant);
         }
       }

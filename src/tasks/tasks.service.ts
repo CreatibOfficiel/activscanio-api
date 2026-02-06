@@ -6,9 +6,9 @@
  *
  * Weekly Tasks:
  * - Monday 00:00: Create new betting week + reset weekly flags
- * - Sunday 23:50: Close current week
- * - Sunday 23:55: Determine podium + finalize week + calculate points
- * - Sunday 23:58: Recalculate monthly rankings
+ * - Thursday 23:59: Close current week
+ * - Sunday 20:00: Determine podium + finalize week + calculate points
+ * - Sunday 20:03: Recalculate monthly rankings
  *
  * Monthly Tasks:
  * - 1st 00:00: Reset ELO and race counts
@@ -46,6 +46,23 @@ import {
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
+  private readonly runningTasks = new Set<string>();
+
+  /**
+   * Acquire a lock for a task. Returns false if already running.
+   */
+  private acquireTaskLock(taskName: string): boolean {
+    if (this.runningTasks.has(taskName)) {
+      this.logger.warn(`Task "${taskName}" is already running — skipping`);
+      return false;
+    }
+    this.runningTasks.add(taskName);
+    return true;
+  }
+
+  private releaseTaskLock(taskName: string): void {
+    this.runningTasks.delete(taskName);
+  }
 
   constructor(
     private readonly weekManagerService: WeekManagerService,
@@ -127,7 +144,7 @@ export class TasksService {
 
   /**
    * Close current betting week
-   * Runs every Sunday at 23:50 UTC
+   * Runs every Thursday at 23:59 UTC
    */
   @Cron(BETTING_CRON_SCHEDULES.CLOSE_WEEK, {
     name: 'close-week',
@@ -163,7 +180,7 @@ export class TasksService {
 
   /**
    * Finalize betting week (determine podium + calculate points)
-   * Runs every Sunday at 23:55 UTC
+   * Runs every Sunday at 20:00 UTC
    */
   @Cron(BETTING_CRON_SCHEDULES.FINALIZE_WEEK, {
     name: 'finalize-week',
@@ -174,6 +191,8 @@ export class TasksService {
       this.logger.warn('Task "finalize-week" is disabled');
       return;
     }
+
+    if (!this.acquireTaskLock('finalize-week')) return;
 
     this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.finalizeWeek}`);
 
@@ -190,8 +209,10 @@ export class TasksService {
 
       if (!podium) {
         this.logger.warn(
-          'Could not determine podium (insufficient competitors)',
+          'Could not determine podium (insufficient competitors) — cancelling week bets',
         );
+        // Cancel all pending bets for this week so they don't stay stuck
+        await this.weekManagerService.cancelWeek(currentWeek.id);
         return;
       }
 
@@ -219,12 +240,14 @@ export class TasksService {
         `❌ Failed to finalize week: ${error.message}`,
         error.stack,
       );
+    } finally {
+      this.releaseTaskLock('finalize-week');
     }
   }
 
   /**
    * Recalculate monthly rankings
-   * Runs every Sunday at 23:58 UTC
+   * Runs every Sunday at 20:03 UTC
    */
   @Cron(BETTING_CRON_SCHEDULES.RECALCULATE_RANKINGS, {
     name: 'recalculate-rankings',
@@ -235,6 +258,8 @@ export class TasksService {
       this.logger.warn('Task "recalculate-rankings" is disabled');
       return;
     }
+
+    if (!this.acquireTaskLock('recalculate-rankings')) return;
 
     this.logger.log(
       `🚀 Starting task: ${TASK_DESCRIPTIONS.recalculateRankings}`,
@@ -252,6 +277,8 @@ export class TasksService {
         `❌ Failed to recalculate rankings: ${error.message}`,
         error.stack,
       );
+    } finally {
+      this.releaseTaskLock('recalculate-rankings');
     }
   }
 
@@ -376,6 +403,8 @@ export class TasksService {
       return;
     }
 
+    if (!this.acquireTaskLock('reset-monthly-stats')) return;
+
     this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.resetMonthlyStats}`);
 
     try {
@@ -387,6 +416,8 @@ export class TasksService {
         error.stack,
       );
       await this.retryTask(() => this.competitorsService.resetMonthlyStats());
+    } finally {
+      this.releaseTaskLock('reset-monthly-stats');
     }
   }
 

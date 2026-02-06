@@ -9,12 +9,12 @@ export class DailyStatsCronService {
   constructor(private readonly dailyStatsTracker: DailyStatsTrackerService) {}
 
   /**
-   * Exécuté chaque jour à 3h du matin (Europe/Paris)
+   * Exécuté chaque jour à 2h du matin UTC
    * Agrège les stats de la veille
    */
-  @Cron('0 3 * * *', {
+  @Cron('0 2 * * *', {
     name: 'aggregate-daily-stats',
-    timeZone: 'Europe/Paris',
+    timeZone: 'UTC',
   })
   async handleDailyAggregation() {
     this.logger.log('🔄 Running daily stats aggregation cron job');
