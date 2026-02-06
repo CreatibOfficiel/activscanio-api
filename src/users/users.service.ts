@@ -3,9 +3,11 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { createClerkClient } from '@clerk/backend';
 import { User, UserRole } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -20,6 +22,11 @@ import {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+  private readonly clerkClient = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY,
+  });
+
   constructor(
     private readonly userRepository: UserRepository,
     @InjectRepository(CharacterVariant)
@@ -61,21 +68,15 @@ export class UsersService {
 
       return await this.userRepository.save(user);
     } else {
-      // Raw SQL to avoid TypeORM enum cast issue with users_role_enum
-      await this.dataSource.query(
-        `INSERT INTO "users" ("clerkId", "email", "firstName", "lastName", "profilePictureUrl", "role")
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          syncDto.clerkId,
-          syncDto.email || '',
-          syncDto.firstName || '',
-          syncDto.lastName || '',
-          syncDto.profilePictureUrl || null,
-          'pending',
-        ],
-      );
-
-      return (await this.userRepository.findByClerkId(syncDto.clerkId))!;
+      const newUser = this.userRepository.create({
+        clerkId: syncDto.clerkId,
+        email: syncDto.email || '',
+        firstName: syncDto.firstName || '',
+        lastName: syncDto.lastName || '',
+        profilePictureUrl: syncDto.profilePictureUrl || undefined,
+        role: UserRole.PENDING,
+      });
+      return await this.userRepository.save(newUser);
     }
   }
 
@@ -109,32 +110,26 @@ export class UsersService {
   /**
    * Get or create user by Clerk ID
    * Creates user with PENDING role if doesn't exist (auto-sync on first API call)
+   * Fetches user data from Clerk API to get email, name, and profile picture
    */
-  async getOrCreateByClerkId(clerkPayload: {
-    clerkId: string;
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    profilePictureUrl?: string;
-  }): Promise<User> {
-    let user = await this.userRepository.findByClerkId(clerkPayload.clerkId);
+  async getOrCreateByClerkId(clerkId: string): Promise<User> {
+    let user = await this.userRepository.findByClerkId(clerkId);
 
     if (!user) {
-      // Raw SQL to avoid TypeORM enum cast issue with users_role_enum
-      await this.dataSource.query(
-        `INSERT INTO "users" ("clerkId", "email", "firstName", "lastName", "profilePictureUrl", "role")
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          clerkPayload.clerkId,
-          clerkPayload.email || '',
-          clerkPayload.firstName || '',
-          clerkPayload.lastName || '',
-          clerkPayload.profilePictureUrl || null,
-          'pending',
-        ],
-      );
+      const clerkUser = await this.clerkClient.users.getUser(clerkId);
 
-      user = (await this.userRepository.findByClerkId(clerkPayload.clerkId))!;
+      const newUser = this.userRepository.create({
+        clerkId,
+        email: clerkUser.emailAddresses?.[0]?.emailAddress || '',
+        firstName: clerkUser.firstName || '',
+        lastName: clerkUser.lastName || '',
+        profilePictureUrl: clerkUser.imageUrl || undefined,
+        role: UserRole.PENDING,
+      });
+      user = await this.userRepository.save(newUser);
+      this.logger.log(
+        `Auto-created user for Clerk ID ${clerkId}: ${user.firstName} ${user.lastName}`,
+      );
     }
 
     return user;

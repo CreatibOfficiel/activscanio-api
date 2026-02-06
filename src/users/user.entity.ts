@@ -43,6 +43,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
+    enumName: 'users_role_enum',
     default: UserRole.PENDING,
   })
   role: UserRole;

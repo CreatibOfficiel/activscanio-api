@@ -46,34 +46,42 @@ export class UsersController {
 
     // Verify SVIX signature
     const wh = new Webhook(webhookSecret);
-    let evt: any;
+    let evt: { type: string; data: Record<string, any> };
     try {
       evt = wh.verify(JSON.stringify(body), {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,
         'svix-signature': svixSignature,
-      });
+      }) as typeof evt;
     } catch {
       this.logger.warn('Invalid webhook signature');
       throw new ForbiddenException('Invalid webhook signature');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const data = evt.data;
-    const syncDto: SyncClerkUserDto = {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      clerkId: data.id,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      email: data.email_addresses?.[0]?.email_address,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      firstName: data.first_name,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      lastName: data.last_name,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      profilePictureUrl: data.image_url,
-    };
+    const { type, data } = evt;
 
-    return await this.usersService.syncFromClerk(syncDto);
+    if (type === 'user.updated') {
+      const syncDto: SyncClerkUserDto = {
+        clerkId: data.id as string,
+        email: (data.email_addresses as any[])?.[0]?.email_address as string,
+        firstName: data.first_name as string,
+        lastName: data.last_name as string,
+        profilePictureUrl: data.image_url as string,
+      };
+      return await this.usersService.syncFromClerk(syncDto);
+    }
+
+    if (type === 'user.deleted') {
+      const clerkId = data.id as string;
+      const user = await this.usersService.findByClerkId(clerkId);
+      if (user) {
+        await this.usersService.remove(user.id);
+        this.logger.log(`Deleted user ${user.id} (Clerk ID: ${clerkId})`);
+      }
+      return { success: true };
+    }
+
+    return { success: true };
   }
 
   /**
@@ -98,20 +106,8 @@ export class UsersController {
    * Extracts user info from JWT token via ClerkGuard
    */
   @Get('me')
-  async getMe(@CurrentUser() user: any) {
-    const dbUser = await this.usersService.getOrCreateByClerkId({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      clerkId: user.clerkId,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      email: user.email,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      firstName: user.first_name || user.firstName,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      lastName: user.last_name || user.lastName,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      profilePictureUrl: user.image_url || user.profilePictureUrl,
-    });
-    // Include the computed getter in the response
+  async getMe(@CurrentUser('clerkId') clerkId: string) {
+    const dbUser = await this.usersService.getOrCreateByClerkId(clerkId);
     return {
       ...dbUser,
       hasCompletedOnboarding: dbUser.hasCompletedOnboarding,
@@ -133,13 +129,10 @@ export class UsersController {
    */
   @Patch('me/character')
   async changeCharacter(
-    @CurrentUser() user: any,
+    @CurrentUser('clerkId') clerkId: string,
     @Body() changeCharacterDto: ChangeCharacterDto,
   ) {
-    const dbUser = await this.usersService.getOrCreateByClerkId({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      clerkId: user.clerkId,
-    });
+    const dbUser = await this.usersService.getOrCreateByClerkId(clerkId);
     return await this.usersService.changeCharacterVariant(
       dbUser.id,
       changeCharacterDto.characterVariantId,

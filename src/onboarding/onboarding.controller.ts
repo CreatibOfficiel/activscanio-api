@@ -28,19 +28,8 @@ export class OnboardingController {
    * Helper method to get or create user from clerkId
    * Auto-creates the user if they don't exist (first API call)
    */
-  private async getOrCreateUserFromClerkId(
-    clerkId: string,
-    clerkPayload?: {
-      email?: string;
-      firstName?: string;
-      lastName?: string;
-      profilePictureUrl?: string;
-    },
-  ): Promise<string> {
-    const user = await this.usersService.getOrCreateByClerkId({
-      clerkId,
-      ...clerkPayload,
-    });
+  private async getOrCreateUserFromClerkId(clerkId: string): Promise<string> {
+    const user = await this.usersService.getOrCreateByClerkId(clerkId);
     return user.id;
   }
 
