@@ -41,9 +41,7 @@ export class User {
   profilePictureUrl: string;
 
   @Column({
-    type: 'enum',
-    enum: UserRole,
-    enumName: 'users_role_enum',
+    type: 'varchar',
     default: UserRole.PENDING,
   })
   role: UserRole;
