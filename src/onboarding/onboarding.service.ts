@@ -179,11 +179,48 @@ export class OnboardingService {
 
       // BETTOR PATH: User chose to be bettor only (no competitor/character)
       if (dto.isSpectator) {
+        // Link to a competitor if provided (existing or new)
+        if (dto.existingCompetitorId) {
+          const competitor = await queryRunner.manager.findOne(Competitor, {
+            where: { id: dto.existingCompetitorId },
+          });
+          if (!competitor) {
+            throw new NotFoundException(
+              `Competitor with ID ${dto.existingCompetitorId} not found`,
+            );
+          }
+          const existingLink = await queryRunner.manager.findOne(User, {
+            where: { competitorId: dto.existingCompetitorId },
+          });
+          if (existingLink && existingLink.id !== userId) {
+            throw new ConflictException(
+              `Competitor "${competitor.firstName} ${competitor.lastName}" is already linked to another user`,
+            );
+          }
+          user.competitorId = dto.existingCompetitorId;
+        } else if (dto.newCompetitor) {
+          const firstName = dto.newCompetitor.firstName.trim();
+          const lastName = dto.newCompetitor.lastName.trim();
+          if (!firstName || !lastName) {
+            throw new BadRequestException(
+              'First name and last name cannot be empty',
+            );
+          }
+          const newCompetitor = queryRunner.manager.create(Competitor, {
+            firstName,
+            lastName,
+            profilePictureUrl: dto.newCompetitor.profilePictureUrl,
+          });
+          const savedCompetitor = await queryRunner.manager.save(newCompetitor);
+          user.competitorId = savedCompetitor.id;
+        }
+
         user.role = UserRole.BETTOR;
-        // hasCompletedOnboarding will automatically be true via getter (role=BETTOR)
         const updatedUser = await queryRunner.manager.save(user);
         await queryRunner.commitTransaction();
-        this.logger.log(`User ${userId} completed onboarding as BETTOR`);
+        this.logger.log(
+          `User ${userId} completed onboarding as BETTOR${user.competitorId ? ` (linked to competitor ${user.competitorId})` : ''}`,
+        );
         return updatedUser;
       }
 
