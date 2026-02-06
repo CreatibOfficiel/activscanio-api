@@ -8,7 +8,7 @@ export class AddCalibrationWeekSupport1770200000001
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add 'calibration' to the betting_week_status enum
     await queryRunner.query(`
-      ALTER TYPE "betting_week_status_enum" ADD VALUE IF NOT EXISTS 'calibration' BEFORE 'open'
+      ALTER TYPE "betting_weeks_status_enum" ADD VALUE IF NOT EXISTS 'calibration' BEFORE 'open'
     `);
 
     // Add isCalibrationWeek column

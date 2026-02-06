@@ -23,19 +23,19 @@ export class AddCompetitorFormFields1770300000000
     await queryRunner.query(`
       UPDATE "competitors" c
       SET "recentPositions" = (
-        SELECT string_agg(rr."rank12"::text, ',' ORDER BY re.date DESC)
+        SELECT string_agg(rr."rank12"::text, ',' ORDER BY r.date DESC)
         FROM (
           SELECT rr2."competitorId", rr2."rank12", rr2."raceId"
           FROM "race_results" rr2
-          INNER JOIN "race_events" re2 ON re2.id = rr2."raceId"
-          WHERE rr2."competitorId" = c.id
-          ORDER BY re2.date DESC
+          INNER JOIN "races" r2 ON r2.id = rr2."raceId"
+          WHERE rr2."competitorId" = c.id::text
+          ORDER BY r2.date DESC
           LIMIT 5
         ) rr
-        INNER JOIN "race_events" re ON re.id = rr."raceId"
+        INNER JOIN "races" r ON r.id = rr."raceId"
       )
       WHERE EXISTS (
-        SELECT 1 FROM "race_results" WHERE "competitorId" = c.id
+        SELECT 1 FROM "race_results" WHERE "competitorId" = c.id::text
       )
     `);
 

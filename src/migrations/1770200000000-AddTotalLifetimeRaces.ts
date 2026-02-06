@@ -16,7 +16,7 @@ export class AddTotalLifetimeRaces1770200000000 implements MigrationInterface {
       SET "totalLifetimeRaces" = (
         SELECT COUNT(*)
         FROM "race_results" rr
-        WHERE rr."competitorId" = c.id
+        WHERE rr."competitorId" = c.id::text
       )
     `);
   }
