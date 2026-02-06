@@ -40,14 +40,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // Extract error details
     const errorDetails = this.extractErrorDetails(exception);
 
-    // Build error response
+    // Build error response — hide internals in production
+    const isProduction = process.env.NODE_ENV === 'production';
     const errorResponse = {
       statusCode: status,
       message: 'Internal server error',
-      error: errorDetails.message,
+      ...(isProduction ? {} : { error: errorDetails.message }),
       timestamp: new Date().toISOString(),
       path: request.url,
-      method: request.method,
     };
 
     // Log the unexpected error with full details

@@ -23,7 +23,15 @@ import { UploadService } from './upload.service';
           cb(null, `${uuidv4()}${extname(file.originalname)}`);
         },
       }),
-      limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo, ajustez si nécessaire
+      fileFilter: (req, file, cb) => {
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedMimes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new Error(`File type ${file.mimetype} not allowed. Only JPEG, PNG, and WebP are accepted.`), false);
+        }
+      },
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo
     }),
   ],
   providers: [UploadService],

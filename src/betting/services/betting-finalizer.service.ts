@@ -30,7 +30,7 @@ import {
   BettingWeek,
   BettingWeekStatus,
 } from '../entities/betting-week.entity';
-import { Bet } from '../entities/bet.entity';
+import { Bet, BetStatus } from '../entities/bet.entity';
 import { BetPick, BetPosition } from '../entities/bet-pick.entity';
 import { BettorRanking } from '../entities/bettor-ranking.entity';
 import { CompetitorOdds } from '../entities/competitor-odds.entity';
@@ -163,9 +163,9 @@ export class BettingFinalizerService {
       `Podium for week ${week.weekNumber}/${week.year}: [${podium.firstId}, ${podium.secondId}, ${podium.thirdId}]`,
     );
 
-    // 3. Fetch all bets for this week
+    // 3. Fetch only non-finalized bets for this week (prevents double finalization)
     const bets = await this.betRepository.find({
-      where: { bettingWeekId: weekId },
+      where: { bettingWeekId: weekId, isFinalized: false },
       relations: ['picks'],
     });
 
@@ -335,6 +335,23 @@ export class BettingFinalizerService {
       // Calculate high odds bonus (declare outside try block for later use)
       const highOddsBonus = this.calculateHighOddsXP(calculation.picks);
 
+      // Pre-compute comeback bonus eligibility (used in both XP and daily stats)
+      let comebackBonusEligible = false;
+      const betWon = correctPicksCount > 0;
+      if (betWon) {
+        const previousBets = await this.betRepository.find({
+          where: { userId: bet.userId, isFinalized: true },
+          order: { createdAt: 'DESC' },
+          take: 4,
+        });
+        const lastThreeBets = previousBets
+          .filter((b) => b.id !== bet.id)
+          .slice(0, 3);
+        comebackBonusEligible =
+          lastThreeBets.length === 3 &&
+          lastThreeBets.every((b) => (b.pointsEarned ?? 0) === 0);
+      }
+
       // Award XP for betting actions
       try {
         // Base XP for placing bet
@@ -371,36 +388,17 @@ export class BettingFinalizerService {
         }
 
         // Comeback bonus - award 25 XP for winning after 3+ consecutive losses
-        const betWon = correctPicksCount > 0;
-        if (betWon) {
-          // Get last 3 finalized bets before this one
-          const previousBets = await this.betRepository.find({
-            where: { userId: bet.userId, isFinalized: true },
-            order: { createdAt: 'DESC' },
-            take: 4, // Take 4 to exclude current bet
-          });
-
-          // Filter out current bet and keep only last 3
-          const lastThreeBets = previousBets
-            .filter((b) => b.id !== bet.id)
-            .slice(0, 3);
-
-          // Check if all 3 previous bets were losses
-          if (
-            lastThreeBets.length === 3 &&
-            lastThreeBets.every((b) => b.pointsEarned === 0)
-          ) {
-            await this.xpLevelService.awardXP(
-              bet.userId,
-              XPSource.COMEBACK_BONUS,
-              null,
-              bet.id,
-              'Comeback bonus (won after 3 consecutive losses)',
-            );
-            this.logger.log(
-              `Comeback bonus awarded to user ${bet.userId} for bet ${bet.id}`,
-            );
-          }
+        if (comebackBonusEligible) {
+          await this.xpLevelService.awardXP(
+            bet.userId,
+            XPSource.COMEBACK_BONUS,
+            null,
+            bet.id,
+            'Comeback bonus (won after 3 consecutive losses)',
+          );
+          this.logger.log(
+            `Comeback bonus awarded to user ${bet.userId} for bet ${bet.id}`,
+          );
         }
       } catch (error) {
         const errorMessage =
@@ -412,8 +410,6 @@ export class BettingFinalizerService {
 
       // Track daily stats
       try {
-        const betWonForStats = correctPicksCount > 0; // At least one correct pick = win
-
         // Calculate total XP earned for this bet
         let totalXP = 0;
         totalXP += 10; // BET_PLACED
@@ -424,28 +420,15 @@ export class BettingFinalizerService {
         totalXP += 20; // WEEKLY_PARTICIPATION
         totalXP += highOddsBonus; // HIGH_ODDS_BONUS if any
 
-        // Check if comeback bonus was awarded (same logic as above)
-        if (betWonForStats) {
-          const previousBets = await this.betRepository.find({
-            where: { userId: bet.userId, isFinalized: true },
-            order: { createdAt: 'DESC' },
-            take: 4,
-          });
-          const lastThreeBets = previousBets
-            .filter((b) => b.id !== bet.id)
-            .slice(0, 3);
-          if (
-            lastThreeBets.length === 3 &&
-            lastThreeBets.every((b) => b.pointsEarned === 0)
-          ) {
-            totalXP += 25; // COMEBACK_BONUS
-          }
+        // Add comeback bonus XP if eligible (pre-computed above)
+        if (comebackBonusEligible) {
+          totalXP += 25; // COMEBACK_BONUS
         }
 
         await this.dailyBonusService.trackDailyActivity(
           bet.userId,
           true, // bet was placed
-          betWonForStats,
+          betWon,
           calculation.finalPoints,
           totalXP,
         );
@@ -542,6 +525,9 @@ export class BettingFinalizerService {
         pointsEarned = DEFAULT_SCORING_PARAMS.incorrectPickPoints;
       }
 
+      // Round to 2 decimal places to avoid floating point accumulation
+      pointsEarned = Math.round(pointsEarned * 100) / 100;
+
       pickCalculations.push({
         pickId: pick.id,
         competitorId: pick.competitorId,
@@ -575,6 +561,10 @@ export class BettingFinalizerService {
       finalPoints =
         totalPointsBeforeBonus * DEFAULT_SCORING_PARAMS.perfectPodiumBonus;
     }
+
+    // Round to 2 decimal places to avoid floating point accumulation errors
+    finalPoints = Math.round(finalPoints * 100) / 100;
+    perfectPodiumBonus = Math.round(perfectPodiumBonus * 100) / 100;
 
     return {
       betId: bet.id,
@@ -616,6 +606,7 @@ export class BettingFinalizerService {
     // Update bet
     bet.isFinalized = true;
     bet.pointsEarned = calculation.finalPoints;
+    bet.status = calculation.finalPoints > 0 ? BetStatus.WON : BetStatus.LOST;
     await this.betRepository.save(bet);
 
     // Update individual picks
@@ -663,7 +654,8 @@ export class BettingFinalizerService {
   }
 
   /**
-   * Create or update bettor ranking
+   * Create or update bettor ranking using atomic SQL to prevent race conditions.
+   * Uses INSERT ... ON CONFLICT with atomic addition.
    */
   private async upsertBettorRanking(
     userId: string,
@@ -671,25 +663,14 @@ export class BettingFinalizerService {
     year: number,
     pointsToAdd: number,
   ): Promise<void> {
-    let ranking = await this.bettorRankingRepository.findOne({
-      where: { userId, month, year },
-    });
-
-    if (!ranking) {
-      // Create new ranking
-      ranking = this.bettorRankingRepository.create({
-        userId,
-        month,
-        year,
-        totalPoints: pointsToAdd,
-        rank: 0, // Will be recalculated
-      });
-    } else {
-      // Update existing ranking
-      ranking.totalPoints += pointsToAdd;
-    }
-
-    await this.bettorRankingRepository.save(ranking);
+    await this.bettorRankingRepository.query(
+      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "rank")
+       VALUES ($1, $2, $3, $4, 0)
+       ON CONFLICT ("userId", "month", "year")
+       DO UPDATE SET "totalPoints" = bettor_rankings."totalPoints" + $4,
+                     "updatedAt" = NOW()`,
+      [userId, month, year, pointsToAdd],
+    );
   }
 
   /**
@@ -701,22 +682,20 @@ export class BettingFinalizerService {
   async recalculateRanks(month: number, year: number): Promise<void> {
     this.logger.log(`Recalculating ranks for ${month}/${year}...`);
 
-    // Fetch all rankings for this month, sorted by points desc
-    const rankings = await this.bettorRankingRepository.find({
-      where: { month, year },
-      order: { totalPoints: 'DESC' },
-    });
-
-    // Assign ranks
-    let currentRank = 1;
-    for (const ranking of rankings) {
-      ranking.rank = currentRank++;
-      await this.bettorRankingRepository.save(ranking);
-    }
-
-    this.logger.log(
-      `Ranks recalculated for ${rankings.length} users in ${month}/${year}`,
+    // Atomic rank recalculation using a single SQL UPDATE with window function
+    await this.bettorRankingRepository.query(
+      `UPDATE bettor_rankings br
+       SET rank = sub.new_rank
+       FROM (
+         SELECT id, ROW_NUMBER() OVER (ORDER BY "totalPoints" DESC) AS new_rank
+         FROM bettor_rankings
+         WHERE month = $1 AND year = $2
+       ) sub
+       WHERE br.id = sub.id`,
+      [month, year],
     );
+
+    this.logger.log(`Ranks recalculated atomically for ${month}/${year}`);
   }
 
   /**

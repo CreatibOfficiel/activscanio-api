@@ -7,13 +7,18 @@ import * as path from 'path';
 import * as express from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   // Register global exception filters
   // Order matters: HttpExceptionFilter catches HttpException, AllExceptionsFilter catches everything else
   app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());
 
-  app.enableCors();
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    credentials: true,
+  });
 
   // Serve static files for generated images using Express static middleware
   // This must be done BEFORE setting the global prefix
