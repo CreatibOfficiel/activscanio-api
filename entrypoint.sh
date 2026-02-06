@@ -39,7 +39,7 @@ else
   cat data-source.prod.js | grep -A 3 "migrations:"
   echo ""
   echo "🔌 Database connection:"
-  echo "  DATABASE_URL: ${DATABASE_URL:0:30}... (masked)"
+  echo "  DATABASE_URL: $(echo "$DATABASE_URL" | cut -c1-30)... (masked)"
   echo "=========================================="
   echo "🚀 Running migrations in prod mode..."
   echo "=========================================="
