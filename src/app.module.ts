@@ -17,7 +17,11 @@ import { RaceAnalysisModule } from './race-analysis/race-analysis.module';
 import { UploadModule } from './upload/upload.module';
 import { OpenAIModule } from './openai/openai.module';
 import { OpenAIService } from './openai/openai.service';
-import { SeederModule } from './seeder/seeder.module';
+// SeederModule only loaded in dev (requires @faker-js/faker devDependency)
+const SeederModule =
+  process.env.NODE_ENV !== 'production'
+    ? require('./seeder/seeder.module').SeederModule
+    : null;
 import { BaseCharactersModule } from './base-characters/base-characters.module';
 import { CharacterVariantsModule } from './character-variants/character-variants.module';
 import { UsersModule } from './users/users.module';
@@ -52,7 +56,7 @@ import { ExportModule } from './export/export.module';
     UploadModule,
     OpenAIModule,
     RaceAnalysisModule,
-    SeederModule,
+    ...(SeederModule ? [SeederModule] : []),
     BaseCharactersModule,
     CharacterVariantsModule,
     UsersModule,
