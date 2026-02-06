@@ -61,8 +61,9 @@ export class UsersService {
 
       return await this.userRepository.save(user);
     } else {
-      // Create new user with PENDING role (onboarding not completed)
-      user = this.userRepository.create({
+      // Create new user with PENDING role
+      // Use insert() + findByClerkId() instead of save() to avoid TypeORM enum cast issue
+      await this.userRepository.repository.insert({
         clerkId: syncDto.clerkId,
         email: syncDto.email || '',
         firstName: syncDto.firstName || '',
@@ -71,7 +72,7 @@ export class UsersService {
         role: UserRole.PENDING,
       });
 
-      return await this.userRepository.save(user);
+      return (await this.userRepository.findByClerkId(syncDto.clerkId))!;
     }
   }
 
@@ -117,7 +118,8 @@ export class UsersService {
 
     if (!user) {
       // Auto-create user with PENDING role
-      user = this.userRepository.create({
+      // Use insert() + findByClerkId() instead of save() to avoid TypeORM enum cast issue
+      await this.userRepository.repository.insert({
         clerkId: clerkPayload.clerkId,
         email: clerkPayload.email || '',
         firstName: clerkPayload.firstName || '',
@@ -126,7 +128,7 @@ export class UsersService {
         role: UserRole.PENDING,
       });
 
-      user = await this.userRepository.save(user);
+      user = (await this.userRepository.findByClerkId(clerkPayload.clerkId))!;
     }
 
     return user;
