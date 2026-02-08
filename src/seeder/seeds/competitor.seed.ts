@@ -184,12 +184,6 @@ export async function seedCompetitors(dataSource: DataSource) {
         'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/66714083f387e411c05cf936_Je%CC%81rem.webp',
     },
     {
-      firstName: 'Pinot',
-      lastName: 'Cocker',
-      profilePictureUrl:
-        'https://cdn.prod.website-files.com/664f5a68996a65b2123d7b3f/66714ad02f4f40cc2c018bfd_Pinot.webp',
-    },
-    {
       firstName: 'Raya',
       lastName: 'Kangal',
       profilePictureUrl:
