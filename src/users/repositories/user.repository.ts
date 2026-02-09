@@ -38,7 +38,7 @@ export class UserRepository extends BaseRepository<User> {
     // because TypeORM doesn't auto-load inverse OneToOne without JoinColumn
     const variant = await this.characterVariantRepository.findOne({
       where: { competitor: { id: user.competitor.id } },
-      relations: ['baseCharacter'],
+      relations: ['baseCharacter', 'baseCharacter.variants'],
     });
 
     if (variant) {
