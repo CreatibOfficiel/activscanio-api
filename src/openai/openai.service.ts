@@ -36,36 +36,10 @@ export class OpenAIService {
     const prompt = buildPrompt(whitelist);
 
     const resp = await this.openai.chat.completions.create({
-      model: 'gpt-4o-2024-11-20',
+      model: 'gpt-5.2',
       max_tokens: 4096,
       temperature: 0,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'race_results',
-          strict: true,
-          schema: {
-            type: 'object',
-            properties: {
-              results: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    character: { type: 'string' },
-                    rank12: { type: 'integer' },
-                    score: { type: 'integer' },
-                  },
-                  required: ['character', 'rank12', 'score'],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ['results'],
-            additionalProperties: false,
-          },
-        },
-      },
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
@@ -87,18 +61,17 @@ export class OpenAIService {
       ],
     });
 
-    const choice = resp.choices?.[0]?.message;
-
-    // Structured outputs put refusals in a dedicated field
-    if ((choice as any)?.refusal) {
-      this.logger.warn('OpenAI refusal:', (choice as any).refusal);
-      throw new Error(`OpenAI a refusé l'analyse : ${(choice as any).refusal}`);
-    }
-
-    const txt = choice?.content ?? '';
+    const txt = resp.choices?.[0]?.message?.content ?? '';
     this.logger.log('OpenAI response:', txt);
 
+    if (!txt || txt.includes("can't assist") || txt.includes('cannot assist')) {
+      throw new Error(`OpenAI a refusé l'analyse de l'image`);
+    }
+
     const parsed = JSON.parse(txt) as { results: ImageAnalysisRow[] };
+    if (!parsed.results?.length) {
+      throw new Error('JSON invalide : clé "results" absente ou vide');
+    }
     return parsed.results;
   }
 }
