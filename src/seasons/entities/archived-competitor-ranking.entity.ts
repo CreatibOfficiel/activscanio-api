@@ -24,8 +24,11 @@ export class ArchivedCompetitorRanking {
   @Column()
   competitorName: string; // Denormalized for historical preservation
 
-  @Column({ type: 'int' })
-  rank: number;
+  @Column({ type: 'int', nullable: true })
+  rank: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  provisional: boolean;
 
   @Column({ type: 'float' })
   finalRating: number;

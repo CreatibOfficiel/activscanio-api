@@ -119,18 +119,25 @@ export class SeasonsService {
     archive: SeasonArchive,
     competitors: Competitor[],
   ): Promise<void> {
-    // Sort competitors by conservative score (rating - 2*rd)
-    const sorted = competitors
-      .map((c) => ({
-        competitor: c,
-        score: c.rating - 2 * c.rd,
-      }))
+    // Determine provisional status for each competitor (same logic as sanitize-competitor.ts)
+    const withStatus = competitors.map((c) => ({
+      competitor: c,
+      score: c.rating - 2 * c.rd,
+      provisional: c.raceCount < 5 || c.rd > 150,
+    }));
+
+    // Separate confirmed (ranked) and calibrating (provisional) competitors
+    const confirmed = withStatus
+      .filter((c) => !c.provisional)
+      .sort((a, b) => b.score - a.score);
+    const calibrating = withStatus
+      .filter((c) => c.provisional)
       .sort((a, b) => b.score - a.score);
 
-    // Create archive records in batches
+    // Archive confirmed competitors with official ranks
     const BATCH_SIZE = 100;
-    for (let i = 0; i < sorted.length; i += BATCH_SIZE) {
-      const batch = sorted.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < confirmed.length; i += BATCH_SIZE) {
+      const batch = confirmed.slice(i, i + BATCH_SIZE);
 
       const rankings = batch.map((item, batchIndex) => {
         const { competitor } = item;
@@ -141,6 +148,7 @@ export class SeasonsService {
           competitorId: competitor.id,
           competitorName: `${competitor.firstName} ${competitor.lastName}`,
           rank,
+          provisional: false,
           finalRating: competitor.rating,
           finalRd: competitor.rd,
           finalVol: competitor.vol,
@@ -153,12 +161,41 @@ export class SeasonsService {
       await queryRunner.manager.save(rankings);
 
       this.logger.log(
-        `Archived batch ${Math.floor(i / BATCH_SIZE) + 1}: ${rankings.length} competitors`,
+        `Archived batch ${Math.floor(i / BATCH_SIZE) + 1}: ${rankings.length} confirmed competitors`,
+      );
+    }
+
+    // Archive calibrating competitors with provisional = true and rank = null
+    for (let i = 0; i < calibrating.length; i += BATCH_SIZE) {
+      const batch = calibrating.slice(i, i + BATCH_SIZE);
+
+      const rankings = batch.map((item) => {
+        const { competitor } = item;
+
+        return queryRunner.manager.create(ArchivedCompetitorRanking, {
+          seasonArchiveId: archive.id,
+          competitorId: competitor.id,
+          competitorName: `${competitor.firstName} ${competitor.lastName}`,
+          rank: null,
+          provisional: true,
+          finalRating: competitor.rating,
+          finalRd: competitor.rd,
+          finalVol: competitor.vol,
+          totalRaces: competitor.raceCount,
+          winStreak: competitor.winStreak,
+          avgRank12: competitor.avgRank12,
+        });
+      });
+
+      await queryRunner.manager.save(rankings);
+
+      this.logger.log(
+        `Archived batch: ${rankings.length} provisional competitors`,
       );
     }
 
     this.logger.log(
-      `Archived ${sorted.length} competitor rankings for season ${archive.month}/${archive.year}`,
+      `Archived ${confirmed.length} confirmed + ${calibrating.length} provisional competitor rankings for season ${archive.month}/${archive.year}`,
     );
   }
 
