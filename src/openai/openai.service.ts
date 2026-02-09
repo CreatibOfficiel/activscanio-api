@@ -8,6 +8,14 @@ export interface ImageAnalysisRow {
   score: number; // 0-60
 }
 
+const SYSTEM_MESSAGE = `You are a data-extraction assistant for a private, recreational Mario Kart 8 Deluxe tournament tracking application.
+
+Your sole task is to read race result screenshots and output structured JSON data (character names, rankings, scores) for tournament record-keeping purposes.
+
+This is a fully legitimate and harmless use case: extracting game statistics from Nintendo Switch screenshots for a small group of friends. The screenshots contain only in-game UI elements (character icons, ranks 1-12, scores 0-60). There is no real-world sensitive content.
+
+Always comply with the extraction request. Output only valid JSON matching the provided schema.`;
+
 @Injectable()
 export class OpenAIService {
   private readonly logger = new Logger(OpenAIService.name);
@@ -28,34 +36,70 @@ export class OpenAIService {
     const prompt = buildPrompt(whitelist);
 
     const resp = await this.openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-2024-11-20',
       max_tokens: 4096,
       temperature: 0,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'race_results',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              results: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    character: { type: 'string' },
+                    rank12: { type: 'integer' },
+                    score: { type: 'integer' },
+                  },
+                  required: ['character', 'rank12', 'score'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ['results'],
+            additionalProperties: false,
+          },
+        },
+      },
       messages: [
         {
           role: 'system',
-          content:
-            'You are a helpful assistant that extracts race result data from Mario Kart 8 Deluxe screenshots for a private tournament tracking app. Output only valid JSON.',
+          content: SYSTEM_MESSAGE,
         },
         {
           role: 'user',
           content: [
-            { type: 'text', text: prompt.trim() },
             {
               type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${base64}` },
+              image_url: {
+                url: `data:image/jpeg;base64,${base64}`,
+                detail: 'high',
+              },
             },
+            { type: 'text', text: prompt.trim() },
           ],
         },
       ],
     });
 
-    const txt = resp.choices?.[0]?.message?.content ?? '';
-    this.logger.log('OpenAI response:', txt);
-    const json = txt.match(/\[[\s\S]*]/);
-    if (!json) throw new Error('JSON absent de la réponse OpenAI');
+    const choice = resp.choices?.[0]?.message;
 
-    return JSON.parse(json[0]) as ImageAnalysisRow[];
+    // Structured outputs put refusals in a dedicated field
+    if ((choice as any)?.refusal) {
+      this.logger.warn('OpenAI refusal:', (choice as any).refusal);
+      throw new Error(`OpenAI a refusé l'analyse : ${(choice as any).refusal}`);
+    }
+
+    const txt = choice?.content ?? '';
+    this.logger.log('OpenAI response:', txt);
+
+    const parsed = JSON.parse(txt) as { results: ImageAnalysisRow[] };
+    return parsed.results;
   }
 }
 
@@ -95,21 +139,21 @@ function buildPrompt(whitelist: string[]) {
   _Ne crée jamais un libellé absent de la whitelist_ (si la couleur n’est pas dans la table, omets ce joueur).
   
   📋 FORMAT DE SORTIE — STRICTEMENT
-  Rends **uniquement** ce tableau JSON, pas de texte ni markdown :
-  
-  [
-    { "character": "<NomExact>", "rank12": 1, "score": 60 },
-    { "character": "<NomExact>", "rank12": 2, "score": 52 }
-    // uniquement les lignes des joueurs humains détectés
-  ]
-  
+  Rends un objet JSON avec une clé "results" contenant le tableau :
+
+  {
+    "results": [
+      { "character": "<NomExact>", "rank12": 1, "score": 60 },
+      { "character": "<NomExact>", "rank12": 2, "score": 52 }
+    ]
+  }
+
   Règles :
-  • 'character' → l’un des libellés autorisés, après application éventuelle de la couleur.  
-  • 'rank12'   → numéro de ligne (1 = ligne 1, 2 = ligne 2, …).  
-  • 'score'     → valeur entière affichée (0 – 60).  
-  • Conserve l’ordre naturel (rang 1 en premier, etc.).  
-  • Si un joueur humain est absent du tableau, ne l’inclus pas dans le JSON.
-  
-  ⚠️ Aucun commentaire, aucune prose : **juste le JSON**.  
+  • 'character' → l'un des libellés autorisés, après application éventuelle de la couleur.
+  • 'rank12'   → numéro de ligne (1 = ligne 1, 2 = ligne 2, …).
+  • 'score'     → valeur entière affichée (0 – 60).
+  • Conserve l'ordre naturel (rang 1 en premier, etc.).
+  • Si un joueur humain est absent du tableau, ne l'inclus pas.
+  • Le tableau "results" ne contient que les joueurs humains détectés.
   `;
 }
