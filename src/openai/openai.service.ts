@@ -37,7 +37,7 @@ export class OpenAIService {
 
     const resp = await this.openai.chat.completions.create({
       model: 'gpt-5.2',
-      max_tokens: 4096,
+      max_completion_tokens: 4096,
       temperature: 0,
       response_format: { type: 'json_object' },
       messages: [
