@@ -14,6 +14,13 @@ export const sanitizeCompetitor = (c: Competitor) => ({
   conservativeScore: c.rating - 2 * c.rd,
   provisional: c.raceCount < 5 || c.rd > 150,
 
+  winStreak: c.winStreak,
+  recentPositions: c.recentPositions,
+  formFactor: c.formFactor,
+  previousDayRank: c.previousDayRank,
+  totalLifetimeRaces: c.totalLifetimeRaces,
+  currentMonthRaceCount: c.currentMonthRaceCount,
+
   characterVariant: c.characterVariant
     ? {
         id: c.characterVariant.id,
