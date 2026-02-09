@@ -33,6 +33,11 @@ export class OpenAIService {
       temperature: 0,
       messages: [
         {
+          role: 'system',
+          content:
+            'You are a helpful assistant that extracts race result data from Mario Kart 8 Deluxe screenshots for a private tournament tracking app. Output only valid JSON.',
+        },
+        {
           role: 'user',
           content: [
             { type: 'text', text: prompt.trim() },
