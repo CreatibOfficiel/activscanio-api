@@ -102,7 +102,7 @@ export class RacesService {
   // GET /races?recent=true
   async findAll(recent?: boolean): Promise<RaceEvent[]> {
     if (recent) {
-      return this.raceEventRepository.findRecent(20, 7);
+      return this.raceEventRepository.findRecent(7, 20);
     }
 
     return this.raceEventRepository.findAllWithResults();

@@ -54,7 +54,7 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
       .leftJoinAndSelect('r.results', 'res')
       .where('r.date >= :minDate', { minDate })
       .orderBy('r.date', 'DESC')
-      .limit(limit)
+      .take(limit)
       .getMany();
   }
 
