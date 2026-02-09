@@ -9,6 +9,7 @@ export interface CharacterVariantWithAvailability {
   imageUrl: string;
   isAvailable: boolean;
   takenBy?: {
+    competitorId: string;
     firstName: string;
     profilePictureUrl?: string;
   };
@@ -85,6 +86,7 @@ export class BaseCharactersService {
           isAvailable: !variant.competitor,
           takenBy: variant.competitor
             ? {
+                competitorId: variant.competitor.id,
                 firstName: variant.competitor.firstName,
                 profilePictureUrl: variant.competitor.profilePictureUrl,
               }
