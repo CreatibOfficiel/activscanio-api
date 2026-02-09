@@ -267,7 +267,7 @@ export class AchievementsController {
     const totalAchievements = await this.achievementRepository.count();
     const unlockedAchievements = user.achievementCount;
     const achievementProgress =
-      (unlockedAchievements / totalAchievements) * 100;
+      totalAchievements > 0 ? (unlockedAchievements / totalAchievements) * 100 : 0;
 
     return {
       userId: user.id,
