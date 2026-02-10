@@ -4,7 +4,9 @@ import {
   BaseCharacterWithAvailability,
 } from './base-characters.service';
 import { BaseCharacter } from './base-character.entity';
+import { Public } from '../auth/decorators/public.decorator';
 
+@Public()
 @Controller('base-characters')
 export class BaseCharactersController {
   constructor(private readonly baseCharactersService: BaseCharactersService) {}
