@@ -6,6 +6,7 @@ import { CharacterVariant } from 'src/character-variants/character-variant.entit
 import { RaceResult } from '../races/race-result.entity';
 import { sanitizeCompetitor } from './utils/sanitize-competitor';
 import { CompetitorRepository } from './repositories/competitor.repository';
+import { CompetitorMonthlyStatsRepository } from '../betting/repositories/competitor-monthly-stats.repository';
 import { RatingCalculationService } from '../rating/rating-calculation.service';
 import {
   CompetitorNotFoundException,
@@ -13,10 +14,18 @@ import {
   ValidationException,
 } from '../common/exceptions';
 
+export interface EloHistoryPoint {
+  date: string;
+  rating: number;
+  rd: number;
+  raceCount: number;
+}
+
 @Injectable()
 export class CompetitorsService {
   constructor(
     private competitorRepository: CompetitorRepository,
+    private competitorMonthlyStatsRepository: CompetitorMonthlyStatsRepository,
     private ratingCalculationService: RatingCalculationService,
   ) {}
 
@@ -157,5 +166,57 @@ export class CompetitorsService {
     raceResults: { competitorId: string; rank12: number }[],
   ): Promise<void> {
     await this.competitorRepository.updateFormForRaceResults(raceResults);
+  }
+
+  /**
+   * Get ELO history for a competitor from monthly snapshots
+   * Includes current rating as the latest point
+   */
+  async getEloHistory(
+    competitorId: string,
+    days?: number,
+  ): Promise<EloHistoryPoint[]> {
+    const competitor = await this.competitorRepository.findOne(competitorId);
+    if (!competitor) {
+      throw new CompetitorNotFoundException(competitorId);
+    }
+
+    // Get all monthly snapshots, ordered ASC
+    const monthlyStats =
+      await this.competitorMonthlyStatsRepository.findByCompetitor(
+        competitorId,
+      );
+
+    // findByCompetitor returns DESC order, reverse to get ASC
+    monthlyStats.reverse();
+
+    // Filter by period if `days` is provided
+    let filtered = monthlyStats;
+    if (days) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      filtered = monthlyStats.filter((s) => {
+        const snapshotDate = new Date(s.year, s.month - 1, 1);
+        return snapshotDate >= cutoff;
+      });
+    }
+
+    // Map to EloHistoryPoint
+    const history: EloHistoryPoint[] = filtered.map((s) => ({
+      date: new Date(s.year, s.month - 1, 1).toISOString(),
+      rating: s.finalRating,
+      rd: s.finalRd,
+      raceCount: s.raceCount,
+    }));
+
+    // Add current point (today)
+    history.push({
+      date: new Date().toISOString(),
+      rating: competitor.rating,
+      rd: competitor.rd,
+      raceCount: competitor.raceCount,
+    });
+
+    return history;
   }
 }
