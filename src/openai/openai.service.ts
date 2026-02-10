@@ -79,13 +79,28 @@ export class OpenAIService {
 function buildPrompt(whitelist: string[]) {
   return `
   🎮 CONTEXTE
-  Tu analyses la capture d’écran d’un tableau de résultats Mario Kart 8 Deluxe.
+  Tu analyses la capture d'écran d'un tableau de résultats Mario Kart 8 Deluxe.
   12 lignes, de la première (rang 1) à la dernière (rang 12).
   Chaque ligne affiche :
-  • l’icône du personnage
+  • l'icône du personnage
   • parfois son nom écrit
   • son score (0 – 60)
-  
+
+  🔍 IDENTIFICATION DES JOUEURS HUMAINS
+  Sur l'écran de résultats, les joueurs humains se distinguent visuellement :
+  • Joueur humain → fond de ligne en COULEUR VIVE (rouge, vert, bleu, jaune, rose, etc.)
+  • CPU (ordinateur) → fond de ligne GRIS / SOMBRE
+  Ne retourne QUE les joueurs dont la ligne a un fond coloré (pas gris).
+
+  ⚠️ LANGUE DE L'ÉCRAN
+  Les noms affichés sont en FRANÇAIS. Exemples de correspondance :
+  • "Yoshi rouge" à l'écran → "Red Yoshi" dans la whitelist
+  • "Yoshi noir" → "Black Yoshi"
+  • "Mario de métal" → "Metal Mario"
+  • "Skelerex" → "Dry Bones"
+  • "Villageoise" → "Villager (Female)"
+  Fais toujours correspondre le nom français affiché au libellé anglais de la whitelist.
+
   👥 JOUEURS HUMAINS
   Seuls les personnages ci-dessous sont contrôlés par des humains.
   **Recopie-les à l’identique** (même orthographe / casse) dans ta réponse :
@@ -111,6 +126,12 @@ function buildPrompt(whitelist: string[]) {
   Ex. « Yoshi bleu clair » → **Light-Blue Yoshi**.  
   _Ne crée jamais un libellé absent de la whitelist_ (si la couleur n’est pas dans la table, omets ce joueur).
   
+  🔢 LECTURE DES SCORES
+  Les scores sont affichés à droite de chaque ligne. Ils peuvent être partiellement masqués par la scène 3D à droite.
+  • Les scores sont des entiers entre 0 et 60.
+  • Regarde attentivement chaque chiffre, même s'il est partiellement couvert par un élément 3D.
+  • Un joueur mieux classé a forcément un score ≥ au joueur en-dessous.
+
   📋 FORMAT DE SORTIE — STRICTEMENT
   Rends un objet JSON avec une clé "results" contenant le tableau :
 
