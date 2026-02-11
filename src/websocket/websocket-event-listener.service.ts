@@ -80,7 +80,7 @@ export class WebSocketEventListener {
       betId: payload.betId,
       imageUrl: payload.imageUrl,
       celebratedAt: payload.celebratedAt,
-      message: '🎉 PERFECT SCORE! You scored 60 points!',
+      message: '🎉 SCORE PARFAIT ! Vous avez marqué 60 points !',
     });
   }
 
