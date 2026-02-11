@@ -190,22 +190,4 @@ export class NotificationsService {
       }
     }
   }
-
-  /**
-   * Send a test notification to a user
-   */
-  async sendTestNotification(userId: string): Promise<void> {
-    await this.sendNotification({
-      userIds: [userId],
-      title: 'Test Notification',
-      body: 'This is a test notification from Activscanio!',
-      category: 'special' as any,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-72x72.png',
-      tag: 'test',
-      data: {
-        test: true,
-      },
-    });
-  }
 }

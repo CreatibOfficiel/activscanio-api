@@ -80,17 +80,6 @@ export class NotificationsController {
   }
 
   /**
-   * POST /api/notifications/test
-   * Send a test notification to the current user
-   */
-  @Post('test')
-  async sendTest(@CurrentUser('clerkId') clerkId: string) {
-    const userId = await this.getUserIdFromClerkId(clerkId);
-    await this.notificationsService.sendTestNotification(userId);
-    return { message: 'Test notification sent' };
-  }
-
-  /**
    * POST /api/notifications/send
    * Send a notification to one or multiple users
    * (This could be restricted to admin users in production)
