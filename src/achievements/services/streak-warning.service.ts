@@ -149,8 +149,9 @@ export class StreakWarningService {
     for (const competitor of atRisk) {
       const missed = businessDaysBetween(competitor.lastRaceDate!, today);
 
-      // Only warn if 1 (warning) or 2 (critical) business days missed
-      if (missed < 1 || missed > 2) continue;
+      // Grace rule: 1 missed day is tolerated. Only warn at exactly 2
+      // (last chance before streak resets at 3+).
+      if (missed !== 2) continue;
 
       // Find the user linked to this competitor
       const user = await this.userRepository.findOne({
@@ -162,10 +163,8 @@ export class StreakWarningService {
       // Dedup: already warned today?
       if (competitor.lastPlayStreakWarningDate === todayStr) continue;
 
-      const level: 'warning' | 'critical' = missed === 1 ? 'warning' : 'critical';
       const { title, body } = this.getPlayWarningMessage(
         competitor.playStreak,
-        level,
       );
 
       await this.notificationsService.sendNotification({
@@ -245,7 +244,9 @@ export class StreakWarningService {
         const today = new Date();
         const missed = businessDaysBetween(competitor.lastRaceDate, today);
 
-        if (missed >= 1) {
+        // Grace rule: 1 missed business day is tolerated.
+        // Only warn when missed >= 2 (last chance before streak resets at 3).
+        if (missed >= 2) {
           result.playStreak = {
             atRisk: true,
             currentStreak: competitor.playStreak,
@@ -300,32 +301,23 @@ export class StreakWarningService {
 
   private getPlayWarningMessage(
     streak: number,
-    level: 'warning' | 'critical',
   ): { title: string; body: string } {
-    if (level === 'critical') {
-      return {
-        title: 'DERNIERE CHANCE !',
-        body: `Dernier jour pour sauver ta serie de ${streak} jours. Apres c'est fini !`,
-      };
-    }
-
-    // Warning (1 day missed)
     if (streak <= 3) {
       return {
-        title: 'N\'oublie pas de courir !',
-        body: `Serie de ${streak}j en cours. Cours aujourd'hui pour la garder !`,
+        title: `Serie de ${streak}j en danger !`,
+        body: 'Dernier jour pour la sauver. Fais une course !',
       };
     }
     if (streak <= 9) {
       return {
-        title: `Serie de ${streak} jours en danger`,
-        body: 'Tu as manque hier. Une course aujourd\'hui et c\'est sauve !',
+        title: `Serie de ${streak} jours en danger !`,
+        body: 'Dernier jour avant la perte. Une course et c\'est sauve !',
       };
     }
     // 10+
     return {
       title: `${streak} jours de serie en peril !`,
-      body: `Ne perds pas ${streak} jours d'effort ! Cours aujourd'hui.`,
+      body: `Ne perds pas ${streak} jours d'effort ! Joue aujourd'hui.`,
     };
   }
 }
