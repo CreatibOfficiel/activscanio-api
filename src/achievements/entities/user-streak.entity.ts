@@ -43,6 +43,13 @@ export class UserStreak {
   @Column({ type: 'timestamptz', nullable: true })
   lifetimeStreakStartedAt: Date | null;
 
+  // Warning dedup
+  @Column({ type: 'int', nullable: true })
+  lastBettingWarningWeek: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  lastBettingWarningYear: number | null;
+
   // Metadata
   @Column({ type: 'int', default: 0 })
   totalWeeksParticipated: number;

@@ -21,6 +21,7 @@ import { AchievementCalculatorService } from './services/achievement-calculator.
 import { XPLevelService } from './services/xp-level.service';
 import { StreakTrackerService } from './services/streak-tracker.service';
 import { LevelRewardsService } from './services/level-rewards.service';
+import { StreakWarningService, StreakWarningStatus } from './services/streak-warning.service';
 import { AdvancedStatsService } from '../betting/services/advanced-stats.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -59,6 +60,7 @@ export class AchievementsController {
     private readonly streakTrackerService: StreakTrackerService,
     private readonly levelRewardsService: LevelRewardsService,
     private readonly advancedStatsService: AdvancedStatsService,
+    private readonly streakWarningService: StreakWarningService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -211,6 +213,20 @@ export class AchievementsController {
         unlocksTitle: ua.achievement.unlocksTitle,
       },
     }));
+  }
+
+  /**
+   * Get streak warning status for current user
+   */
+  @Get('streak-warnings/me')
+  @ApiOperation({ summary: 'Get streak warning status for current user' })
+  @ApiResponse({ status: 200, description: 'Streak warning status' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getStreakWarnings(
+    @CurrentUser('clerkId') clerkId: string,
+  ): Promise<StreakWarningStatus> {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    return this.streakWarningService.getStreakWarningStatus(userId);
   }
 
   /**

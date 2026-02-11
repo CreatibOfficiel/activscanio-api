@@ -39,6 +39,7 @@ import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { SeasonsService } from '../seasons/seasons.service';
 import { StreakTrackerService } from '../achievements/services/streak-tracker.service';
+import { StreakWarningService } from '../achievements/services/streak-warning.service';
 import { ELIGIBILITY_RULES } from '../betting/config/odds-calculator.config';
 import {
   BETTING_CRON_SCHEDULES,
@@ -77,6 +78,7 @@ export class TasksService {
     private readonly competitorRepo: CompetitorRepository,
     private readonly seasonsService: SeasonsService,
     private readonly streakTrackerService: StreakTrackerService,
+    private readonly streakWarningService: StreakWarningService,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
     @InjectRepository(CompetitorMonthlyStats)
@@ -525,6 +527,100 @@ export class TasksService {
     } catch (error) {
       this.logger.error(
         `❌ Failed to snapshot bettor ranks: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /* ==================== STREAK WARNING TASKS ==================== */
+
+  /**
+   * Betting streak warning (early)
+   * Runs every Wednesday at 10:00 UTC
+   */
+  @Cron(BETTING_CRON_SCHEDULES.BETTING_STREAK_WARNING_EARLY, {
+    name: 'betting-streak-warning-early',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleBettingStreakWarningEarly(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.bettingStreakWarningEarly) {
+      this.logger.warn('Task "betting-streak-warning-early" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.bettingStreakWarningEarly}`,
+    );
+
+    try {
+      const warned =
+        await this.streakWarningService.checkBettingStreakWarnings('early');
+      this.logger.log(`✅ Betting streak warning (early): ${warned} users warned`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed betting streak warning (early): ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * Betting streak warning (urgent)
+   * Runs every Thursday at 10:00 UTC
+   */
+  @Cron(BETTING_CRON_SCHEDULES.BETTING_STREAK_WARNING_URGENT, {
+    name: 'betting-streak-warning-urgent',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleBettingStreakWarningUrgent(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.bettingStreakWarningUrgent) {
+      this.logger.warn('Task "betting-streak-warning-urgent" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.bettingStreakWarningUrgent}`,
+    );
+
+    try {
+      const warned =
+        await this.streakWarningService.checkBettingStreakWarnings('urgent');
+      this.logger.log(
+        `✅ Betting streak warning (urgent): ${warned} users warned`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed betting streak warning (urgent): ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * Play streak warning
+   * Runs every weekday (Mon-Fri) at 09:00 UTC
+   */
+  @Cron(BETTING_CRON_SCHEDULES.PLAY_STREAK_WARNING, {
+    name: 'play-streak-warning',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handlePlayStreakWarning(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.playStreakWarning) {
+      this.logger.warn('Task "play-streak-warning" is disabled');
+      return;
+    }
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.playStreakWarning}`,
+    );
+
+    try {
+      const warned =
+        await this.streakWarningService.checkPlayStreakWarnings();
+      this.logger.log(`✅ Play streak warning: ${warned} users warned`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed play streak warning: ${error.message}`,
         error.stack,
       );
     }

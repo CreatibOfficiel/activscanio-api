@@ -95,6 +95,9 @@ export class Competitor {
   @Column({ type: 'int', default: 0 })
   bestPlayStreak: number;
 
+  @Column({ type: 'date', nullable: true })
+  lastPlayStreakWarningDate: string | null;
+
   @OneToOne(() => CharacterVariant, (variant) => variant.competitor, {
     nullable: true,
   })

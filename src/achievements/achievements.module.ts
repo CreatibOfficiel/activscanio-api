@@ -13,14 +13,17 @@ import { DailyBonusService } from './services/daily-bonus.service';
 import { LevelRewardsService } from './services/level-rewards.service';
 import { TemporaryAchievementService } from './services/temporary-achievement.service';
 import { AchievementCronService } from './services/achievement-cron.service';
+import { StreakWarningService } from './services/streak-warning.service';
 import { AchievementsController } from './achievements.controller';
 import { User } from '../users/user.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 import { Bet } from '../betting/entities/bet.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
 import { DailyUserStats } from '../betting/entities/daily-user-stats.entity';
+import { Competitor } from '../competitors/competitor.entity';
 import { UsersModule } from '../users/users.module';
 import { BettingModule } from '../betting/betting.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -35,9 +38,11 @@ import { BettingModule } from '../betting/betting.module';
       BettorRanking,
       Bet,
       BettingWeek,
+      Competitor,
     ]),
     UsersModule,
     forwardRef(() => BettingModule),
+    NotificationsModule,
   ],
   controllers: [AchievementsController],
   providers: [
@@ -49,6 +54,7 @@ import { BettingModule } from '../betting/betting.module';
     LevelRewardsService,
     TemporaryAchievementService,
     AchievementCronService,
+    StreakWarningService,
   ],
   exports: [
     AchievementSeedService,
@@ -59,6 +65,7 @@ import { BettingModule } from '../betting/betting.module';
     LevelRewardsService,
     TemporaryAchievementService,
     AchievementCronService,
+    StreakWarningService,
     TypeOrmModule,
   ],
 })
