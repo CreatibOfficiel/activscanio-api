@@ -143,7 +143,7 @@ async function seedCompetitorOdds(
           winStreak: competitor.winStreak,
           raceCount: competitor.raceCount,
           avgRank: competitor.avgRank12 || 6,
-          formFactor: seededRandom.float(0.8, 1.2),
+          formFactor: 1.0,
           probability: 1 / finalOdds,
         },
       });

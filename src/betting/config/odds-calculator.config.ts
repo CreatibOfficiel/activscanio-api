@@ -12,8 +12,6 @@ import { OddsCalculationParams } from '../types/odds-calculator.types';
  *
  * These values have been chosen to provide:
  * - Reasonable odds range (1.1x to 50x)
- * - Balanced form factor influence
- * - Meaningful win streak rewards
  */
 export const DEFAULT_ODDS_PARAMS: OddsCalculationParams = {
   /**
@@ -36,64 +34,9 @@ export const DEFAULT_ODDS_PARAMS: OddsCalculationParams = {
   maxOdd: 50,
 
   /**
-   * Minimum form factor (poor recent form)
-   * A competitor with terrible recent results gets this multiplier
-   * 0.7 = 30% penalty on their probability
-   */
-  formFactorMin: 0.7,
-
-  /**
-   * Maximum form factor (excellent recent form)
-   * A competitor on a hot streak gets this multiplier
-   * 1.3 = 30% boost to their probability
-   */
-  formFactorMax: 1.3,
-
-  /**
-   * Bonus per consecutive win
-   * Each win in the streak adds this to the form factor
-   * 0.05 = 5% boost per win (e.g., 3-win streak = +15%)
-   */
-  winStreakBonus: 0.05,
-
-  /**
-   * Number of recent races to analyze for form
-   * Higher value = more historical data
-   * Lower value = more reactive to recent changes
+   * Number of recent races to analyze for eligibility
    */
   recentRacesCount: 5,
-};
-
-/**
- * Rank thresholds for form factor calculation
- *
- * These define how recent race positions affect form.
- * Lower rank = better performance = higher form factor
- */
-export const FORM_RANK_THRESHOLDS = {
-  /** Top tier performance (1st-3rd place) */
-  EXCELLENT: {
-    maxRank: 3,
-    baseFactor: 1.2,
-  },
-
-  /** Good performance (4th-6th place) */
-  GOOD: {
-    maxRank: 6,
-    baseFactor: 1.1,
-  },
-
-  /** Average performance (7th-9th place) */
-  AVERAGE: {
-    maxRank: 9,
-    baseFactor: 1.0,
-  },
-
-  /** Poor performance (10th-12th place) */
-  POOR: {
-    maxRank: 12,
-    baseFactor: 0.9,
-  },
 };
 
 /**

@@ -49,15 +49,15 @@ export interface OddsCalculationStep {
   rd: number; // Rating Deviation
   conservativeScore: number; // rating - 2 * rd
 
-  // Step 2: Form factor
+  // Step 2: Recent stats
   recentRaceCount: number;
   avgRecentRank: number;
   winStreak: number;
-  formFactor: number; // Between 0.7 and 1.3
+  formFactor: number; // Always 1.0 (kept for JSONB compat)
 
   // Step 3: Probability calculation
-  rawProbability: number; // Before adjustment
-  adjustedProbability: number; // After form factor
+  rawProbability: number;
+  adjustedProbability: number; // Same as rawProbability (no form adjustment)
   normalizedProbability: number; // Sum = 1
 
   // Step 4: Final odd
@@ -98,7 +98,6 @@ export interface CompetitorOdd {
   oddSecond: number;
   oddThird: number;
   probability: number;
-  formFactor: number;
   isEligible: boolean;
   metadata: OddMetadata;
 }
@@ -125,8 +124,5 @@ export interface OddsCalculationParams {
   baseMultiplier: number; // Base multiplier for odds (default: 10)
   minOdd: number; // Minimum odd value (default: 1.1)
   maxOdd: number; // Maximum odd value (default: 50)
-  formFactorMin: number; // Minimum form factor (default: 0.7)
-  formFactorMax: number; // Maximum form factor (default: 1.3)
-  winStreakBonus: number; // Bonus per consecutive win (default: 0.05)
   recentRacesCount: number; // Number of recent races to consider (default: 5)
 }

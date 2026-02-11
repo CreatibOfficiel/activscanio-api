@@ -13,13 +13,11 @@
  * 1. Fetch all competitors + recent race data
  * 2. Filter eligible competitors (min 1 race this week)
  * 3. Calculate conservative scores (ELO - 2*RD)
- * 4. Calculate form factors (recent performance)
- * 5. Calculate raw probabilities (normalized scores)
- * 6. Adjust probabilities with form factors
- * 7. Normalize probabilities (sum = 1)
- * 8. Convert to odds (BASE / probability)
- * 9. Apply min/max capping
- * 10. Save to database
+ * 4. Calculate raw probabilities (normalized scores)
+ * 5. Normalize probabilities (sum = 1)
+ * 6. Convert to odds (BASE / probability)
+ * 7. Apply min/max capping
+ * 8. Save to database
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -40,7 +38,6 @@ import {
 } from '../types/odds-calculator.types';
 import {
   DEFAULT_ODDS_PARAMS,
-  FORM_RANK_THRESHOLDS,
   ELIGIBILITY_RULES,
   ODDS_LOGGER_CONFIG,
   POSITION_FACTORS,
@@ -115,7 +112,6 @@ export class OddsCalculatorService {
       oddSecond: step.oddSecond,
       oddThird: step.oddThird,
       probability: step.normalizedProbability,
-      formFactor: step.formFactor,
       isEligible: step.isEligible,
       metadata: {
         elo: step.rating,
@@ -124,7 +120,7 @@ export class OddsCalculatorService {
         winStreak: step.winStreak,
         raceCount: step.recentRaceCount,
         avgRank: step.avgRecentRank,
-        formFactor: step.formFactor,
+        formFactor: 1.0,
         probability: step.normalizedProbability,
       },
     }));
@@ -172,7 +168,7 @@ export class OddsCalculatorService {
           .select(['result.rank12', 'race.date', 'race.id'])
           .getRawMany();
 
-        // Get recent races for form calculation
+        // Get recent races for eligibility check
         const recentRaces = await this.raceResultRepository
           .createQueryBuilder('result')
           .innerJoin('result.race', 'race')
@@ -326,53 +322,36 @@ export class OddsCalculatorService {
     // Guard against totalConservativeScore = 0 (all scores identical after shift)
     if (totalConservativeScore === 0) totalConservativeScore = 1;
 
-    // Step 2: Calculate form factors and raw probabilities
+    // Step 2: Calculate raw probabilities (no form factor adjustment)
     for (const step of steps) {
-      const { competitor, recentRaces } = competitorsWithStats.find(
+      const { recentRaces } = competitorsWithStats.find(
         (c) => c.competitor.id === step.competitorId,
       )!;
 
-      // Calculate average recent rank
+      // Calculate average recent rank (for metadata only)
       step.avgRecentRank =
         recentRaces.length > 0
           ? recentRaces.reduce((sum, r) => sum + r.rank12, 0) /
             recentRaces.length
-          : 6.5; // Default to mid-rank if no races
-
-      // Use competitor's stored formFactor (updated after each race)
-      // This ensures consistency and uses the weighted calculation
-      // Falls back to calculated value if not set
-      step.formFactor =
-        competitor.formFactor !== undefined &&
-        competitor.formFactor !== null &&
-        competitor.formFactor >= DEFAULT_ODDS_PARAMS.formFactorMin &&
-        competitor.formFactor <= DEFAULT_ODDS_PARAMS.formFactorMax
-          ? competitor.formFactor
-          : this.calculateFormFactor(
-              step.avgRecentRank,
-              step.winStreak,
-              step.recentRaceCount,
-            );
+          : 6.5;
 
       // Calculate raw probability using shifted scores
       step.rawProbability =
         (step.conservativeScore + shift) / totalConservativeScore;
+
+      // No form factor adjustment — probability goes straight through
+      step.adjustedProbability = step.rawProbability;
     }
 
-    // Step 3: Adjust probabilities with form factors
-    for (const step of steps) {
-      step.adjustedProbability = step.rawProbability * step.formFactor;
-    }
-
-    // Step 4: Normalize probabilities (sum = 1)
-    const totalAdjustedProbability = steps.reduce(
+    // Step 3: Normalize probabilities (sum = 1)
+    const totalProbability = steps.reduce(
       (sum, step) => sum + step.adjustedProbability,
       0,
     );
 
     for (const step of steps) {
       step.normalizedProbability =
-        step.adjustedProbability / totalAdjustedProbability;
+        step.adjustedProbability / totalProbability;
     }
 
     // Step 5: Calculate odds and apply capping
@@ -451,56 +430,6 @@ export class OddsCalculatorService {
   }
 
   /**
-   * Calculate form factor based on recent performance
-   *
-   * Form factor ranges from 0.7 (poor form) to 1.3 (excellent form)
-   *
-   * Components:
-   * - Rank-based factor (based on average recent position)
-   * - Win streak bonus (each consecutive win adds 5%)
-   *
-   * @param avgRecentRank - Average rank in recent races (1-12)
-   * @param winStreak - Number of consecutive wins
-   * @param recentRaceCount - Number of recent races
-   * @returns Form factor between 0.7 and 1.3
-   */
-  private calculateFormFactor(
-    avgRecentRank: number,
-    winStreak: number,
-    recentRaceCount: number,
-  ): number {
-    // No recent races = neutral form
-    if (recentRaceCount === 0) {
-      return 1.0;
-    }
-
-    // Determine rank-based factor
-    let rankFactor: number;
-
-    if (avgRecentRank <= FORM_RANK_THRESHOLDS.EXCELLENT.maxRank) {
-      rankFactor = FORM_RANK_THRESHOLDS.EXCELLENT.baseFactor;
-    } else if (avgRecentRank <= FORM_RANK_THRESHOLDS.GOOD.maxRank) {
-      rankFactor = FORM_RANK_THRESHOLDS.GOOD.baseFactor;
-    } else if (avgRecentRank <= FORM_RANK_THRESHOLDS.AVERAGE.maxRank) {
-      rankFactor = FORM_RANK_THRESHOLDS.AVERAGE.baseFactor;
-    } else {
-      rankFactor = FORM_RANK_THRESHOLDS.POOR.baseFactor;
-    }
-
-    // Add win streak bonus
-    const streakBonus = winStreak * DEFAULT_ODDS_PARAMS.winStreakBonus;
-
-    // Combine factors
-    const formFactor = rankFactor + streakBonus;
-
-    // Apply bounds
-    return Math.max(
-      DEFAULT_ODDS_PARAMS.formFactorMin,
-      Math.min(formFactor, DEFAULT_ODDS_PARAMS.formFactorMax),
-    );
-  }
-
-  /**
    * Save calculated odds to database
    */
   private async saveOddsToDatabase(
@@ -556,7 +485,6 @@ export class OddsCalculatorService {
       oddSecond: entity.oddSecond,
       oddThird: entity.oddThird,
       probability: entity.metadata.probability,
-      formFactor: entity.metadata.formFactor,
       isEligible: true,
       metadata: entity.metadata,
     }));
