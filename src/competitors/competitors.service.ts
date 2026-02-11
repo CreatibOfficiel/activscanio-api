@@ -157,15 +157,25 @@ export class CompetitorsService {
   }
 
   /**
-   * Update form for all competitors in a race
+   * Update play streak for a competitor after a race
+   */
+  async updatePlayStreak(
+    competitorId: string,
+    raceDate: Date,
+  ): Promise<void> {
+    await this.competitorRepository.updatePlayStreak(competitorId, raceDate);
+  }
+
+  /**
+   * Update recent positions for all competitors in a race
    * Called after each race creation
    *
    * @param raceResults - Array of race results with competitorId and rank12
    */
-  async updateFormForRaceResults(
+  async updateRecentPositions(
     raceResults: { competitorId: string; rank12: number }[],
   ): Promise<void> {
-    await this.competitorRepository.updateFormForRaceResults(raceResults);
+    await this.competitorRepository.updateRecentPositions(raceResults);
   }
 
   /**

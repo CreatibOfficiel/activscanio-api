@@ -103,6 +103,9 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
           lastRaceDate: new Date(),
           avgRank12:
             c.avgRank12 + (result.rank12 - c.avgRank12) / (c.raceCount + 1),
+          lifetimeAvgRank:
+            c.lifetimeAvgRank +
+            (result.rank12 - c.lifetimeAvgRank) / (c.totalLifetimeRaces + 1),
         });
         await em.save(c);
       }
@@ -158,101 +161,19 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
         winStreak: 0,
         avgRank12: 0,
         // Note: totalLifetimeRaces is intentionally NOT reset
-        // Note: recentPositions and formFactor are preserved
+        // Note: recentPositions is preserved (based on actual race history)
       })
       .execute();
     this.logger.log('Soft reset (75/25) monthly stats for all competitors');
   }
 
   /**
-   * Update form after a race for a competitor
-   * - Adds new position to recentPositions (keeps last 5)
-   * - Recalculates formFactor based on weighted positions
-   *
-   * @param competitorId - Competitor UUID
-   * @param newPosition - Position in the new race (1-12)
-   */
-  async updateFormAfterRace(
-    competitorId: string,
-    newPosition: number,
-  ): Promise<void> {
-    const competitor = await this.repository.findOne({
-      where: { id: competitorId },
-    });
-
-    if (!competitor) {
-      this.logger.warn(
-        `Competitor ${competitorId} not found for form update`,
-      );
-      return;
-    }
-
-    // Update recent positions (prepend new position, keep max 5)
-    const currentPositions = competitor.recentPositions ?? [];
-    const newPositions = [newPosition, ...currentPositions].slice(0, 5);
-
-    // Calculate new form factor using weighted formula
-    const formFactor = this.calculateFormFactor(newPositions);
-
-    await this.repository.update(competitorId, {
-      recentPositions: newPositions,
-      formFactor,
-    });
-
-    this.logger.log(
-      `Updated form for competitor ${competitorId}: positions=${newPositions.join(',')}, formFactor=${formFactor.toFixed(2)}`,
-    );
-  }
-
-  /**
-   * Calculate form factor from recent positions
-   *
-   * Uses weighted formula where more recent races have higher impact:
-   * - Weights: [0.35, 0.25, 0.20, 0.12, 0.08] for positions 1-5
-   * - Score = sum((13 - position) * weight)
-   * - formFactor = 0.7 + (score / 12) * 0.6
-   * - Range: [0.7, 1.3]
-   *
-   * @param positions - Array of recent positions (most recent first)
-   * @returns Form factor between 0.7 and 1.3
-   */
-  private calculateFormFactor(positions: number[]): number {
-    if (positions.length === 0) {
-      return 1.0; // Neutral form if no history
-    }
-
-    const weights = [0.35, 0.25, 0.2, 0.12, 0.08];
-    let weightedScore = 0;
-    let totalWeight = 0;
-
-    for (let i = 0; i < Math.min(positions.length, 5); i++) {
-      const position = positions[i];
-      const weight = weights[i];
-      // 13 - position: rank 1 = 12 points, rank 12 = 1 point
-      weightedScore += (13 - position) * weight;
-      totalWeight += weight;
-    }
-
-    // Normalize if we have fewer than 5 positions
-    if (totalWeight > 0 && totalWeight < 1) {
-      weightedScore = weightedScore / totalWeight;
-    }
-
-    // Convert to form factor: 0.7 + (score/12) * 0.6
-    // Max score = 12 (all 1st places) → formFactor = 1.3
-    // Min score = 1 (all 12th places) → formFactor ≈ 0.75
-    const formFactor = 0.7 + (weightedScore / 12) * 0.6;
-
-    // Clamp to [0.7, 1.3]
-    return Math.max(0.7, Math.min(1.3, formFactor));
-  }
-
-  /**
-   * Batch update form for multiple competitors after a race
+   * Batch update recent positions for multiple competitors after a race.
+   * Prepends new position and keeps last 5.
    *
    * @param raceResults - Array of race results with competitorId and rank12
    */
-  async updateFormForRaceResults(
+  async updateRecentPositions(
     raceResults: { competitorId: string; rank12: number }[],
   ): Promise<void> {
     await this.repository.manager.transaction(async (em) => {
@@ -266,23 +187,22 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
         }
 
         const currentPositions = competitor.recentPositions ?? [];
-        const newPositions = [result.rank12, ...currentPositions].slice(0, 5);
-        const formFactor = this.calculateFormFactor(newPositions);
-
-        competitor.recentPositions = newPositions;
-        competitor.formFactor = formFactor;
+        competitor.recentPositions = [result.rank12, ...currentPositions].slice(
+          0,
+          5,
+        );
         await em.save(competitor);
       }
     });
 
     this.logger.log(
-      `Updated form for ${raceResults.length} competitors after race`,
+      `Updated recent positions for ${raceResults.length} competitors after race`,
     );
   }
 
   /**
-   * Snapshot daily ranks for all competitors.
-   * Called by cron Mon-Fri at midnight.
+   * Snapshot daily ranks for all confirmed competitors.
+   * Called by cron daily at midnight.
    *
    * Calculates current rank based on conservativeScore (rating - 2*rd)
    * and stores it in previousDayRank for trend calculation.
@@ -293,9 +213,9 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
       order: {},
     });
 
-    // Calculate conservative scores and sort
+    // Calculate conservative scores and sort (confirmed only: same criteria as sanitize-competitor.ts)
     const scoredCompetitors = competitors
-      .filter((c) => c.raceCount > 0)
+      .filter((c) => c.raceCount >= 5 && c.rd <= 150)
       .map((c) => ({
         id: c.id,
         conservativeScore: c.rating - 2 * c.rd,
@@ -314,5 +234,81 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
     this.logger.log(
       `Snapshotted daily ranks for ${scoredCompetitors.length} competitors`,
     );
+  }
+
+  /**
+   * Update play streak for a competitor after a race.
+   *
+   * Rules:
+   * - Only weekdays (Mon-Fri) count
+   * - 1 missed weekday is tolerated (grace)
+   * - 2+ missed weekdays resets the streak
+   *
+   * @param competitorId - Competitor UUID
+   * @param raceDate - Date of the race
+   */
+  async updatePlayStreak(
+    competitorId: string,
+    raceDate: Date,
+  ): Promise<void> {
+    const competitor = await this.repository.findOne({
+      where: { id: competitorId },
+    });
+
+    if (!competitor) return;
+
+    let { playStreak, bestPlayStreak } = competitor;
+
+    if (!competitor.lastRaceDate) {
+      playStreak = 1;
+    } else {
+      const businessDays = this.businessDaysBetween(
+        competitor.lastRaceDate,
+        raceDate,
+      );
+
+      if (businessDays === 0) {
+        // Same business day — no change
+        return;
+      } else if (businessDays <= 2) {
+        // Consecutive day (1) or 1-day grace (2)
+        playStreak += 1;
+      } else {
+        // 2+ missed weekdays — streak broken
+        playStreak = 1;
+      }
+    }
+
+    bestPlayStreak = Math.max(bestPlayStreak, playStreak);
+
+    await this.repository.update(competitorId, {
+      playStreak,
+      bestPlayStreak,
+    });
+  }
+
+  /**
+   * Count the number of business days (Mon-Fri) between two dates (date-only, ignoring time).
+   * Returns 0 if both dates fall on the same business day.
+   */
+  private businessDaysBetween(d1: Date, d2: Date): number {
+    const start = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+    const end = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
+
+    if (start >= end) return 0;
+
+    let count = 0;
+    const cursor = new Date(start);
+    cursor.setDate(cursor.getDate() + 1); // start from the day after d1
+
+    while (cursor <= end) {
+      const day = cursor.getDay(); // 0=Sun, 6=Sat
+      if (day !== 0 && day !== 6) {
+        count++;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return count;
   }
 }

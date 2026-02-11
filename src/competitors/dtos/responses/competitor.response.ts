@@ -46,12 +46,25 @@ export class CompetitorResponse {
   @Expose()
   avgRank12: number;
 
+  /**
+   * Lifetime average rank across all races (never resets).
+   * Used as baseline for relative form calculation.
+   */
+  @Expose()
+  lifetimeAvgRank: number;
+
   @Expose()
   @Type(() => Date)
   lastRaceDate: Date | null;
 
   @Expose()
   winStreak: number;
+
+  @Expose()
+  playStreak: number;
+
+  @Expose()
+  bestPlayStreak: number;
 
   @Expose()
   currentMonthRaceCount: number;
@@ -72,13 +85,6 @@ export class CompetitorResponse {
    */
   @Expose()
   recentPositions: number[] | null;
-
-  /**
-   * Form factor based on recent performance.
-   * Range: 0.7 (poor form) to 1.3 (excellent form)
-   */
-  @Expose()
-  formFactor: number;
 
   /**
    * Previous day rank for trend calculation.

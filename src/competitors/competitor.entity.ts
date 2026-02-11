@@ -42,6 +42,13 @@ export class Competitor {
   @Column('float', { default: 0 })
   avgRank12: number;
 
+  /**
+   * Lifetime average rank across all races (never resets).
+   * Used as baseline for relative form calculation.
+   */
+  @Column('float', { default: 0 })
+  lifetimeAvgRank: number;
+
   // Last race date (null if none)
   @Column({ type: 'timestamptz', nullable: true })
   lastRaceDate: Date | null;
@@ -58,15 +65,6 @@ export class Competitor {
    */
   @Column('simple-array', { nullable: true })
   recentPositions: number[] | null;
-
-  /**
-   * Form factor based on recent performance.
-   * Range: 0.7 (poor form) to 1.3 (excellent form)
-   * Default: 1.0 (neutral)
-   * Calculated automatically after each race.
-   */
-  @Column('float', { default: 1.0 })
-  formFactor: number;
 
   // Current month race count (reset monthly)
   @Column({ default: 0 })
@@ -90,6 +88,12 @@ export class Competitor {
    */
   @Column({ type: 'int', nullable: true })
   previousDayRank: number | null;
+
+  @Column({ type: 'int', default: 0 })
+  playStreak: number;
+
+  @Column({ type: 'int', default: 0 })
+  bestPlayStreak: number;
 
   @OneToOne(() => CharacterVariant, (variant) => variant.competitor, {
     nullable: true,

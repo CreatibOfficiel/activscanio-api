@@ -65,11 +65,19 @@ export class RacesService {
       // Mark competitors as active this week
       await this.markCompetitorsActive(savedRace.results);
 
-      // Update competitor form (recentPositions + formFactor)
+      // Update competitor recent positions
       try {
-        await this.updateCompetitorsForm(savedRace.results);
+        await this.updateCompetitorsRecentPositions(savedRace.results);
       } catch (error) {
-        this.logger.error('Error updating competitor form:', error.stack);
+        this.logger.error('Error updating recent positions:', error.stack);
+        // Non-critical, don't fail the race creation
+      }
+
+      // Update play streaks
+      try {
+        await this.updateCompetitorsPlayStreak(savedRace.results, raceDate);
+      } catch (error) {
+        this.logger.error('Error updating play streaks:', error.stack);
         // Non-critical, don't fail the race creation
       }
 
@@ -176,20 +184,39 @@ export class RacesService {
   }
 
   /**
-   * Update competitor form after a race
-   * This updates recentPositions and recalculates formFactor
+   * Update play streak for each competitor in the race
    */
-  private async updateCompetitorsForm(
+  private async updateCompetitorsPlayStreak(
+    raceResults: RaceResult[],
+    raceDate: Date,
+  ): Promise<void> {
+    const competitorIds = [
+      ...new Set(raceResults.map((r) => r.competitorId)),
+    ];
+
+    for (const competitorId of competitorIds) {
+      await this.competitorsService.updatePlayStreak(competitorId, raceDate);
+    }
+
+    this.logger.log(
+      `Updated play streaks for ${competitorIds.length} competitors`,
+    );
+  }
+
+  /**
+   * Update competitor recent positions after a race
+   */
+  private async updateCompetitorsRecentPositions(
     raceResults: RaceResult[],
   ): Promise<void> {
-    const formData = raceResults.map((r) => ({
+    const data = raceResults.map((r) => ({
       competitorId: r.competitorId,
       rank12: r.rank12,
     }));
 
-    await this.competitorsService.updateFormForRaceResults(formData);
+    await this.competitorsService.updateRecentPositions(data);
     this.logger.log(
-      `Updated form for ${formData.length} competitors after race`,
+      `Updated recent positions for ${data.length} competitors after race`,
     );
   }
 }
