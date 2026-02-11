@@ -13,10 +13,11 @@ export class AddLifetimeAvgRankAndRelativeForm1771100000000
     `);
 
     // 2. Backfill lifetimeAvgRank from race_results history
+    // Note: competitorId was converted to uuid by migration 1770600000001
     await queryRunner.query(`
       UPDATE "competitors" c
       SET "lifetimeAvgRank" = COALESCE(
-        (SELECT AVG(rr."rank12"::float) FROM "race_results" rr WHERE rr."competitorId" = c.id::text),
+        (SELECT AVG(rr."rank12"::float) FROM "race_results" rr WHERE rr."competitorId" = c.id),
         0
       )
     `);
