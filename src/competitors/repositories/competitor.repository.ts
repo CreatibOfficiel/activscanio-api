@@ -222,17 +222,31 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
       }))
       .sort((a, b) => b.conservativeScore - a.conservativeScore);
 
-    // Update previousDayRank for each competitor (1-indexed)
+    const confirmedIds = scoredCompetitors.map((c) => c.id);
+
+    // Update previousDayRank for each confirmed competitor (1-indexed)
+    // and clear previousDayRank for non-confirmed competitors
     await this.repository.manager.transaction(async (em) => {
       for (let i = 0; i < scoredCompetitors.length; i++) {
         await em.update(Competitor, scoredCompetitors[i].id, {
           previousDayRank: i + 1,
         });
       }
+
+      // Clear previousDayRank for non-confirmed competitors so they don't
+      // leave stale rank data that skews trend calculations
+      const nonConfirmed = competitors.filter(
+        (c) => !confirmedIds.includes(c.id),
+      );
+      for (const c of nonConfirmed) {
+        if (c.previousDayRank !== null) {
+          await em.update(Competitor, c.id, { previousDayRank: null });
+        }
+      }
     });
 
     this.logger.log(
-      `Snapshotted daily ranks for ${scoredCompetitors.length} competitors`,
+      `Snapshotted daily ranks for ${scoredCompetitors.length} competitors (cleared ${competitors.length - confirmedIds.length} non-confirmed)`,
     );
   }
 
