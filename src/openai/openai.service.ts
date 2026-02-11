@@ -99,6 +99,7 @@ function buildPrompt(whitelist: string[]) {
   • "Mario de métal" → "Metal Mario"
   • "Skelerex" → "Dry Bones"
   • "Villageoise" → "Villager (Female)"
+  • "Maskass" → "Shy Guy" (+ couleur si précisée, ex. "Maskass rouge" → "Red Shy Guy")
   Fais toujours correspondre le nom français affiché au libellé anglais de la whitelist.
 
   👥 JOUEURS HUMAINS
