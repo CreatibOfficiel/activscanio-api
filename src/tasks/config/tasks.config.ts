@@ -20,16 +20,16 @@
  */
 export const BETTING_CRON_SCHEDULES = {
   /**
-   * Create new betting week
-   * Every Monday at 00:00 UTC
+   * Reset weekly activity flags
+   * Every Monday at 00:00 UTC (BEFORE week creation so odds use fresh flags)
    */
-  CREATE_WEEK: '0 0 0 * * 1',
+  RESET_WEEKLY_ACTIVITY: '0 0 0 * * 1',
 
   /**
-   * Reset weekly activity flags
-   * Every Monday at 00:05 UTC (after week creation)
+   * Create new betting week
+   * Every Monday at 00:05 UTC (after reset so initial odds use current week flags)
    */
-  RESET_WEEKLY_ACTIVITY: '0 5 0 * * 1',
+  CREATE_WEEK: '0 5 0 * * 1',
 
   /**
    * Close current betting week
@@ -138,8 +138,8 @@ export const TASK_EXECUTION_CONFIG = {
  * Task descriptions for logging
  */
 export const TASK_DESCRIPTIONS = {
-  createWeek: 'Create new betting week (Monday 00:00)',
-  resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:05)',
+  resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:00)',
+  createWeek: 'Create new betting week (Monday 00:05)',
   closeWeek: 'Close betting week (Thursday 23:59)',
   finalizeWeek: 'Finalize betting week and calculate points (Sunday 20:00)',
   recalculateRankings: 'Recalculate monthly rankings (Sunday 20:03)',

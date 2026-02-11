@@ -220,7 +220,15 @@ export class BettingService {
       placedAt: new Date(),
     });
 
-    await this.betRepository.save(bet);
+    try {
+      await this.betRepository.save(bet);
+    } catch (error: any) {
+      // Handle unique constraint violation (concurrent duplicate bet)
+      if (error.code === '23505') {
+        throw new ConflictException('You already placed a bet for this week');
+      }
+      throw error;
+    }
 
     // Create bet picks
     const positions: BetPosition[] = [
@@ -256,12 +264,29 @@ export class BettingService {
 
     await this.betPickRepository.save(picks);
 
-    // Update boost usage if boost was applied
+    // Atomically consume the boost to prevent race conditions (M2)
     if (boostCount === 1) {
-      await this.userRepository.update(userId, {
-        lastBoostUsedMonth: new Date().getMonth() + 1,
-        lastBoostUsedYear: new Date().getFullYear(),
-      });
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+      const result = await this.userRepository
+        .createQueryBuilder()
+        .update()
+        .set({
+          lastBoostUsedMonth: currentMonth,
+          lastBoostUsedYear: currentYear,
+        })
+        .where('id = :userId', { userId })
+        .andWhere(
+          '("lastBoostUsedMonth" IS NULL OR "lastBoostUsedMonth" != :month OR "lastBoostUsedYear" != :year)',
+          { month: currentMonth, year: currentYear },
+        )
+        .execute();
+
+      if (result.affected === 0) {
+        throw new BadRequestException(
+          'You have already used your monthly boost. Boost resets at the start of each month.',
+        );
+      }
     }
 
     // Reload bet with picks

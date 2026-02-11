@@ -288,12 +288,9 @@ export class OddsCalculatorService {
   ): OddsCalculationStep[] {
     const steps: OddsCalculationStep[] = [];
 
-    // Step 1: Calculate conservative scores and total
-    let totalConservativeScore = 0;
-
+    // Step 1: Calculate conservative scores
     for (const { competitor, recentRaces } of competitorsWithStats) {
       const conservativeScore = competitor.rating - 2 * competitor.rd;
-      totalConservativeScore += conservativeScore;
 
       steps.push({
         competitorId: competitor.id,
@@ -318,6 +315,17 @@ export class OddsCalculatorService {
       });
     }
 
+    // Shift scores to guarantee all positive values before probability calculation.
+    // If any conservativeScore is negative, shift all scores up so the minimum becomes 1.
+    const minScore = Math.min(...steps.map((s) => s.conservativeScore));
+    const shift = minScore < 0 ? Math.abs(minScore) + 1 : 0;
+    let totalConservativeScore = steps.reduce(
+      (sum, s) => sum + (s.conservativeScore + shift),
+      0,
+    );
+    // Guard against totalConservativeScore = 0 (all scores identical after shift)
+    if (totalConservativeScore === 0) totalConservativeScore = 1;
+
     // Step 2: Calculate form factors and raw probabilities
     for (const step of steps) {
       const { competitor, recentRaces } = competitorsWithStats.find(
@@ -335,7 +343,10 @@ export class OddsCalculatorService {
       // This ensures consistency and uses the weighted calculation
       // Falls back to calculated value if not set
       step.formFactor =
-        competitor.formFactor !== undefined && competitor.formFactor !== null
+        competitor.formFactor !== undefined &&
+        competitor.formFactor !== null &&
+        competitor.formFactor >= DEFAULT_ODDS_PARAMS.formFactorMin &&
+        competitor.formFactor <= DEFAULT_ODDS_PARAMS.formFactorMax
           ? competitor.formFactor
           : this.calculateFormFactor(
               step.avgRecentRank,
@@ -343,8 +354,9 @@ export class OddsCalculatorService {
               step.recentRaceCount,
             );
 
-      // Calculate raw probability (before form adjustment)
-      step.rawProbability = step.conservativeScore / totalConservativeScore;
+      // Calculate raw probability using shifted scores
+      step.rawProbability =
+        (step.conservativeScore + shift) / totalConservativeScore;
     }
 
     // Step 3: Adjust probabilities with form factors

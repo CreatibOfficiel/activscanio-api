@@ -5,7 +5,8 @@
  * Orchestrates all scheduled tasks for the betting system.
  *
  * Weekly Tasks:
- * - Monday 00:00: Create new betting week + reset weekly flags
+ * - Monday 00:00: Reset weekly activity flags
+ * - Monday 00:05: Create new betting week
  * - Thursday 23:59: Close current week
  * - Sunday 20:00: Determine podium + finalize week + calculate points
  * - Sunday 20:03: Recalculate monthly rankings
@@ -28,14 +29,17 @@ import { Repository } from 'typeorm';
 import { WeekManagerService } from '../betting/services/week-manager.service';
 import { BettingFinalizerService } from '../betting/services/betting-finalizer.service';
 import { RankingsService } from '../betting/services/rankings.service';
+import { OddsCalculatorService } from '../betting/services/odds-calculator.service';
 import { CompetitorsService } from '../competitors/competitors.service';
 import { CompetitorRepository } from '../competitors/repositories/competitor.repository';
 import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
+import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { SeasonsService } from '../seasons/seasons.service';
 import { StreakTrackerService } from '../achievements/services/streak-tracker.service';
+import { ELIGIBILITY_RULES } from '../betting/config/odds-calculator.config';
 import {
   BETTING_CRON_SCHEDULES,
   TASK_EXECUTION_CONFIG,
@@ -68,6 +72,7 @@ export class TasksService {
     private readonly weekManagerService: WeekManagerService,
     private readonly bettingFinalizerService: BettingFinalizerService,
     private readonly rankingsService: RankingsService,
+    private readonly oddsCalculatorService: OddsCalculatorService,
     private readonly competitorsService: CompetitorsService,
     private readonly competitorRepo: CompetitorRepository,
     private readonly seasonsService: SeasonsService,
@@ -76,6 +81,8 @@ export class TasksService {
     private readonly competitorRepository: Repository<Competitor>,
     @InjectRepository(CompetitorMonthlyStats)
     private readonly competitorMonthlyStatsRepository: Repository<CompetitorMonthlyStats>,
+    @InjectRepository(RaceResult)
+    private readonly raceResultRepository: Repository<RaceResult>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
@@ -204,7 +211,18 @@ export class TasksService {
         return;
       }
 
-      // 1. Determine podium
+      // 1. Recalculate odds with up-to-date data before finalization (M3)
+      try {
+        await this.oddsCalculatorService.calculateOddsForWeek(currentWeek.id);
+        this.logger.log('Odds recalculated before finalization');
+      } catch (error) {
+        this.logger.error(
+          `Failed to recalculate odds before finalization: ${error.message}`,
+          error.stack,
+        );
+      }
+
+      // 2. Determine podium
       const podium = await this.determinePodium(currentWeek);
 
       if (!podium) {
@@ -220,14 +238,14 @@ export class TasksService {
         `Podium determined: [${podium[0].firstName} ${podium[0].lastName}, ${podium[1].firstName} ${podium[1].lastName}, ${podium[2].firstName} ${podium[2].lastName}]`,
       );
 
-      // 2. Finalize week with podium
+      // 3. Finalize week with podium
       await this.weekManagerService.finalizeWeek(currentWeek.id, [
         podium[0].id,
         podium[1].id,
         podium[2].id,
       ]);
 
-      // 3. Calculate points for all bets
+      // 4. Calculate points for all bets
       const result = await this.bettingFinalizerService.finalizeWeek(
         currentWeek.id,
       );
@@ -518,7 +536,7 @@ export class TasksService {
    * Determine the top 3 competitors for a week (podium)
    *
    * Algorithm:
-   * 1. Filter eligible competitors (min 1 race this week)
+   * 1. Filter eligible competitors (same criteria as odds: lifetime races, 14-day activity, weekly activity)
    * 2. Score based on conservative score (rating - 2*rd)
    * 3. Sort by score descending
    * 4. Apply tie-breakers if needed
@@ -530,10 +548,60 @@ export class TasksService {
     // Fetch all competitors
     const allCompetitors = await this.competitorRepository.find();
 
-    // Filter eligible competitors
-    const eligibleCompetitors = allCompetitors.filter(
-      (c) => c.isActiveThisWeek,
+    // Apply the same eligibility criteria as odds calculation:
+    // 1. Calibration: totalLifetimeRaces >= MIN_LIFETIME_RACES
+    // 2. Recent activity: >= MIN_RECENT_RACES in last RECENT_WINDOW_DAYS
+    // 3. Weekly activity: >= MIN_RACES_THIS_WEEK in current week
+    const windowStart = new Date();
+    windowStart.setDate(
+      windowStart.getDate() - ELIGIBILITY_RULES.RECENT_WINDOW_DAYS,
     );
+
+    const eligibilityChecks = await Promise.all(
+      allCompetitors.map(async (competitor) => {
+        // Rule 1: Calibration
+        if (
+          competitor.totalLifetimeRaces < ELIGIBILITY_RULES.MIN_LIFETIME_RACES
+        ) {
+          return { competitor, isEligible: false };
+        }
+
+        // Rule 2: Recent activity (rolling 14-day window)
+        const recentRacesCount = await this.raceResultRepository
+          .createQueryBuilder('result')
+          .innerJoin('result.race', 'race')
+          .where('result.competitorId = :competitorId', {
+            competitorId: competitor.id,
+          })
+          .andWhere('race.date >= :windowStart', { windowStart })
+          .getCount();
+
+        if (recentRacesCount < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
+          return { competitor, isEligible: false };
+        }
+
+        // Rule 3: Weekly activity
+        const racesThisWeek = await this.raceResultRepository
+          .createQueryBuilder('result')
+          .innerJoin('result.race', 'race')
+          .where('result.competitorId = :competitorId', {
+            competitorId: competitor.id,
+          })
+          .andWhere('race.date >= :startDate', { startDate: week.startDate })
+          .andWhere('race.date <= :endDate', { endDate: week.endDate })
+          .getCount();
+
+        if (racesThisWeek < ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK) {
+          return { competitor, isEligible: false };
+        }
+
+        return { competitor, isEligible: true };
+      }),
+    );
+
+    const eligibleCompetitors = eligibilityChecks
+      .filter((c) => c.isEligible)
+      .map((c) => c.competitor);
 
     if (eligibleCompetitors.length < 3) {
       this.logger.warn(

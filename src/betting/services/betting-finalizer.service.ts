@@ -633,43 +633,53 @@ export class BettingFinalizerService {
   ): Promise<void> {
     this.logger.log(`Updating bettor rankings for ${month}/${year}...`);
 
-    // Group points by user
-    const userPoints = new Map<string, number>();
-
+    // Update or create ranking records per bet
     for (const calc of calculations) {
-      const currentPoints = userPoints.get(calc.userId) || 0;
-      userPoints.set(calc.userId, currentPoints + calc.finalPoints);
-    }
+      const hasCorrectPick = calc.picks.some((p) => p.isCorrect);
+      const hasBoost = calc.picks.some((p) => p.hasBoost);
 
-    // Update or create ranking records
-    for (const [userId, points] of userPoints.entries()) {
-      await this.upsertBettorRanking(userId, month, year, points);
+      await this.upsertBettorRanking(
+        calc.userId,
+        month,
+        year,
+        calc.finalPoints,
+        hasCorrectPick ? 1 : 0,
+        calc.isPerfectPodium ? 1 : 0,
+        hasBoost ? 1 : 0,
+      );
     }
 
     if (SCORING_LOGGER_CONFIG.logRankingUpdates) {
       this.logger.log(
-        `Updated rankings for ${userPoints.size} users in ${month}/${year}`,
+        `Updated rankings for ${calculations.length} bets in ${month}/${year}`,
       );
     }
   }
 
   /**
    * Create or update bettor ranking using atomic SQL to prevent race conditions.
-   * Uses INSERT ... ON CONFLICT with atomic addition.
+   * Uses INSERT ... ON CONFLICT with atomic addition for all counters.
    */
   private async upsertBettorRanking(
     userId: string,
     month: number,
     year: number,
     pointsToAdd: number,
+    betWon: number,
+    perfectBet: number,
+    boostUsed: number,
   ): Promise<void> {
     await this.bettorRankingRepository.query(
-      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "rank")
-       VALUES ($1, $2, $3, $4, 0)
+      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
+       VALUES ($1, $2, $3, $4, 1, $5, $6, $7, 0)
        ON CONFLICT ("userId", "month", "year")
        DO UPDATE SET "totalPoints" = bettor_rankings."totalPoints" + $4,
+                     "betsPlaced" = bettor_rankings."betsPlaced" + 1,
+                     "betsWon" = bettor_rankings."betsWon" + $5,
+                     "perfectBets" = bettor_rankings."perfectBets" + $6,
+                     "boostsUsed" = bettor_rankings."boostsUsed" + $7,
                      "updatedAt" = NOW()`,
-      [userId, month, year, pointsToAdd],
+      [userId, month, year, pointsToAdd, betWon, perfectBet, boostUsed],
     );
   }
 
