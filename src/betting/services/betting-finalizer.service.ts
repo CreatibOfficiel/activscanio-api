@@ -697,7 +697,7 @@ export class BettingFinalizerService {
       `UPDATE bettor_rankings br
        SET rank = sub.new_rank
        FROM (
-         SELECT id, ROW_NUMBER() OVER (ORDER BY "totalPoints" DESC) AS new_rank
+         SELECT id, RANK() OVER (ORDER BY "totalPoints" DESC) AS new_rank
          FROM bettor_rankings
          WHERE month = $1 AND year = $2
        ) sub

@@ -225,12 +225,20 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
 
     const confirmedIds = scoredCompetitors.map((c) => c.id);
 
-    // Update previousDayRank for each confirmed competitor (1-indexed)
+    // Update previousDayRank for each confirmed competitor (with ties)
     // and clear previousDayRank for non-confirmed competitors
     await this.repository.manager.transaction(async (em) => {
+      let currentRank = 1;
       for (let i = 0; i < scoredCompetitors.length; i++) {
+        if (
+          i > 0 &&
+          scoredCompetitors[i].conservativeScore <
+            scoredCompetitors[i - 1].conservativeScore
+        ) {
+          currentRank = i + 1;
+        }
         await em.update(Competitor, scoredCompetitors[i].id, {
-          previousDayRank: i + 1,
+          previousDayRank: currentRank,
         });
       }
 

@@ -134,6 +134,16 @@ export class SeasonsService {
       .filter((c) => c.provisional)
       .sort((a, b) => b.score - a.score);
 
+    // Pre-calculate ranks with ties on the full confirmed list
+    const confirmedRanks: number[] = [];
+    let currentRank = 1;
+    for (let i = 0; i < confirmed.length; i++) {
+      if (i > 0 && confirmed[i].score < confirmed[i - 1].score) {
+        currentRank = i + 1;
+      }
+      confirmedRanks.push(currentRank);
+    }
+
     // Archive confirmed competitors with official ranks
     const BATCH_SIZE = 100;
     for (let i = 0; i < confirmed.length; i += BATCH_SIZE) {
@@ -141,7 +151,7 @@ export class SeasonsService {
 
       const rankings = batch.map((item, batchIndex) => {
         const { competitor } = item;
-        const rank = i + batchIndex + 1;
+        const rank = confirmedRanks[i + batchIndex];
 
         return queryRunner.manager.create(ArchivedCompetitorRanking, {
           seasonArchiveId: archive.id,

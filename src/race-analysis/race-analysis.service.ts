@@ -37,7 +37,7 @@ export class RaceAnalysisService {
     const labelForVariant = (v: any) =>
       v.baseCharacter.variants.length <= 1 || v.label === 'Default'
         ? v.baseCharacter.name
-        : `${v.label} ${v.baseCharacter.name}`.trim();
+        : `${v.baseCharacter.name} ${v.label.toLowerCase()}`.trim();
 
     const nameToVariant = new Map(variants.map((v) => [labelForVariant(v), v]));
 

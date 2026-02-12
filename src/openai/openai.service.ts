@@ -92,16 +92,6 @@ function buildPrompt(whitelist: string[]) {
   • CPU (ordinateur) → fond de ligne GRIS / SOMBRE
   Ne retourne QUE les joueurs dont la ligne a un fond coloré (pas gris).
 
-  ⚠️ LANGUE DE L'ÉCRAN
-  Les noms affichés sont en FRANÇAIS. Exemples de correspondance :
-  • "Yoshi rouge" à l'écran → "Red Yoshi" dans la whitelist
-  • "Yoshi noir" → "Black Yoshi"
-  • "Mario de métal" → "Metal Mario"
-  • "Skelerex" → "Dry Bones"
-  • "Villageoise" → "Villager (Female)"
-  • "Maskass" → "Shy Guy" (+ couleur si précisée, ex. "Maskass rouge" → "Red Shy Guy")
-  Fais toujours correspondre le nom français affiché au libellé anglais de la whitelist.
-
   👥 JOUEURS HUMAINS
   Seuls les personnages ci-dessous sont contrôlés par des humains.
   **Recopie-les à l’identique** (même orthographe / casse) dans ta réponse :
@@ -110,22 +100,22 @@ function buildPrompt(whitelist: string[]) {
   
   (Les autres lignes sont des CPU → ignore-les.)
   
-  🎨 COULEURS & VARIANTES  
-  Si le nom affiché à l’écran n’indique pas explicitement la couleur, déduis-la d’après l’icône, puis utilise le libellé exact du tableau ci-dessous :
-  
+  🎨 COULEURS & VARIANTES
+  Si le nom affiché à l'écran n'indique pas explicitement la couleur, déduis-la d'après l'icône, puis utilise le libellé exact du tableau ci-dessous :
+
   | Couleur dominante | Libellé attendu                     |
   |-------------------|-------------------------------------|
-  | Vert              | Green <NomPerso>                   |
-  | Rouge             | Red <NomPerso>                     |
-  | Bleu clair        | Light-Blue <NomPerso>              |
-  | Bleu foncé        | Dark-Blue <NomPerso>               |
-  | Jaune             | Yellow <NomPerso>                  |
-  | Rose              | Pink <NomPerso>                    |
-  | Noir              | Black <NomPerso>                   |
-  | Blanc             | White <NomPerso>                   |
-  
-  Ex. « Yoshi bleu clair » → **Light-Blue Yoshi**.  
-  _Ne crée jamais un libellé absent de la whitelist_ (si la couleur n’est pas dans la table, omets ce joueur).
+  | Vert              | <NomPerso> vert                    |
+  | Rouge             | <NomPerso> rouge                   |
+  | Bleu clair        | <NomPerso> bleu clair              |
+  | Bleu foncé        | <NomPerso> bleu foncé              |
+  | Jaune             | <NomPerso> jaune                   |
+  | Rose              | <NomPerso> rose                    |
+  | Noir              | <NomPerso> noir                    |
+  | Blanc             | <NomPerso> blanc                   |
+
+  Ex. « Yoshi bleu clair » → **Yoshi bleu clair**.
+  _Ne crée jamais un libellé absent de la whitelist_ (si la couleur n'est pas dans la table, omets ce joueur).
   
   🔢 LECTURE DES SCORES
   Les scores sont affichés à droite de chaque ligne. Ils peuvent être partiellement masqués par la scène 3D à droite.
