@@ -80,7 +80,8 @@ function buildPrompt(whitelist: string[]) {
   return `
   🎮 CONTEXTE
   Tu analyses la capture d'écran d'un tableau de résultats Mario Kart 8 Deluxe.
-  12 lignes, de la première (rang 1) à la dernière (rang 12).
+  Jusqu'à 12 lignes. Chaque ligne a un numéro de placement affiché à gauche (1-12).
+  Attention : deux joueurs avec le même score peuvent avoir le même numéro (ex-aequo).
   Chaque ligne affiche :
   • l'icône du personnage
   • parfois son nom écrit
@@ -121,7 +122,7 @@ function buildPrompt(whitelist: string[]) {
   Les scores sont affichés à droite de chaque ligne. Ils peuvent être partiellement masqués par la scène 3D à droite.
   • Les scores sont des entiers entre 0 et 60.
   • Regarde attentivement chaque chiffre, même s'il est partiellement couvert par un élément 3D.
-  • Un joueur mieux classé a forcément un score ≥ au joueur en-dessous.
+  • Deux joueurs avec le même score ont le même numéro de placement.
 
   📋 FORMAT DE SORTIE — STRICTEMENT
   Rends un objet JSON avec une clé "results" contenant le tableau :
@@ -135,7 +136,7 @@ function buildPrompt(whitelist: string[]) {
 
   Règles :
   • 'character' → l'un des libellés autorisés, après application éventuelle de la couleur.
-  • 'rank12'   → numéro de ligne (1 = ligne 1, 2 = ligne 2, …).
+  • 'rank12'   → le numéro de placement affiché à gauche de la ligne (1–12). Lis-le tel quel. Deux joueurs peuvent avoir le même rank12 en cas d'ex-aequo (ex : 1, 1, 3).
   • 'score'     → valeur entière affichée (0 – 60).
   • Conserve l'ordre naturel (rang 1 en premier, etc.).
   • Si un joueur humain est absent du tableau, ne l'inclus pas.
