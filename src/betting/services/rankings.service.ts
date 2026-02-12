@@ -41,6 +41,7 @@ export class RankingsService {
       boostsUsed: number;
       winRate: number;
       currentMonthlyStreak: number;
+      previousWeekRank: number | null;
     }>;
   }> {
     // Build query
@@ -81,6 +82,7 @@ export class RankingsService {
       boostsUsed: r.boostsUsed,
       winRate: r.betsPlaced > 0 ? (r.betsWon / r.betsPlaced) * 100 : 0,
       currentMonthlyStreak: (r as any).streak_currentMonthlyStreak || 0,
+      previousWeekRank: r.previousWeekRank ?? null,
     }));
 
     this.logger.log(
@@ -115,6 +117,7 @@ export class RankingsService {
       boostsUsed: number;
       winRate: number;
       currentMonthlyStreak: number;
+      previousWeekRank: number | null;
     }>;
   }> {
     const now = new Date();
