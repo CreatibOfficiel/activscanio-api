@@ -3,9 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
 export interface ImageAnalysisRow {
-  character: string; // doit correspondre EXACTEMENT à la whitelist
+  character: string; // must match the whitelist EXACTLY
   rank12: number; // 1-12
   score: number; // 0-60
+  confidence: number; // 0.0 - 1.0
 }
 
 const SYSTEM_MESSAGE = `You are a data-extraction assistant for a private, recreational Mario Kart 8 Deluxe tournament tracking application.
@@ -31,7 +32,7 @@ export class OpenAIService {
 
   async analyzeRaceImage(
     base64: string,
-    whitelist: string[], // noms autorisés, ortho exacte
+    whitelist: string[], // allowed names, exact spelling
   ): Promise<ImageAnalysisRow[]> {
     const prompt = buildPrompt(whitelist);
 
@@ -65,12 +66,12 @@ export class OpenAIService {
     this.logger.log('OpenAI response:', txt);
 
     if (!txt || txt.includes("can't assist") || txt.includes('cannot assist')) {
-      throw new Error(`OpenAI a refusé l'analyse de l'image`);
+      throw new Error(`OpenAI refused to analyze the image`);
     }
 
     const parsed = JSON.parse(txt) as { results: ImageAnalysisRow[] };
     if (!parsed.results?.length) {
-      throw new Error('JSON invalide : clé "results" absente ou vide');
+      throw new Error('Invalid JSON: "results" key missing or empty');
     }
     return parsed.results;
   }
@@ -91,6 +92,13 @@ function buildPrompt(whitelist: string[]) {
   Sur l'écran de résultats, les joueurs humains se distinguent visuellement :
   • Joueur humain → fond de ligne en COULEUR VIVE (rouge, vert, bleu, jaune, rose, etc.)
   • CPU (ordinateur) → fond de ligne GRIS / SOMBRE
+
+  RÈGLES STRICTES :
+  • SEULS les joueurs avec un fond de couleur VIVE (rouge, vert, bleu, jaune, rose, orange, violet, etc.) sont des humains.
+  • Les fonds gris, gris foncé, gris-bleu, noirs ou tout fond NON-COLORÉ = CPU. En cas de doute, c'est un CPU.
+  • Il y a au MAXIMUM 4 joueurs humains dans une course. Ne retourne JAMAIS plus de 4 résultats.
+  • Si tu hésites sur un joueur, retourne uniquement ceux dont tu es le plus certain.
+
   Ne retourne QUE les joueurs dont la ligne a un fond coloré (pas gris).
 
   👥 JOUEURS HUMAINS
@@ -129,17 +137,19 @@ function buildPrompt(whitelist: string[]) {
 
   {
     "results": [
-      { "character": "<NomExact>", "rank12": 1, "score": 60 },
-      { "character": "<NomExact>", "rank12": 2, "score": 52 }
+      { "character": "<NomExact>", "rank12": 1, "score": 60, "confidence": 0.95 },
+      { "character": "<NomExact>", "rank12": 2, "score": 52, "confidence": 0.90 }
     ]
   }
 
   Règles :
-  • 'character' → l'un des libellés autorisés, après application éventuelle de la couleur.
-  • 'rank12'   → le numéro de placement affiché à gauche de la ligne (1–12). Lis-le tel quel. Deux joueurs peuvent avoir le même rank12 en cas d'ex-aequo (ex : 1, 1, 3).
-  • 'score'     → valeur entière affichée (0 – 60).
+  • 'character'  → l'un des libellés autorisés, après application éventuelle de la couleur.
+  • 'rank12'     → le numéro de placement affiché à gauche de la ligne (1–12). Lis-le tel quel. Deux joueurs peuvent avoir le même rank12 en cas d'ex-aequo (ex : 1, 1, 3).
+  • 'score'      → valeur entière affichée (0 – 60).
+  • 'confidence' → un nombre entre 0.0 et 1.0 indiquant ta certitude que cette ligne a un fond COLORÉ (= joueur humain). 1.0 = absolument certain, 0.5 = douteux.
   • Conserve l'ordre naturel (rang 1 en premier, etc.).
   • Si un joueur humain est absent du tableau, ne l'inclus pas.
   • Le tableau "results" ne contient que les joueurs humains détectés.
+  • Ne retourne JAMAIS plus de 4 résultats. Si tu hésites, retourne uniquement ceux dont tu es le plus certain.
   `;
 }
