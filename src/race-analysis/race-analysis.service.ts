@@ -41,6 +41,24 @@ export class RaceAnalysisService {
 
     const nameToVariant = new Map(variants.map((v) => [labelForVariant(v), v]));
 
+    // Ajouter les noms de base des personnages à variantes (ex: "Maskass" pour "Maskass rouge")
+    // seulement si un seul competitor utilise ce personnage (sinon ambiguïté)
+    const baseNameCount = new Map<string, number>();
+    for (const v of variants) {
+      const name = v.baseCharacter.name;
+      baseNameCount.set(name, (baseNameCount.get(name) ?? 0) + 1);
+    }
+    for (const v of variants) {
+      const baseName = v.baseCharacter.name;
+      if (
+        v.baseCharacter.variants.length > 1 &&
+        !nameToVariant.has(baseName) &&
+        baseNameCount.get(baseName) === 1
+      ) {
+        nameToVariant.set(baseName, v);
+      }
+    }
+
     const whitelist = [...nameToVariant.keys()];
 
     /* 2 – Appeler OpenAI */
@@ -51,7 +69,18 @@ export class RaceAnalysisService {
     const results: RaceCompetitorResult[] = [];
 
     for (const row of aiRows) {
-      const variant = nameToVariant.get(row.character);
+      let variant = nameToVariant.get(row.character);
+
+      // Fallback : si GPT retourne un nom de base sans couleur, matcher avec l'unique variant de ce perso
+      if (!variant) {
+        const candidates = variants.filter(
+          (v) => v.baseCharacter.name === row.character,
+        );
+        if (candidates.length === 1) {
+          variant = candidates[0];
+        }
+      }
+
       if (!variant) continue; // ligne hors whitelist : on ignore
       const competitorId = variant.competitor.id;
       results.push({
