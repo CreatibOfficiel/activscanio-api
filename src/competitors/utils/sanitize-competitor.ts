@@ -20,7 +20,7 @@ export const sanitizeCompetitor = (c: Competitor) => ({
   totalWins: c.totalWins,
   playStreak: c.playStreak,
   bestPlayStreak: c.bestPlayStreak,
-  recentPositions: c.recentPositions,
+  recentPositions: c.recentPositions?.map(Number) ?? null,
   previousDayRank: c.previousDayRank,
   totalLifetimeRaces: c.totalLifetimeRaces,
   currentMonthRaceCount: c.currentMonthRaceCount,
