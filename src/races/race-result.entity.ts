@@ -15,6 +15,9 @@ export class RaceResult {
   @Column()
   score: number;
 
+  @Column('float', { nullable: true })
+  ratingDelta: number | null;
+
   @ManyToOne(() => RaceEvent, (race) => race.results, {
     onDelete: 'CASCADE',
   })

@@ -7,6 +7,7 @@ import { RaceResult } from '../races/race-result.entity';
 import { sanitizeCompetitor } from './utils/sanitize-competitor';
 import { CompetitorRepository } from './repositories/competitor.repository';
 import { CompetitorEloSnapshotRepository } from './repositories/competitor-elo-snapshot.repository';
+import { RaceResultRepository } from '../races/repositories/race-result.repository';
 import { RatingCalculationService } from '../rating/rating-calculation.service';
 import {
   CompetitorNotFoundException,
@@ -26,6 +27,7 @@ export class CompetitorsService {
   constructor(
     private competitorRepository: CompetitorRepository,
     private competitorEloSnapshotRepository: CompetitorEloSnapshotRepository,
+    private raceResultRepository: RaceResultRepository,
     private ratingCalculationService: RatingCalculationService,
   ) {}
 
@@ -109,6 +111,16 @@ export class CompetitorsService {
         competitors,
         raceResults,
       );
+
+    // Compute and persist rating deltas BEFORE updateManyRatings mutates competitors
+    for (const result of raceResults) {
+      const competitor = competitors.find((c) => c.id === result.competitorId);
+      const newRatings = updatedRatings.get(result.competitorId);
+      if (competitor && newRatings) {
+        result.ratingDelta = newRatings.rating - competitor.rating;
+      }
+    }
+    await this.raceResultRepository.saveMany(raceResults);
 
     // Use repository method to update all ratings in a transaction
     await this.competitorRepository.updateManyRatings(
