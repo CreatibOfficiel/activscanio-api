@@ -410,8 +410,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   // ==================== RANKING (🏅) - Competitive ====================
   {
     key: 'top_ten',
-    name: 'Top 10',
-    description: 'Terminer dans le top 10 mensuel',
+    name: 'Top 5',
+    description: 'Terminer dans le top 5 mensuel',
     category: AchievementCategory.RANKING,
     rarity: AchievementRarity.RARE,
     icon: '🏅',
@@ -421,7 +421,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       type: AchievementConditionType.RANKING,
       metric: 'rank',
       operator: AchievementConditionOperator.LTE,
-      value: 10,
+      value: 5,
       scope: AchievementScope.MONTHLY,
     },
   },
