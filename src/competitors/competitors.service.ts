@@ -6,7 +6,7 @@ import { CharacterVariant } from 'src/character-variants/character-variant.entit
 import { RaceResult } from '../races/race-result.entity';
 import { sanitizeCompetitor } from './utils/sanitize-competitor';
 import { CompetitorRepository } from './repositories/competitor.repository';
-import { CompetitorMonthlyStatsRepository } from '../betting/repositories/competitor-monthly-stats.repository';
+import { CompetitorEloSnapshotRepository } from './repositories/competitor-elo-snapshot.repository';
 import { RatingCalculationService } from '../rating/rating-calculation.service';
 import {
   CompetitorNotFoundException,
@@ -25,7 +25,7 @@ export interface EloHistoryPoint {
 export class CompetitorsService {
   constructor(
     private competitorRepository: CompetitorRepository,
-    private competitorMonthlyStatsRepository: CompetitorMonthlyStatsRepository,
+    private competitorEloSnapshotRepository: CompetitorEloSnapshotRepository,
     private ratingCalculationService: RatingCalculationService,
   ) {}
 
@@ -167,6 +167,16 @@ export class CompetitorsService {
   }
 
   /**
+   * Update win streak for a competitor after a race
+   */
+  async updateWinStreak(
+    competitorId: string,
+    rank12: number,
+  ): Promise<void> {
+    await this.competitorRepository.updateWinStreak(competitorId, rank12);
+  }
+
+  /**
    * Update recent positions for all competitors in a race
    * Called after each race creation
    *
@@ -179,8 +189,8 @@ export class CompetitorsService {
   }
 
   /**
-   * Get ELO history for a competitor from monthly snapshots
-   * Includes current rating as the latest point
+   * Get ELO history for a competitor from daily snapshots.
+   * Always appends a live point for today if not already the last snapshot.
    */
   async getEloHistory(
     competitorId: string,
@@ -191,41 +201,35 @@ export class CompetitorsService {
       throw new CompetitorNotFoundException(competitorId);
     }
 
-    // Get all monthly snapshots, ordered ASC
-    const monthlyStats =
-      await this.competitorMonthlyStatsRepository.findByCompetitor(
+    const sinceDate = days
+      ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      : undefined;
+
+    const snapshots =
+      await this.competitorEloSnapshotRepository.findByCompetitor(
         competitorId,
+        sinceDate,
       );
 
-    // findByCompetitor returns DESC order, reverse to get ASC
-    monthlyStats.reverse();
-
-    // Filter by period if `days` is provided
-    let filtered = monthlyStats;
-    if (days) {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      filtered = monthlyStats.filter((s) => {
-        const snapshotDate = new Date(s.year, s.month - 1, 1);
-        return snapshotDate >= cutoff;
-      });
-    }
-
-    // Map to EloHistoryPoint
-    const history: EloHistoryPoint[] = filtered.map((s) => ({
-      date: new Date(s.year, s.month - 1, 1).toISOString(),
-      rating: s.finalRating,
-      rd: s.finalRd,
+    const history: EloHistoryPoint[] = snapshots.map((s) => ({
+      date: new Date(s.date).toISOString(),
+      rating: s.rating,
+      rd: s.rd,
       raceCount: s.raceCount,
     }));
 
-    // Add current point (today)
-    history.push({
-      date: new Date().toISOString(),
-      rating: competitor.rating,
-      rd: competitor.rd,
-      raceCount: competitor.raceCount,
-    });
+    // Append live point for today if not already present as last snapshot
+    const today = new Date().toISOString().split('T')[0];
+    const lastDate =
+      snapshots.length > 0 ? String(snapshots[snapshots.length - 1].date) : '';
+    if (lastDate !== today) {
+      history.push({
+        date: new Date().toISOString(),
+        rating: competitor.rating,
+        rd: competitor.rd,
+        raceCount: competitor.raceCount,
+      });
+    }
 
     return history;
   }

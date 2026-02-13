@@ -85,6 +85,10 @@ export class UserStatsResponseDto {
   longestLifetimeStreak: number;
   currentLifetimeStreak: number;
 
+  // Win streaks
+  currentWinStreak: number;
+  bestWinStreak: number;
+
   // Monthly stats
   monthlyBetsPlaced: number;
   monthlyBetsWon: number;

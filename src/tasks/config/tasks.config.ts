@@ -112,6 +112,13 @@ export const BETTING_CRON_SCHEDULES = {
    * Every weekday (Mon-Fri) at 09:00 UTC
    */
   PLAY_STREAK_WARNING: '0 0 9 * * 1-5',
+
+  /**
+   * Snapshot competitor ELO (daily)
+   * Every day at 00:01 UTC
+   * Saves current rating/rd/vol for ELO history chart
+   */
+  SNAPSHOT_COMPETITOR_ELO: '0 1 0 * * *',
 };
 
 /**
@@ -138,6 +145,7 @@ export const TASK_EXECUTION_CONFIG = {
     bettingStreakWarningEarly: true,
     bettingStreakWarningUrgent: true,
     playStreakWarning: true,
+    snapshotCompetitorElo: true,
   },
 
   /**
@@ -174,6 +182,7 @@ export const TASK_DESCRIPTIONS = {
   bettingStreakWarningEarly: 'Betting streak warning early (Wednesday 10:00)',
   bettingStreakWarningUrgent: 'Betting streak warning urgent (Thursday 10:00)',
   playStreakWarning: 'Play streak warning (Mon-Fri 09:00)',
+  snapshotCompetitorElo: 'Snapshot competitor ELO for history chart (Daily 00:01)',
 };
 
 /**

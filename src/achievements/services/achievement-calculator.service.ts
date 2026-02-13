@@ -269,6 +269,8 @@ export class AchievementCalculatorService {
         return userStats.currentMonthlyStreak;
       case 'lifetimeStreak':
         return userStats.longestLifetimeStreak;
+      case 'consecutiveWins':
+        return userStats.currentWinStreak;
 
       // Ranking
       case 'rank':
@@ -475,6 +477,8 @@ export class AchievementCalculatorService {
       currentMonthlyStreak: userStreak?.currentMonthlyStreak || 0,
       longestLifetimeStreak: userStreak?.longestLifetimeStreak || 0,
       currentLifetimeStreak: userStreak?.currentLifetimeStreak || 0,
+      currentWinStreak: userStreak?.currentWinStreak || 0,
+      bestWinStreak: userStreak?.bestWinStreak || 0,
       monthlyBetsPlaced,
       monthlyBetsWon,
       monthlyPerfectBets,

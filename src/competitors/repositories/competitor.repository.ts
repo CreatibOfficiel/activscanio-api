@@ -310,4 +310,38 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
     });
   }
 
+  /**
+   * Update win streak for a competitor after a race.
+   *
+   * If rank12 === 1: increment winStreak, update bestWinStreak if new record
+   * Otherwise: reset winStreak to 0
+   *
+   * @param competitorId - Competitor UUID
+   * @param rank12 - Race finishing position
+   */
+  async updateWinStreak(
+    competitorId: string,
+    rank12: number,
+  ): Promise<void> {
+    const competitor = await this.repository.findOne({
+      where: { id: competitorId },
+    });
+
+    if (!competitor) return;
+
+    if (rank12 === 1) {
+      competitor.winStreak += 1;
+      competitor.bestWinStreak = Math.max(
+        competitor.bestWinStreak,
+        competitor.winStreak,
+      );
+    } else {
+      competitor.winStreak = 0;
+    }
+
+    await this.repository.update(competitorId, {
+      winStreak: competitor.winStreak,
+      bestWinStreak: competitor.bestWinStreak,
+    });
+  }
 }

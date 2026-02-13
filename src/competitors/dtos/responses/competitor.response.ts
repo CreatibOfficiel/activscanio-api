@@ -67,6 +67,9 @@ export class CompetitorResponse {
   bestPlayStreak: number;
 
   @Expose()
+  bestWinStreak: number;
+
+  @Expose()
   currentMonthRaceCount: number;
 
   @Expose()

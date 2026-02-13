@@ -32,6 +32,7 @@ import { RankingsService } from '../betting/services/rankings.service';
 import { OddsCalculatorService } from '../betting/services/odds-calculator.service';
 import { CompetitorsService } from '../competitors/competitors.service';
 import { CompetitorRepository } from '../competitors/repositories/competitor.repository';
+import { CompetitorEloSnapshotRepository } from '../competitors/repositories/competitor-elo-snapshot.repository';
 import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
@@ -76,6 +77,7 @@ export class TasksService {
     private readonly oddsCalculatorService: OddsCalculatorService,
     private readonly competitorsService: CompetitorsService,
     private readonly competitorRepo: CompetitorRepository,
+    private readonly competitorEloSnapshotRepo: CompetitorEloSnapshotRepository,
     private readonly seasonsService: SeasonsService,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly streakWarningService: StreakWarningService,
@@ -623,6 +625,60 @@ export class TasksService {
         `❌ Failed play streak warning: ${error.message}`,
         error.stack,
       );
+    }
+  }
+
+  /* ==================== ELO SNAPSHOT TASK ==================== */
+
+  /**
+   * Snapshot competitor ELO (daily)
+   * Runs every day at 00:01 UTC
+   * Saves current rating/rd/vol for each competitor for the ELO history chart
+   */
+  @Cron(BETTING_CRON_SCHEDULES.SNAPSHOT_COMPETITOR_ELO, {
+    name: 'snapshot-competitor-elo',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handleSnapshotCompetitorElo(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.snapshotCompetitorElo) {
+      this.logger.warn('Task "snapshot-competitor-elo" is disabled');
+      return;
+    }
+
+    if (!this.acquireTaskLock('snapshot-competitor-elo')) return;
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.snapshotCompetitorElo}`,
+    );
+
+    try {
+      const competitors = await this.competitorRepository.find();
+      const today = new Date().toISOString().split('T')[0];
+      let count = 0;
+
+      for (const competitor of competitors) {
+        await this.competitorEloSnapshotRepo.upsertSnapshot({
+          competitorId: competitor.id,
+          date: today,
+          rating: competitor.rating,
+          rd: competitor.rd,
+          vol: competitor.vol,
+          raceCount: competitor.raceCount,
+        });
+        count++;
+      }
+
+      this.logger.log(
+        `✅ ELO snapshots saved for ${count} competitors (date: ${today})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to snapshot competitor ELO: ${error.message}`,
+        error.stack,
+      );
+      await this.retryTask(() => this.handleSnapshotCompetitorElo());
+    } finally {
+      this.releaseTaskLock('snapshot-competitor-elo');
     }
   }
 

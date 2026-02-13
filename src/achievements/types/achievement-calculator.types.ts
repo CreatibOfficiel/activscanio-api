@@ -45,6 +45,10 @@ export interface UserStats {
   longestLifetimeStreak: number;
   currentLifetimeStreak: number;
 
+  // Win streaks
+  currentWinStreak: number;
+  bestWinStreak: number;
+
   // Monthly stats (current month)
   monthlyBetsPlaced: number;
   monthlyBetsWon: number;

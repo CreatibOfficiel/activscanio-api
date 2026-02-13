@@ -311,6 +311,8 @@ export class AchievementsController {
       currentMonthlyStreak: userStats.currentMonthlyStreak,
       longestLifetimeStreak: userStats.longestLifetimeStreak,
       currentLifetimeStreak: userStats.currentLifetimeStreak,
+      currentWinStreak: userStats.currentWinStreak,
+      bestWinStreak: userStats.bestWinStreak,
 
       monthlyBetsPlaced: userStats.monthlyBetsPlaced,
       monthlyBetsWon: userStats.monthlyBetsWon,

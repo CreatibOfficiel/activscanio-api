@@ -50,6 +50,20 @@ export class UserStreak {
   @Column({ type: 'int', nullable: true })
   lastBettingWarningYear: number | null;
 
+  // Win streaks
+  @Column({ type: 'int', default: 0 })
+  currentWinStreak: number;
+
+  @Column({ type: 'int', default: 0 })
+  @Index()
+  bestWinStreak: number;
+
+  @Column({ type: 'int', nullable: true })
+  lastWinWeekNumber: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  lastWinYear: number | null;
+
   // Metadata
   @Column({ type: 'int', default: 0 })
   totalWeeksParticipated: number;

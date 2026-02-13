@@ -311,7 +311,7 @@ export class BettingFinalizerService {
       // Update bet record
       await this.updateBetRecord(bet, calculation);
 
-      // Update streak for this user
+      // Update participation streak for this user
       try {
         await this.streakTrackerService.updateStreak(
           bet.userId,
@@ -322,6 +322,22 @@ export class BettingFinalizerService {
           error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(
           `Failed to update streak for user ${bet.userId}: ${errorMessage}`,
+        );
+      }
+
+      // Update win streak for this user
+      try {
+        const betWonForStreak = calculation.finalPoints > 0;
+        await this.streakTrackerService.updateWinStreak(
+          bet.userId,
+          bet.bettingWeekId,
+          betWonForStreak,
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `Failed to update win streak for user ${bet.userId}: ${errorMessage}`,
         );
       }
 

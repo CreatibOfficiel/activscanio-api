@@ -95,6 +95,9 @@ export class Competitor {
   @Column({ type: 'int', default: 0 })
   bestPlayStreak: number;
 
+  @Column({ type: 'int', default: 0 })
+  bestWinStreak: number;
+
   @Column({ type: 'date', nullable: true })
   lastPlayStreakWarningDate: string | null;
 

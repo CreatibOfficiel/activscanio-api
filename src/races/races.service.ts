@@ -81,6 +81,14 @@ export class RacesService {
         // Non-critical, don't fail the race creation
       }
 
+      // Update win streaks
+      try {
+        await this.updateCompetitorsWinStreak(savedRace.results);
+      } catch (error) {
+        this.logger.error('Error updating win streaks:', error.stack);
+        // Non-critical, don't fail the race creation
+      }
+
       // Emit race.created event for other modules to react
       this.eventEmitter.emit(
         'race.created',
@@ -110,7 +118,7 @@ export class RacesService {
   // GET /races?recent=true
   async findAll(recent?: boolean): Promise<RaceEvent[]> {
     if (recent) {
-      return this.raceEventRepository.findRecent(7, 20);
+      return this.raceEventRepository.findRecent(30, 50);
     }
 
     return this.raceEventRepository.findAllWithResults();
@@ -200,6 +208,24 @@ export class RacesService {
 
     this.logger.log(
       `Updated play streaks for ${competitorIds.length} competitors`,
+    );
+  }
+
+  /**
+   * Update win streak for each competitor in the race
+   */
+  private async updateCompetitorsWinStreak(
+    raceResults: RaceResult[],
+  ): Promise<void> {
+    for (const result of raceResults) {
+      await this.competitorsService.updateWinStreak(
+        result.competitorId,
+        result.rank12,
+      );
+    }
+
+    this.logger.log(
+      `Updated win streaks for ${raceResults.length} competitors`,
     );
   }
 

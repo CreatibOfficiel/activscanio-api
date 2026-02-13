@@ -41,6 +41,7 @@ export class RankingsService {
       boostsUsed: number;
       winRate: number;
       currentMonthlyStreak: number;
+      currentWinStreak: number;
       previousWeekRank: number | null;
     }>;
   }> {
@@ -49,7 +50,7 @@ export class RankingsService {
       .createQueryBuilder('ranking')
       .leftJoinAndSelect('ranking.user', 'user')
       .leftJoin('user_streaks', 'streak', 'streak.userId = ranking.userId')
-      .addSelect(['streak.currentMonthlyStreak']);
+      .addSelect(['streak.currentMonthlyStreak', 'streak.currentWinStreak']);
 
     // Apply filters
     if (month !== undefined) {
@@ -82,6 +83,7 @@ export class RankingsService {
       boostsUsed: r.boostsUsed,
       winRate: r.betsPlaced > 0 ? (r.betsWon / r.betsPlaced) * 100 : 0,
       currentMonthlyStreak: (r as any).streak_currentMonthlyStreak || 0,
+      currentWinStreak: (r as any).streak_currentWinStreak || 0,
       previousWeekRank: r.previousWeekRank ?? null,
     }));
 
@@ -117,6 +119,7 @@ export class RankingsService {
       boostsUsed: number;
       winRate: number;
       currentMonthlyStreak: number;
+      currentWinStreak: number;
       previousWeekRank: number | null;
     }>;
   }> {

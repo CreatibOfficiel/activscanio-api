@@ -181,6 +181,126 @@ export class StreakTrackerService {
   }
 
   /**
+   * Update win streak when a bet is finalized
+   *
+   * @param userId - User ID
+   * @param bettingWeekId - Betting week ID
+   * @param isWin - Whether the user won (finalPoints > 0)
+   */
+  async updateWinStreak(
+    userId: string,
+    bettingWeekId: string,
+    isWin: boolean,
+  ): Promise<void> {
+    let userStreak = await this.userStreakRepository.findOne({
+      where: { userId },
+    });
+
+    if (!userStreak) {
+      userStreak = this.userStreakRepository.create({
+        userId,
+        currentMonthlyStreak: 0,
+        longestLifetimeStreak: 0,
+        currentLifetimeStreak: 0,
+        totalWeeksParticipated: 0,
+        currentWinStreak: 0,
+        bestWinStreak: 0,
+      });
+    }
+
+    // Get betting week to determine the week number
+    const bettingWeek = await this.bettingWeekRepository.findOne({
+      where: { id: bettingWeekId },
+    });
+
+    if (!bettingWeek) {
+      throw new Error(`Betting week ${bettingWeekId} not found`);
+    }
+
+    const weekDate = new Date(bettingWeek.startDate);
+    const currentWeekNumber = getISOWeek(weekDate);
+    const currentYear = getISOWeekYear(weekDate);
+
+    // Dedup: skip if already processed this week
+    if (
+      userStreak.lastWinWeekNumber === currentWeekNumber &&
+      userStreak.lastWinYear === currentYear
+    ) {
+      this.logger.debug(
+        `User ${userId}: Win streak already processed for week ${currentWeekNumber}/${currentYear}`,
+      );
+      return;
+    }
+
+    if (isWin) {
+      const isConsecutive = this.isConsecutiveWeek(
+        userStreak.lastWinWeekNumber,
+        userStreak.lastWinYear,
+        currentWeekNumber,
+        currentYear,
+      );
+
+      if (isConsecutive) {
+        userStreak.currentWinStreak += 1;
+      } else {
+        userStreak.currentWinStreak = 1;
+      }
+
+      userStreak.lastWinWeekNumber = currentWeekNumber;
+      userStreak.lastWinYear = currentYear;
+
+      // Check for new record
+      if (userStreak.currentWinStreak > userStreak.bestWinStreak) {
+        const previousRecord = userStreak.bestWinStreak;
+        userStreak.bestWinStreak = userStreak.currentWinStreak;
+
+        this.logger.log(
+          `User ${userId}: New win streak record! ${previousRecord} → ${userStreak.bestWinStreak}`,
+        );
+
+        this.eventEmitter.emit('winStreak.new_record', {
+          userId,
+          newRecord: userStreak.bestWinStreak,
+          previousRecord,
+        });
+      }
+
+      this.logger.log(
+        `User ${userId}: Win streak updated to ${userStreak.currentWinStreak} (best: ${userStreak.bestWinStreak})`,
+      );
+    } else {
+      // Loss: reset current win streak
+      if (userStreak.currentWinStreak > 0) {
+        this.logger.log(
+          `User ${userId}: Win streak broken (was ${userStreak.currentWinStreak})`,
+        );
+      }
+      userStreak.currentWinStreak = 0;
+      userStreak.lastWinWeekNumber = currentWeekNumber;
+      userStreak.lastWinYear = currentYear;
+    }
+
+    await this.userStreakRepository.save(userStreak);
+
+    this.eventEmitter.emit('winStreak.updated', {
+      userId,
+      currentWinStreak: userStreak.currentWinStreak,
+      bestWinStreak: userStreak.bestWinStreak,
+    });
+  }
+
+  /**
+   * Get top win streaks for leaderboard
+   */
+  async getTopWinStreaks(limit: number = 10): Promise<UserStreak[]> {
+    return await this.userStreakRepository.find({
+      order: { bestWinStreak: 'DESC' },
+      take: limit,
+      relations: ['user'],
+    });
+  }
+
+  /**
    * Reset monthly streaks for all users (called by cron on 1st of month)
    */
   async resetMonthlyStreaks(): Promise<number> {
