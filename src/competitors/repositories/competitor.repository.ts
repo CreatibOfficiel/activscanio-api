@@ -331,6 +331,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
 
     if (rank12 === 1) {
       competitor.winStreak += 1;
+      competitor.totalWins += 1;
       competitor.bestWinStreak = Math.max(
         competitor.bestWinStreak,
         competitor.winStreak,
@@ -342,6 +343,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
     await this.repository.update(competitorId, {
       winStreak: competitor.winStreak,
       bestWinStreak: competitor.bestWinStreak,
+      totalWins: competitor.totalWins,
     });
   }
 }

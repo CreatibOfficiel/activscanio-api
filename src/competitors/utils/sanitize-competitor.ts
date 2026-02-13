@@ -17,6 +17,7 @@ export const sanitizeCompetitor = (c: Competitor) => ({
 
   winStreak: c.winStreak,
   bestWinStreak: c.bestWinStreak,
+  totalWins: c.totalWins,
   playStreak: c.playStreak,
   bestPlayStreak: c.bestPlayStreak,
   recentPositions: c.recentPositions,
