@@ -117,7 +117,9 @@ export class CompetitorsService {
       const competitor = competitors.find((c) => c.id === result.competitorId);
       const newRatings = updatedRatings.get(result.competitorId);
       if (competitor && newRatings) {
-        result.ratingDelta = newRatings.rating - competitor.rating;
+        const oldConservative = competitor.rating - 2 * competitor.rd;
+        const newConservative = newRatings.rating - 2 * newRatings.rd;
+        result.ratingDelta = newConservative - oldConservative;
       }
     }
     await this.raceResultRepository.saveMany(raceResults);
