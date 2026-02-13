@@ -149,6 +149,15 @@ export class RacesService {
     });
   }
 
+  // GET /competitors/:competitorId/best-score
+  async getBestScoreForCompetitor(
+    competitorId: string,
+  ): Promise<{ bestScore: number | null }> {
+    const bestScore =
+      await this.raceEventRepository.findBestScoreForCompetitor(competitorId);
+    return { bestScore };
+  }
+
   // GET /races/:raceId/similar
   async findSimilarRaces(raceId: string): Promise<RaceEvent[]> {
     return this.raceEventRepository.findSimilar(raceId, 3);

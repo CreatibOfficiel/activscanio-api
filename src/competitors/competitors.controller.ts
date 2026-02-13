@@ -39,7 +39,7 @@ export class CompetitorsController {
     }
   }
 
-  /* ───────── LISTE & DÉTAIL ───────── */
+  /* ───────── LIST & DETAIL ───────── */
 
   /* --- GET all --- */
   @Public()
@@ -64,7 +64,7 @@ export class CompetitorsController {
     return sanitizeCompetitor(created);
   }
 
-  /* --- PUT / POST / DELETE qui renvoient un competitor --- */
+  /* --- PUT / POST / DELETE returning a competitor --- */
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -111,7 +111,15 @@ export class CompetitorsController {
     return this.competitorsService.getEloHistory(id, days);
   }
 
-  /* ───────── RÉCENTES COURSES ───────── */
+  /* ───────── BEST SCORE ───────── */
+
+  @Public()
+  @Get(':competitorId/best-score')
+  getBestScore(@Param('competitorId') competitorId: string) {
+    return this.racesService.getBestScoreForCompetitor(competitorId);
+  }
+
+  /* ───────── RECENT RACES ───────── */
 
   @Get(':competitorId/recent-races')
   getRecentRaces(

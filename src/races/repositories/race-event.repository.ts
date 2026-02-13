@@ -88,6 +88,22 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
    * @param raceId - Reference race UUID
    * @param limit - Maximum number of races to return
    */
+  /**
+   * Get the best (highest) score ever achieved by a competitor
+   */
+  async findBestScoreForCompetitor(
+    competitorId: string,
+  ): Promise<number | null> {
+    const result = await this.repository.manager
+      .createQueryBuilder()
+      .select('MAX(rr.score)', 'bestScore')
+      .from('race_results', 'rr')
+      .where('rr."competitorId" = :competitorId', { competitorId })
+      .getRawOne();
+
+    return result?.bestScore ?? null;
+  }
+
   async findSimilar(raceId: string, limit: number = 3): Promise<RaceEvent[]> {
     // Get reference race
     const refRace = await this.repository.findOne({
