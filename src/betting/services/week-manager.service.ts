@@ -141,6 +141,10 @@ export class WeekManagerService {
       ? BettingWeekStatus.CALIBRATION
       : BettingWeekStatus.OPEN;
 
+    // Calculate sequential season week number
+    const previousCount = await this.bettingWeekRepository.count();
+    const seasonWeekNumber = previousCount + 1;
+
     const week = this.bettingWeekRepository.create({
       weekNumber,
       year,
@@ -149,6 +153,7 @@ export class WeekManagerService {
       endDate,
       status,
       isCalibrationWeek,
+      seasonWeekNumber,
     });
 
     const savedWeek = await this.bettingWeekRepository.save(week);
