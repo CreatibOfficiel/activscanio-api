@@ -38,6 +38,7 @@ import { Repository, FindOptionsWhere } from 'typeorm';
 import {
   Achievement,
   AchievementCategory,
+  AchievementDomain,
   AchievementRarity,
 } from './entities/achievement.entity';
 import { UserAchievement } from './entities/user-achievement.entity';
@@ -82,6 +83,7 @@ export class AchievementsController {
   @ApiOperation({ summary: 'Get all achievements with optional filters' })
   @ApiQuery({ name: 'category', required: false, enum: AchievementCategory })
   @ApiQuery({ name: 'rarity', required: false, enum: AchievementRarity })
+  @ApiQuery({ name: 'domain', required: false, enum: AchievementDomain })
   @ApiQuery({ name: 'unlockedOnly', required: false, type: Boolean })
   @ApiQuery({ name: 'lockedOnly', required: false, type: Boolean })
   @ApiResponse({
@@ -100,6 +102,9 @@ export class AchievementsController {
     }
     if (query.rarity) {
       where.rarity = query.rarity;
+    }
+    if (query.domain) {
+      where.domain = query.domain;
     }
 
     const achievements = await this.achievementRepository.find({ where });
@@ -145,6 +150,7 @@ export class AchievementsController {
           icon: achievement.icon,
           xpReward: achievement.xpReward,
           unlocksTitle: achievement.unlocksTitle,
+          domain: achievement.domain,
           prerequisiteAchievementKey: achievement.prerequisiteAchievementKey,
           tierLevel: achievement.tierLevel,
           chainName: achievement.chainName,
@@ -170,6 +176,7 @@ export class AchievementsController {
       icon: achievement.icon,
       xpReward: achievement.xpReward,
       unlocksTitle: achievement.unlocksTitle,
+      domain: achievement.domain,
       prerequisiteAchievementKey: achievement.prerequisiteAchievementKey,
       tierLevel: achievement.tierLevel,
       chainName: achievement.chainName,

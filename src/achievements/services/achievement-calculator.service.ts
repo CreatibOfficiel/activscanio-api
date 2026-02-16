@@ -6,6 +6,7 @@ import {
   Achievement,
   AchievementCondition,
   AchievementConditionOperator,
+  AchievementDomain,
   AchievementScope,
 } from '../entities/achievement.entity';
 import { UserAchievement } from '../entities/user-achievement.entity';
@@ -13,6 +14,8 @@ import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
 import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 import { Bet } from '../../betting/entities/bet.entity';
+import { Competitor } from '../../competitors/competitor.entity';
+import { RaceCreatedEvent } from '../../races/events/race-created.event';
 import { XPLevelService, XPSource } from './xp-level.service';
 import {
   BetFinalizedContext,
@@ -37,6 +40,8 @@ export class AchievementCalculatorService {
     private readonly bettorRankingRepository: Repository<BettorRanking>,
     @InjectRepository(Bet)
     private readonly betRepository: Repository<Bet>,
+    @InjectRepository(Competitor)
+    private readonly competitorRepository: Repository<Competitor>,
     private readonly xpLevelService: XPLevelService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -74,6 +79,46 @@ export class AchievementCalculatorService {
       this.logger.error(
         `Failed to check achievements for user ${context.userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
+    }
+  }
+
+  /**
+   * Listen to race.created events and check racing achievements for competitors
+   */
+  @OnEvent('race.created')
+  async handleRaceCreated(event: RaceCreatedEvent): Promise<void> {
+    const race = event.race;
+    if (!race.results || race.results.length === 0) return;
+
+    const competitorIds = [
+      ...new Set(race.results.map((r) => r.competitorId)),
+    ];
+
+    // Find users linked to these competitors
+    const users = await this.userRepository.find({
+      where: competitorIds.map((cid) => ({ competitorId: cid })),
+    });
+
+    for (const user of users) {
+      try {
+        this.logger.log(
+          `Checking racing achievements for user ${user.id} after race created`,
+        );
+
+        const unlockedAchievements = await this.checkAchievements(user.id);
+
+        for (const achievement of unlockedAchievements) {
+          this.eventEmitter.emit('achievement.unlocked', {
+            userId: user.id,
+            achievement,
+            unlockedAt: achievement.unlockedAt,
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to check racing achievements for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
     }
   }
 
@@ -121,6 +166,14 @@ export class AchievementCalculatorService {
     for (const achievement of allAchievements) {
       // Skip if already unlocked
       if (unlockedSet.has(achievement.id)) {
+        continue;
+      }
+
+      // Skip RACING achievements for non-competitors
+      if (
+        achievement.domain === AchievementDomain.RACING &&
+        !userStats.isCompetitor
+      ) {
         continue;
       }
 
@@ -283,6 +336,24 @@ export class AchievementCalculatorService {
       // Special
       case 'comebackBets':
         return userStats.comebackBets;
+
+      // Competitor (racing) metrics
+      case 'competitorTotalWins':
+        return userStats.competitorTotalWins;
+      case 'competitorRaceCount':
+        return userStats.competitorRaceCount;
+      case 'competitorWinStreak':
+        return userStats.competitorWinStreak;
+      case 'competitorBestWinStreak':
+        return userStats.competitorBestWinStreak;
+      case 'competitorPlayStreak':
+        return userStats.competitorPlayStreak;
+      case 'competitorBestPlayStreak':
+        return userStats.competitorBestPlayStreak;
+      case 'competitorRating':
+        return userStats.competitorRating;
+      case 'competitorAvgRank12':
+        return userStats.competitorAvgRank12;
 
       default:
         this.logger.warn(`Unknown metric: ${metric}`);
@@ -462,6 +533,18 @@ export class AchievementCalculatorService {
       }
     }
 
+    // Load competitor stats if user is a competitor
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    let isCompetitor = false;
+    let competitor: Competitor | null = null;
+
+    if (user?.competitorId) {
+      competitor = await this.competitorRepository.findOne({
+        where: { id: user.competitorId },
+      });
+      isCompetitor = !!competitor;
+    }
+
     return {
       userId,
       totalBetsPlaced,
@@ -487,6 +570,15 @@ export class AchievementCalculatorService {
       bestMonthlyRank,
       consecutiveMonthlyWins,
       comebackBets,
+      isCompetitor,
+      competitorTotalWins: competitor?.totalWins ?? 0,
+      competitorRaceCount: competitor?.raceCount ?? 0,
+      competitorWinStreak: competitor?.winStreak ?? 0,
+      competitorBestWinStreak: competitor?.bestWinStreak ?? 0,
+      competitorPlayStreak: competitor?.playStreak ?? 0,
+      competitorBestPlayStreak: competitor?.bestPlayStreak ?? 0,
+      competitorRating: competitor?.rating ?? 0,
+      competitorAvgRank12: competitor?.avgRank12 ?? 0,
     };
   }
 

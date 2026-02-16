@@ -62,6 +62,17 @@ export interface UserStats {
 
   // Special achievements
   comebackBets: number; // Bets placed after 5+ losing weeks
+
+  // Competitor stats (racing)
+  isCompetitor: boolean;
+  competitorTotalWins: number;
+  competitorRaceCount: number;
+  competitorWinStreak: number;
+  competitorBestWinStreak: number;
+  competitorPlayStreak: number;
+  competitorBestPlayStreak: number;
+  competitorRating: number;
+  competitorAvgRank12: number;
 }
 
 /**

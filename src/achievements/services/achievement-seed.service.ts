@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Achievement } from '../entities/achievement.entity';
+import { Achievement, AchievementDomain } from '../entities/achievement.entity';
 import { ACHIEVEMENT_DEFINITIONS } from '../config/achievement-definitions';
 
 @Injectable()
@@ -49,6 +49,9 @@ export class AchievementSeedService {
               xpReward: definition.xpReward,
               unlocksTitle: definition.unlocksTitle,
               condition: definition.condition,
+              domain:
+                (definition as { domain?: AchievementDomain }).domain ||
+                AchievementDomain.BETTING,
             },
           );
           updatedCount++;

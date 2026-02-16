@@ -1,5 +1,6 @@
 import {
   AchievementCategory,
+  AchievementDomain,
   AchievementRarity,
 } from '../entities/achievement.entity';
 
@@ -16,6 +17,7 @@ export class AchievementResponseDto {
   icon: string;
   xpReward: number;
   unlocksTitle: string | null;
+  domain?: AchievementDomain;
 
   // Progressive chain fields
   prerequisiteAchievementKey?: string | null;

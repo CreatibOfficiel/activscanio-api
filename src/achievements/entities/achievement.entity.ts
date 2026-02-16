@@ -40,6 +40,11 @@ export enum AchievementScope {
   MONTHLY = 'MONTHLY',
 }
 
+export enum AchievementDomain {
+  BETTING = 'BETTING',
+  RACING = 'RACING',
+}
+
 export interface AchievementCondition {
   type: AchievementConditionType;
   metric: string; // e.g., 'betsPlaced', 'perfectBets', 'rank', 'winRate'
@@ -95,6 +100,10 @@ export class Achievement {
 
   @Column({ type: 'boolean', default: false })
   canBeLost: boolean;
+
+  @Column({ type: 'varchar', default: AchievementDomain.BETTING })
+  @Index()
+  domain: AchievementDomain;
 
   @Column({ type: 'int', default: 0 })
   tierLevel: number; // For progressive chains (1, 2, 3, 4)

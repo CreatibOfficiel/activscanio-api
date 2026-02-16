@@ -2,6 +2,7 @@ import { IsEnum, IsOptional, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import {
   AchievementCategory,
+  AchievementDomain,
   AchievementRarity,
 } from '../entities/achievement.entity';
 
@@ -16,6 +17,10 @@ export class AchievementQueryDto {
   @IsOptional()
   @IsEnum(AchievementRarity)
   rarity?: AchievementRarity;
+
+  @IsOptional()
+  @IsEnum(AchievementDomain)
+  domain?: AchievementDomain;
 
   @IsOptional()
   @IsBoolean()
