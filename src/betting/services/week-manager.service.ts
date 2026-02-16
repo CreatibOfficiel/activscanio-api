@@ -119,14 +119,18 @@ export class WeekManagerService {
     // Check if this is the first ISO week of the month (calibration week)
     let isCalibrationWeek = this.isFirstWeekOfMonth(startDate);
 
-    // If no finalized week exists yet, this is the very first season launch → force calibration
+    // If this is the very first week ever created, force calibration
     if (!isCalibrationWeek) {
-      const anyFinalized = await this.bettingWeekRepository.findOne({
-        where: { status: BettingWeekStatus.FINALIZED },
-      });
-      if (!anyFinalized) {
+      const anyPreviousWeek = await this.bettingWeekRepository
+        .createQueryBuilder('week')
+        .where('week.weekNumber != :weekNumber OR week.year != :year', {
+          weekNumber,
+          year,
+        })
+        .getOne();
+      if (!anyPreviousWeek) {
         this.logger.log(
-          'No finalized week found — first ever launch, forcing CALIBRATION',
+          'No previous week found — first ever launch, forcing CALIBRATION',
         );
         isCalibrationWeek = true;
       }

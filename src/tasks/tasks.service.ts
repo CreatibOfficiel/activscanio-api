@@ -35,7 +35,10 @@ import { CompetitorRepository } from '../competitors/repositories/competitor.rep
 import { CompetitorEloSnapshotRepository } from '../competitors/repositories/competitor-elo-snapshot.repository';
 import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
-import { BettingWeek } from '../betting/entities/betting-week.entity';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../betting/entities/betting-week.entity';
 import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { SeasonsService } from '../seasons/seasons.service';
@@ -89,6 +92,8 @@ export class TasksService {
     private readonly raceResultRepository: Repository<RaceResult>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(BettingWeek)
+    private readonly bettingWeekRepository: Repository<BettingWeek>,
   ) {}
 
   /* ==================== WEEKLY TASKS ==================== */
@@ -110,6 +115,25 @@ export class TasksService {
     this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.createWeek}`);
 
     try {
+      // Auto-finalize past calibration weeks before creating the new one
+      const finalized = await this.bettingWeekRepository
+        .createQueryBuilder()
+        .update(BettingWeek)
+        .set({
+          status: BettingWeekStatus.FINALIZED,
+          finalizedAt: new Date(),
+        })
+        .where('status = :status AND "endDate" < NOW()', {
+          status: BettingWeekStatus.CALIBRATION,
+        })
+        .execute();
+
+      if (finalized.affected && finalized.affected > 0) {
+        this.logger.log(
+          `Auto-finalized ${finalized.affected} past calibration week(s)`,
+        );
+      }
+
       const week = await this.weekManagerService.createCurrentWeek();
       this.logger.log(
         `✅ Week created successfully: ${week.year}-W${week.weekNumber}`,
