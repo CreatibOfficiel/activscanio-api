@@ -33,11 +33,11 @@ export const BETTING_CRON_SCHEDULES = {
 
   /**
    * Close current betting week
-   * Every Thursday at 23:59 UTC
-   * This gives 3 days of uncertainty (Friday, Saturday, Sunday)
-   * before the podium is determined on Sunday 23:55
+   * Every Tuesday at 00:00 UTC (= Monday midnight)
+   * This gives 6 days of uncertainty (Tuesday to Sunday)
+   * before the podium is determined on Sunday 20:00
    */
-  CLOSE_WEEK: '0 59 23 * * 4',
+  CLOSE_WEEK: '0 0 0 * * 2',
 
   /**
    * Finalize betting week (determine podium + calculate points)
@@ -96,16 +96,12 @@ export const BETTING_CRON_SCHEDULES = {
   SNAPSHOT_BETTOR_RANKS: '0 5 20 * * 0',
 
   /**
-   * Betting streak warning (early)
-   * Every Wednesday at 10:00 UTC
+   * Betting streak warning
+   * Every Monday at 18:00 UTC (20h Paris)
+   * Since the betting window closes at Tuesday 00:00 UTC,
+   * this is the last chance reminder on the only betting day.
    */
-  BETTING_STREAK_WARNING_EARLY: '0 0 10 * * 3',
-
-  /**
-   * Betting streak warning (urgent)
-   * Every Thursday at 10:00 UTC
-   */
-  BETTING_STREAK_WARNING_URGENT: '0 0 10 * * 4',
+  BETTING_STREAK_WARNING_EARLY: '0 0 18 * * 1',
 
   /**
    * Play streak warning
@@ -143,7 +139,6 @@ export const TASK_EXECUTION_CONFIG = {
     snapshotCompetitorRanks: true,
     snapshotBettorRanks: true,
     bettingStreakWarningEarly: true,
-    bettingStreakWarningUrgent: true,
     playStreakWarning: true,
     snapshotCompetitorElo: true,
   },
@@ -169,7 +164,7 @@ export const TASK_EXECUTION_CONFIG = {
 export const TASK_DESCRIPTIONS = {
   resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:00)',
   createWeek: 'Create new betting week (Monday 00:05)',
-  closeWeek: 'Close betting week (Thursday 23:59)',
+  closeWeek: 'Close betting week (Tuesday 00:00 = Monday midnight)',
   finalizeWeek: 'Finalize betting week and calculate points (Sunday 20:00)',
   recalculateRankings: 'Recalculate monthly rankings (Sunday 20:03)',
   archiveSeason: 'Archive previous season (1st 00:01)',
@@ -179,8 +174,7 @@ export const TASK_DESCRIPTIONS = {
   archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:02)',
   snapshotCompetitorRanks: 'Snapshot competitor ranks for trends (Mon-Fri 00:00)',
   snapshotBettorRanks: 'Snapshot bettor ranks for trends (Sunday 20:05)',
-  bettingStreakWarningEarly: 'Betting streak warning early (Wednesday 10:00)',
-  bettingStreakWarningUrgent: 'Betting streak warning urgent (Thursday 10:00)',
+  bettingStreakWarningEarly: 'Betting streak warning (Monday 18:00)',
   playStreakWarning: 'Play streak warning (Mon-Fri 09:00)',
   snapshotCompetitorElo: 'Snapshot competitor ELO for history chart (Daily 00:01)',
 };

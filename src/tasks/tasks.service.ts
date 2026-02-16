@@ -7,7 +7,7 @@
  * Weekly Tasks:
  * - Monday 00:00: Reset weekly activity flags
  * - Monday 00:05: Create new betting week
- * - Thursday 23:59: Close current week
+ * - Tuesday 00:00 (Monday midnight): Close current week
  * - Sunday 20:00: Determine podium + finalize week + calculate points
  * - Sunday 20:03: Recalculate monthly rankings
  *
@@ -179,7 +179,7 @@ export class TasksService {
 
   /**
    * Close current betting week
-   * Runs every Thursday at 23:59 UTC
+   * Runs every Tuesday at 00:00 UTC (Monday midnight)
    */
   @Cron(BETTING_CRON_SCHEDULES.CLOSE_WEEK, {
     name: 'close-week',
@@ -561,8 +561,9 @@ export class TasksService {
   /* ==================== STREAK WARNING TASKS ==================== */
 
   /**
-   * Betting streak warning (early)
-   * Runs every Wednesday at 10:00 UTC
+   * Betting streak warning
+   * Runs every Monday at 18:00 UTC (20h Paris)
+   * Since Monday is the only betting day, this sends "DERNIER JOUR" (urgent) messages.
    */
   @Cron(BETTING_CRON_SCHEDULES.BETTING_STREAK_WARNING_EARLY, {
     name: 'betting-streak-warning-early',
@@ -580,43 +581,11 @@ export class TasksService {
 
     try {
       const warned =
-        await this.streakWarningService.checkBettingStreakWarnings('early');
-      this.logger.log(`✅ Betting streak warning (early): ${warned} users warned`);
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed betting streak warning (early): ${error.message}`,
-        error.stack,
-      );
-    }
-  }
-
-  /**
-   * Betting streak warning (urgent)
-   * Runs every Thursday at 10:00 UTC
-   */
-  @Cron(BETTING_CRON_SCHEDULES.BETTING_STREAK_WARNING_URGENT, {
-    name: 'betting-streak-warning-urgent',
-    timeZone: TASK_EXECUTION_CONFIG.timezone,
-  })
-  async handleBettingStreakWarningUrgent(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.bettingStreakWarningUrgent) {
-      this.logger.warn('Task "betting-streak-warning-urgent" is disabled');
-      return;
-    }
-
-    this.logger.log(
-      `🚀 Starting task: ${TASK_DESCRIPTIONS.bettingStreakWarningUrgent}`,
-    );
-
-    try {
-      const warned =
         await this.streakWarningService.checkBettingStreakWarnings('urgent');
-      this.logger.log(
-        `✅ Betting streak warning (urgent): ${warned} users warned`,
-      );
+      this.logger.log(`✅ Betting streak warning: ${warned} users warned`);
     } catch (error) {
       this.logger.error(
-        `❌ Failed betting streak warning (urgent): ${error.message}`,
+        `❌ Failed betting streak warning: ${error.message}`,
         error.stack,
       );
     }

@@ -46,7 +46,7 @@ export class StreakWarningService {
 
   /**
    * Check betting streak warnings and send notifications.
-   * @param urgency - 'early' (Wednesday) or 'urgent' (Thursday)
+   * @param urgency - 'early' or 'urgent' (Monday 18:00 UTC)
    * @returns number of users warned
    */
   async checkBettingStreakWarnings(
@@ -272,11 +272,11 @@ export class StreakWarningService {
       };
     }
 
-    // Early (Wednesday)
+    // Early (Monday)
     if (streak === 1) {
       return {
         title: 'Ta serie est en jeu !',
-        body: 'Tu as parie 1 semaine d\'affilee. Place ton prono avant jeudi soir !',
+        body: 'Tu as parie 1 semaine d\'affilee. Place ton prono avant ce soir !',
       };
     }
     if (streak <= 4) {
