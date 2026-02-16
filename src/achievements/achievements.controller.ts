@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Body,
@@ -18,12 +19,15 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AchievementCalculatorService } from './services/achievement-calculator.service';
+import { AchievementSeedService } from './services/achievement-seed.service';
 import { XPLevelService } from './services/xp-level.service';
 import { StreakTrackerService } from './services/streak-tracker.service';
 import { LevelRewardsService } from './services/level-rewards.service';
 import { StreakWarningService, StreakWarningStatus } from './services/streak-warning.service';
 import { AdvancedStatsService } from '../betting/services/advanced-stats.service';
+import { ConfigService } from '@nestjs/config';
 import { ClerkGuard } from '../auth/clerk.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from '../users/users.service';
 import { AchievementQueryDto } from './dto/achievement-query.dto';
@@ -57,7 +61,9 @@ export class AchievementsController {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly achievementCalculatorService: AchievementCalculatorService,
+    private readonly achievementSeedService: AchievementSeedService,
     private readonly xpLevelService: XPLevelService,
+    private readonly configService: ConfigService,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly levelRewardsService: LevelRewardsService,
     private readonly advancedStatsService: AdvancedStatsService,
@@ -588,5 +594,55 @@ export class AchievementsController {
       nextReward,
       activeMultiplier,
     };
+  }
+
+  /**
+   * Admin endpoint: seed achievements + backfill racing achievements for competitors
+   * Protected by ADMIN_SECRET query parameter
+   */
+  @Public()
+  @Post('admin/seed-and-backfill')
+  @ApiOperation({
+    summary: 'Seed achievements and backfill racing achievements for competitors',
+  })
+  @ApiQuery({ name: 'secret', required: true, type: String })
+  @ApiResponse({ status: 200, description: 'Seed and backfill completed' })
+  @ApiResponse({ status: 403, description: 'Invalid admin secret' })
+  async seedAndBackfill(
+    @Query('secret') secret: string,
+  ): Promise<{
+    seeded: number;
+    backfillResults: { userId: string; unlocked: string[] }[];
+  }> {
+    const adminSecret = this.configService.get<string>('ADMIN_SECRET');
+    if (!adminSecret || secret !== adminSecret) {
+      throw new ForbiddenException('Invalid admin secret');
+    }
+
+    // 1. Seed achievements
+    const seeded = await this.achievementSeedService.seedAchievements();
+
+    // 2. Find all users with a competitorId (they are competitors)
+    const competitorUsers = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.competitorId IS NOT NULL')
+      .getMany();
+
+    // 3. Backfill: check achievements for each competitor user
+    const backfillResults: { userId: string; unlocked: string[] }[] = [];
+
+    for (const user of competitorUsers) {
+      const unlocked = await this.achievementCalculatorService.checkAchievements(
+        user.id,
+      );
+      if (unlocked.length > 0) {
+        backfillResults.push({
+          userId: user.id,
+          unlocked: unlocked.map((a) => a.achievementKey),
+        });
+      }
+    }
+
+    return { seeded, backfillResults };
   }
 }
