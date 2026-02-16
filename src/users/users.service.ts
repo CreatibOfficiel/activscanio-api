@@ -130,6 +130,21 @@ export class UsersService {
       this.logger.log(
         `Auto-created user for Clerk ID ${clerkId}: ${user.firstName} ${user.lastName}`,
       );
+    } else if (!user.profilePictureUrl) {
+      try {
+        const clerkUser = await this.clerkClient.users.getUser(clerkId);
+        if (clerkUser.imageUrl) {
+          user.profilePictureUrl = clerkUser.imageUrl;
+          user = await this.userRepository.save(user);
+          this.logger.log(
+            `Synced profilePictureUrl for user ${user.id} (Clerk ID: ${clerkId})`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to sync profilePictureUrl for Clerk ID ${clerkId}: ${error instanceof Error ? error.message : error}`,
+        );
+      }
     }
 
     return user;

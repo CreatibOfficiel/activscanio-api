@@ -60,7 +60,7 @@ export class UsersController {
 
     const { type, data } = evt;
 
-    if (type === 'user.updated') {
+    if (type === 'user.created' || type === 'user.updated') {
       const syncDto: SyncClerkUserDto = {
         clerkId: data.id as string,
         email: (data.email_addresses as any[])?.[0]?.email_address as string,
