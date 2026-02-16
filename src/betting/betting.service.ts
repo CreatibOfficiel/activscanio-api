@@ -6,9 +6,15 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import {
+  Repository,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  FindOptionsWhere,
+} from 'typeorm';
 import { BettingWeek, BettingWeekStatus } from './entities/betting-week.entity';
-import { Bet } from './entities/bet.entity';
+import { Bet, BetStatus } from './entities/bet.entity';
 import { BetPick, BetPosition } from './entities/bet-pick.entity';
 import { CreateBettingWeekDto } from './dto/create-betting-week.dto';
 import { PlaceBetDto } from './dto/place-bet.dto';
@@ -440,5 +446,29 @@ export class BettingService {
       lastUsed,
       resetsOn,
     };
+  }
+
+  /**
+   * Get all community bets with pagination and optional filters
+   */
+  async getCommunityBets(
+    limit = 10,
+    offset = 0,
+    userId?: string,
+    status?: BetStatus,
+  ): Promise<PaginatedResponse<Bet>> {
+    const where: FindOptionsWhere<Bet> = {};
+    if (userId) where.userId = userId;
+    if (status) where.status = status;
+
+    const [bets, total] = await this.betRepository.findAndCount({
+      where,
+      relations: ['user', 'picks', 'picks.competitor', 'bettingWeek'],
+      order: { placedAt: 'DESC' },
+      take: limit,
+      skip: offset,
+    });
+
+    return PaginatedResponse.create(bets, total, limit, offset);
   }
 }

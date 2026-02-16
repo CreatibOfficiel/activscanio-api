@@ -27,6 +27,7 @@ import { UsersService } from '../users/users.service';
 import { OddsCalculatorService } from './services/odds-calculator.service';
 import { RankingsService } from './services/rankings.service';
 import { PaginationQueryDto } from '../common';
+import { QueryCommunityBetsDto } from './dto/query-community-bets.dto';
 
 @ApiTags('betting')
 @ApiBearerAuth()
@@ -174,6 +175,44 @@ export class BettingController {
   ) {
     const userId = await this.getUserIdFromClerkId(clerkId);
     return await this.bettingService.placeBet(userId, placeBetDto);
+  }
+
+  /**
+   * Get community bets (all users, public)
+   */
+  @Public()
+  @Get('bets/community')
+  @ApiOperation({ summary: 'Get all community bets with pagination and filters' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of items (1-50)', example: 10 })
+  @ApiQuery({ name: 'offset', required: false, description: 'Items to skip', example: 0 })
+  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by bet status', enum: ['pending', 'won', 'lost', 'cancelled'] })
+  @ApiResponse({ status: 200, description: 'Paginated community bets' })
+  async getCommunityBets(@Query() query: QueryCommunityBetsDto) {
+    const result = await this.bettingService.getCommunityBets(
+      query.limit ?? 10,
+      query.offset ?? 0,
+      query.userId,
+      query.status,
+    );
+
+    // Whitelist user fields to avoid leaking sensitive data
+    return {
+      ...result,
+      data: result.data.map((bet) => ({
+        ...bet,
+        user: bet.user
+          ? {
+              id: bet.user.id,
+              firstName: bet.user.firstName,
+              lastName: bet.user.lastName,
+              profilePictureUrl: bet.user.profilePictureUrl,
+              level: bet.user.level,
+              currentTitle: bet.user.currentTitle,
+            }
+          : undefined,
+      })),
+    };
   }
 
   /**
