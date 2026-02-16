@@ -98,7 +98,6 @@ export class OddsCalculatorService {
     const odds: CompetitorOdd[] = calculationSteps.map((step) => ({
       competitorId: step.competitorId,
       competitorName: step.competitorName,
-      odd: step.cappedOdd,
       oddFirst: step.oddFirst,
       oddSecond: step.oddSecond,
       oddThird: step.oddThird,
@@ -292,8 +291,6 @@ export class OddsCalculatorService {
         pFirst: 0,
         pSecond: 0,
         pThird: 0,
-        odd: 0,
-        cappedOdd: 0,
         oddFirst: 0,
         oddSecond: 0,
         oddThird: 0,
@@ -337,9 +334,6 @@ export class OddsCalculatorService {
       s.step.oddSecond = clamp(1 / s.step.pSecond);
       s.step.oddThird = clamp(1 / s.step.pThird);
 
-      // Legacy odd field: use oddFirst as the primary odd
-      s.step.odd = s.step.oddFirst;
-      s.step.cappedOdd = s.step.oddFirst;
     }
 
     return strengths.map((s) => s.step);
@@ -417,7 +411,6 @@ export class OddsCalculatorService {
       this.competitorOddsRepository.create({
         competitorId: odd.competitorId,
         bettingWeekId,
-        odd: odd.odd,
         oddFirst: odd.oddFirst,
         oddSecond: odd.oddSecond,
         oddThird: odd.oddThird,
@@ -436,7 +429,7 @@ export class OddsCalculatorService {
    */
   private calculateAverageOdd(odds: CompetitorOdd[]): number {
     if (odds.length === 0) return 0;
-    return odds.reduce((sum, o) => sum + o.odd, 0) / odds.length;
+    return odds.reduce((sum, o) => sum + o.oddFirst, 0) / odds.length;
   }
 
   /**
@@ -455,7 +448,6 @@ export class OddsCalculatorService {
     return oddsEntities.map((entity) => ({
       competitorId: entity.competitorId,
       competitorName: `${entity.competitor.firstName} ${entity.competitor.lastName}`,
-      odd: entity.odd,
       oddFirst: entity.oddFirst,
       oddSecond: entity.oddSecond,
       oddThird: entity.oddThird,

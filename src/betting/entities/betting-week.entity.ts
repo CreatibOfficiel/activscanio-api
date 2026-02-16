@@ -79,7 +79,7 @@ export class BettingWeek {
   @Column({ type: 'timestamptz', nullable: true })
   finalizedAt: Date;
 
-  @Column({ type: 'int', default: 1 })
+  @Column({ type: 'int', default: 0 })
   seasonWeekNumber: number;
 
   @Column({ nullable: true })

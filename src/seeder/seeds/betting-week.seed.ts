@@ -134,7 +134,9 @@ async function seedCompetitorOdds(
       oddsToCreate.push({
         competitorId: competitor.id,
         bettingWeekId: week.id,
-        odd: Math.max(1.1, Math.min(finalOdds, 20)),
+        oddFirst: Math.max(1.1, Math.min(finalOdds, 20)),
+        oddSecond: Math.max(1.1, Math.min(finalOdds * 1.1, 20)),
+        oddThird: Math.max(1.1, Math.min(finalOdds * 1.2, 20)),
         calculatedAt: week.startDate,
         metadata: {
           elo: competitor.rating,

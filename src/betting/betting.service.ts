@@ -241,16 +241,13 @@ export class BettingService {
       const odd = oddsArray[index]!; // Already checked that odd exists above
       const position = positions[index];
 
-      // Use position-specific odds when available, fallback to legacy 'odd' field
       let oddAtBet: number;
-      if (position === BetPosition.FIRST && odd.oddFirst) {
+      if (position === BetPosition.FIRST) {
         oddAtBet = odd.oddFirst;
-      } else if (position === BetPosition.SECOND && odd.oddSecond) {
+      } else if (position === BetPosition.SECOND) {
         oddAtBet = odd.oddSecond;
-      } else if (position === BetPosition.THIRD && odd.oddThird) {
-        oddAtBet = odd.oddThird;
       } else {
-        oddAtBet = odd.odd; // Fallback to legacy field
+        oddAtBet = odd.oddThird;
       }
 
       return this.betPickRepository.create({

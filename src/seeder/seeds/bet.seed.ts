@@ -77,7 +77,7 @@ export async function seedBets(dataSource: DataSource): Promise<Bet[]> {
     if (!oddsByWeek.has(odd.bettingWeekId)) {
       oddsByWeek.set(odd.bettingWeekId, new Map());
     }
-    oddsByWeek.get(odd.bettingWeekId)!.set(odd.competitorId, odd.odd);
+    oddsByWeek.get(odd.bettingWeekId)!.set(odd.competitorId, odd.oddFirst);
   }
 
   // Generate bets for each week

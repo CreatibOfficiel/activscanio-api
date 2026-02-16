@@ -69,10 +69,6 @@ export interface OddsCalculationStep {
   pSecond: number;
   pThird: number;
 
-  // Step 4: Final odd
-  odd: number;
-  cappedOdd: number; // After min/max bounds
-
   // Position-specific odds (from Monte Carlo)
   oddFirst: number;
   oddSecond: number;
@@ -101,8 +97,6 @@ export interface OddsCalculationResult {
 export interface CompetitorOdd {
   competitorId: string;
   competitorName: string;
-  /** @deprecated Use oddFirst, oddSecond, oddThird instead */
-  odd: number;
   oddFirst: number;
   oddSecond: number;
   oddThird: number;
