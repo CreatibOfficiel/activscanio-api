@@ -13,10 +13,10 @@ import { BettingWeek } from './betting-week.entity';
 import { BetPick } from './bet-pick.entity';
 
 export enum BetStatus {
-  PENDING = 'pending', // En attente des résultats
-  WON = 'won', // Gagné (au moins 1 prono correct)
-  LOST = 'lost', // Perdu (aucun prono correct)
-  CANCELLED = 'cancelled', // Annulé
+  PENDING = 'pending', // Waiting for results
+  WON = 'won', // Won (at least 1 correct pick)
+  LOST = 'lost', // Lost (no correct picks)
+  CANCELLED = 'cancelled', // Cancelled
 }
 
 @Entity('bets')
