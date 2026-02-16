@@ -712,7 +712,7 @@ export class TasksService {
    * Determine the top 3 competitors for a week (podium)
    *
    * Algorithm:
-   * 1. Filter eligible competitors (same criteria as odds: lifetime races, 14-day activity, weekly activity)
+   * 1. Filter eligible competitors (same criteria as odds: lifetime races + 30-day activity)
    * 2. Score based on conservative score (rating - 2*rd)
    * 3. Sort by score descending
    * 4. Apply tie-breakers if needed
@@ -726,8 +726,7 @@ export class TasksService {
 
     // Apply the same eligibility criteria as odds calculation:
     // 1. Calibration: totalLifetimeRaces >= MIN_LIFETIME_RACES
-    // 2. Recent activity: >= MIN_RECENT_RACES in last RECENT_WINDOW_DAYS
-    // 3. Weekly activity: >= MIN_RACES_THIS_WEEK in current week
+    // 2. Recent activity: >= MIN_RECENT_RACES in last RECENT_WINDOW_DAYS (30 days)
     const windowStart = new Date();
     windowStart.setDate(
       windowStart.getDate() - ELIGIBILITY_RULES.RECENT_WINDOW_DAYS,
@@ -742,7 +741,7 @@ export class TasksService {
           return { competitor, isEligible: false };
         }
 
-        // Rule 2: Recent activity (rolling 14-day window)
+        // Rule 2: Recent activity (rolling 30-day window)
         const recentRacesCount = await this.raceResultRepository
           .createQueryBuilder('result')
           .innerJoin('result.race', 'race')
@@ -753,21 +752,6 @@ export class TasksService {
           .getCount();
 
         if (recentRacesCount < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
-          return { competitor, isEligible: false };
-        }
-
-        // Rule 3: Weekly activity
-        const racesThisWeek = await this.raceResultRepository
-          .createQueryBuilder('result')
-          .innerJoin('result.race', 'race')
-          .where('result.competitorId = :competitorId', {
-            competitorId: competitor.id,
-          })
-          .andWhere('race.date >= :startDate', { startDate: week.startDate })
-          .andWhere('race.date <= :endDate', { endDate: week.endDate })
-          .getCount();
-
-        if (racesThisWeek < ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK) {
           return { competitor, isEligible: false };
         }
 

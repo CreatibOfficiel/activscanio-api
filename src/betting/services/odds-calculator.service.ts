@@ -4,20 +4,19 @@
  * Responsible for calculating betting odds for competitors in a given week.
  *
  * Architecture:
- * - Pure calculation logic (no side effects)
+ * - Pure calculation logic (no side effects beyond DB save)
  * - Configurable parameters (via config file)
  * - Detailed intermediate steps (for debugging)
  * - Type-safe throughout
  *
  * Calculation Flow:
  * 1. Fetch all competitors + recent race data
- * 2. Filter eligible competitors (min 1 race this week)
- * 3. Calculate conservative scores (ELO - 2*RD)
- * 4. Calculate raw probabilities (normalized scores)
- * 5. Normalize probabilities (sum = 1)
- * 6. Convert to odds (BASE / probability)
- * 7. Apply min/max capping
- * 8. Save to database
+ * 2. Filter eligible competitors (lifetime calibration + 30-day activity)
+ * 3. Compute Plackett-Luce strengths via Glicko-2 g(phi) dampening
+ * 4. Run Monte Carlo simulation (50K) for P(1st), P(2nd), P(3rd)
+ * 5. Convert probabilities to decimal odds
+ * 6. Apply min/max capping
+ * 7. Save to database
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -40,7 +39,7 @@ import {
   DEFAULT_ODDS_PARAMS,
   ELIGIBILITY_RULES,
   ODDS_LOGGER_CONFIG,
-  POSITION_FACTORS,
+  MONTE_CARLO_CONFIG,
 } from '../config/odds-calculator.config';
 
 @Injectable()
@@ -62,16 +61,12 @@ export class OddsCalculatorService {
 
   /**
    * Calculate odds for all competitors in a betting week
-   *
-   * @param bettingWeekId - The week to calculate odds for
-   * @returns Complete calculation result with all steps
    */
   async calculateOddsForWeek(
     bettingWeekId: string,
   ): Promise<OddsCalculationResult> {
     this.logger.log(`Starting odds calculation for week ${bettingWeekId}`);
 
-    // 1. Fetch betting week
     const week = await this.bettingWeekRepository.findOne({
       where: { id: bettingWeekId },
     });
@@ -80,10 +75,8 @@ export class OddsCalculatorService {
       throw new Error(`Betting week ${bettingWeekId} not found`);
     }
 
-    // 2. Fetch all competitors with their stats
-    const competitorsWithStats = await this.fetchCompetitorsWithStats(week);
+    const competitorsWithStats = await this.fetchCompetitorsWithStats();
 
-    // 3. Filter eligible competitors
     const eligibleCompetitors = competitorsWithStats.filter(
       (c) => c.isEligible,
     );
@@ -100,10 +93,8 @@ export class OddsCalculatorService {
       };
     }
 
-    // 4. Calculate odds
     const calculationSteps = this.calculateOddsSteps(eligibleCompetitors);
 
-    // 5. Create CompetitorOdd objects
     const odds: CompetitorOdd[] = calculationSteps.map((step) => ({
       competitorId: step.competitorId,
       competitorName: step.competitorName,
@@ -122,10 +113,12 @@ export class OddsCalculatorService {
         avgRank: step.avgRecentRank,
         formFactor: 1.0,
         probability: step.normalizedProbability,
+        mu: step.mu,
+        phi: step.phi,
+        plStrength: step.plStrength,
       },
     }));
 
-    // 6. Save to database
     await this.saveOddsToDatabase(bettingWeekId, odds);
 
     const result: OddsCalculationResult = {
@@ -148,27 +141,16 @@ export class OddsCalculatorService {
 
   /**
    * Fetch all competitors with their recent race statistics
+   *
+   * No longer requires a BettingWeek — eligibility is based on
+   * lifetime races and a 30-day rolling window only.
    */
-  private async fetchCompetitorsWithStats(
-    week: BettingWeek,
-  ): Promise<CompetitorWithStats[]> {
+  private async fetchCompetitorsWithStats(): Promise<CompetitorWithStats[]> {
     const competitors = await this.competitorRepository.find();
 
     const competitorsWithStats = await Promise.all(
       competitors.map(async (competitor) => {
-        // Get races within this week
-        const racesThisWeek = await this.raceResultRepository
-          .createQueryBuilder('result')
-          .innerJoin('result.race', 'race')
-          .where('result.competitorId = :competitorId', {
-            competitorId: competitor.id,
-          })
-          .andWhere('race.date >= :startDate', { startDate: week.startDate })
-          .andWhere('race.date <= :endDate', { endDate: week.endDate })
-          .select(['result.rank12', 'race.date', 'race.id'])
-          .getRawMany();
-
-        // Get recent races for eligibility check
+        // Get recent races for metadata
         const recentRaces = await this.raceResultRepository
           .createQueryBuilder('result')
           .innerJoin('result.race', 'race')
@@ -191,13 +173,8 @@ export class OddsCalculatorService {
           }),
         );
 
-        // Check eligibility with new rules
-        const { isEligible, reason, recentRacesIn14Days } =
-          this.checkCompetitorEligibility(
-            competitor,
-            recentRacePerformances,
-            racesThisWeek.length,
-          );
+        const { isEligible, reason, recentRacesInWindow } =
+          this.checkCompetitorEligibility(competitor, recentRacePerformances);
 
         return {
           competitor,
@@ -205,7 +182,7 @@ export class OddsCalculatorService {
           isEligible,
           ineligibilityReason: reason,
           calibrationProgress: competitor.totalLifetimeRaces,
-          recentRacesIn14Days,
+          recentRacesInWindow,
         };
       }),
     );
@@ -218,89 +195,103 @@ export class OddsCalculatorService {
    *
    * Rules:
    * 1. Calibration: Must have >= MIN_LIFETIME_RACES total races (never resets)
-   * 2. Recent activity: Must have >= MIN_RECENT_RACES in the last RECENT_WINDOW_DAYS
-   * 3. Weekly activity: Must have >= MIN_RACES_THIS_WEEK in current betting week
+   * 2. Recent activity: Must have >= MIN_RECENT_RACES in the last RECENT_WINDOW_DAYS (30 days)
    */
   private checkCompetitorEligibility(
     competitor: Competitor,
     recentRaces: RecentRacePerformance[],
-    racesThisWeekCount: number,
   ): {
     isEligible: boolean;
     reason: IneligibilityReason;
-    recentRacesIn14Days: number;
+    recentRacesInWindow: number;
   } {
     // Rule 1: Calibration check (lifetime races)
     if (competitor.totalLifetimeRaces < ELIGIBILITY_RULES.MIN_LIFETIME_RACES) {
       return {
         isEligible: false,
         reason: 'calibrating',
-        recentRacesIn14Days: 0,
+        recentRacesInWindow: 0,
       };
     }
 
-    // Rule 2: Recent activity check (rolling 14-day window)
+    // Rule 2: Recent activity check (rolling 30-day window)
     const windowStart = new Date();
     windowStart.setDate(
       windowStart.getDate() - ELIGIBILITY_RULES.RECENT_WINDOW_DAYS,
     );
 
-    const recentRacesIn14Days = recentRaces.filter(
+    const recentRacesInWindow = recentRaces.filter(
       (r) => new Date(r.date) >= windowStart,
     ).length;
 
-    if (recentRacesIn14Days < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
+    if (recentRacesInWindow < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
       return {
         isEligible: false,
         reason: 'inactive',
-        recentRacesIn14Days,
-      };
-    }
-
-    // Rule 3: Weekly activity check
-    if (racesThisWeekCount < ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK) {
-      return {
-        isEligible: false,
-        reason: 'no_races_this_week',
-        recentRacesIn14Days,
+        recentRacesInWindow,
       };
     }
 
     return {
       isEligible: true,
       reason: null,
-      recentRacesIn14Days,
+      recentRacesInWindow,
     };
   }
 
   /**
-   * Calculate odds with detailed intermediate steps
-   *
-   * This method performs the core calculation logic and returns
-   * all intermediate values for transparency and debugging.
+   * Calculate odds using Plackett-Luce strengths + Monte Carlo simulation
    */
   private calculateOddsSteps(
     competitorsWithStats: CompetitorWithStats[],
   ): OddsCalculationStep[] {
-    const steps: OddsCalculationStep[] = [];
+    const { GLICKO_SCALE, INCORPORATE_RD, NUM_SIMULATIONS } =
+      MONTE_CARLO_CONFIG;
 
-    // Step 1: Calculate conservative scores
+    // Step 1: Compute Plackett-Luce strengths
+    const strengths: Array<{
+      competitorId: string;
+      alpha: number;
+      step: OddsCalculationStep;
+    }> = [];
+
     for (const { competitor, recentRaces } of competitorsWithStats) {
-      const conservativeScore = competitor.rating - 2 * competitor.rd;
+      const mu = (competitor.rating - 1500) / GLICKO_SCALE;
+      const phi = competitor.rd / GLICKO_SCALE;
 
-      steps.push({
+      // g(phi) dampening from Glicko-2
+      const gPhi = INCORPORATE_RD
+        ? 1 / Math.sqrt(1 + (3 * phi * phi) / (Math.PI * Math.PI))
+        : 1;
+
+      const alpha = Math.exp(mu * gPhi);
+
+      // Calculate average recent rank (for metadata)
+      const avgRecentRank =
+        recentRaces.length > 0
+          ? recentRaces.reduce((sum, r) => sum + r.rank12, 0) /
+            recentRaces.length
+          : 6.5;
+
+      const step: OddsCalculationStep = {
         competitorId: competitor.id,
         competitorName: `${competitor.firstName} ${competitor.lastName}`,
         rating: competitor.rating,
         rd: competitor.rd,
-        conservativeScore,
+        conservativeScore: competitor.rating - 2 * competitor.rd,
+        mu,
+        phi,
+        plStrength: alpha,
         recentRaceCount: recentRaces.length,
-        avgRecentRank: 0, // Will calculate next
+        avgRecentRank,
         winStreak: competitor.winStreak,
-        formFactor: 1.0, // Will calculate next
+        formFactor: 1.0,
         rawProbability: 0,
         adjustedProbability: 0,
         normalizedProbability: 0,
+        pFirst: 0,
+        pSecond: 0,
+        pThird: 0,
         odd: 0,
         cappedOdd: 0,
         oddFirst: 0,
@@ -308,125 +299,109 @@ export class OddsCalculatorService {
         oddThird: 0,
         isEligible: true,
         calculatedAt: new Date(),
-      });
+      };
+
+      strengths.push({ competitorId: competitor.id, alpha, step });
     }
 
-    // Shift scores to guarantee all positive values before probability calculation.
-    // If any conservativeScore is negative, shift all scores up so the minimum becomes 1.
-    const minScore = Math.min(...steps.map((s) => s.conservativeScore));
-    const shift = minScore < 0 ? Math.abs(minScore) + 1 : 0;
-    let totalConservativeScore = steps.reduce(
-      (sum, s) => sum + (s.conservativeScore + shift),
-      0,
-    );
-    // Guard against totalConservativeScore = 0 (all scores identical after shift)
-    if (totalConservativeScore === 0) totalConservativeScore = 1;
-
-    // Step 2: Calculate raw probabilities (no form factor adjustment)
-    for (const step of steps) {
-      const { recentRaces } = competitorsWithStats.find(
-        (c) => c.competitor.id === step.competitorId,
-      )!;
-
-      // Calculate average recent rank (for metadata only)
-      step.avgRecentRank =
-        recentRaces.length > 0
-          ? recentRaces.reduce((sum, r) => sum + r.rank12, 0) /
-            recentRaces.length
-          : 6.5;
-
-      // Calculate raw probability using shifted scores
-      step.rawProbability =
-        (step.conservativeScore + shift) / totalConservativeScore;
-
-      // No form factor adjustment — probability goes straight through
-      step.adjustedProbability = step.rawProbability;
+    // Step 2: Win probabilities (softmax)
+    const totalAlpha = strengths.reduce((sum, s) => sum + s.alpha, 0);
+    for (const s of strengths) {
+      const pWin = s.alpha / totalAlpha;
+      s.step.rawProbability = pWin;
+      s.step.adjustedProbability = pWin;
+      s.step.normalizedProbability = pWin;
     }
 
-    // Step 3: Normalize probabilities (sum = 1)
-    const totalProbability = steps.reduce(
-      (sum, step) => sum + step.adjustedProbability,
-      0,
+    // Step 3: Monte Carlo simulation for podium probabilities
+    const mcResults = this.runMonteCarloSimulation(
+      strengths.map((s) => ({ id: s.competitorId, alpha: s.alpha })),
+      NUM_SIMULATIONS,
     );
 
-    for (const step of steps) {
-      step.normalizedProbability =
-        step.adjustedProbability / totalProbability;
+    // Step 4: Convert to odds
+    for (const s of strengths) {
+      const mc = mcResults.get(s.competitorId)!;
+      s.step.pFirst = mc.first / NUM_SIMULATIONS;
+      s.step.pSecond = mc.second / NUM_SIMULATIONS;
+      s.step.pThird = mc.third / NUM_SIMULATIONS;
+
+      // Decimal odds = 1 / probability, clamped
+      const clamp = (v: number) =>
+        Math.max(
+          DEFAULT_ODDS_PARAMS.minOdd,
+          Math.min(v, DEFAULT_ODDS_PARAMS.maxOdd),
+        );
+
+      s.step.oddFirst = clamp(1 / s.step.pFirst);
+      s.step.oddSecond = clamp(1 / s.step.pSecond);
+      s.step.oddThird = clamp(1 / s.step.pThird);
+
+      // Legacy odd field: use oddFirst as the primary odd
+      s.step.odd = s.step.oddFirst;
+      s.step.cappedOdd = s.step.oddFirst;
     }
 
-    // Step 5: Calculate odds and apply capping
-    // First, get all conservative scores for tier calculation
-    const allConservativeScores = steps.map((s) => s.conservativeScore);
-    allConservativeScores.sort((a, b) => a - b);
-
-    for (const step of steps) {
-      // Odd = BASE / probability
-      step.odd =
-        DEFAULT_ODDS_PARAMS.baseMultiplier / step.normalizedProbability;
-
-      // Apply min/max bounds
-      step.cappedOdd = Math.max(
-        DEFAULT_ODDS_PARAMS.minOdd,
-        Math.min(step.odd, DEFAULT_ODDS_PARAMS.maxOdd),
-      );
-
-      // Calculate position-specific odds
-      const positionFactors = this.getPositionFactors(
-        step.conservativeScore,
-        allConservativeScores,
-      );
-
-      // Position odds: base / (probability * position_factor)
-      // Higher factor = higher probability of that position = lower odds
-      const rawOddFirst =
-        DEFAULT_ODDS_PARAMS.baseMultiplier /
-        (step.normalizedProbability * positionFactors.first);
-      const rawOddSecond =
-        DEFAULT_ODDS_PARAMS.baseMultiplier /
-        (step.normalizedProbability * positionFactors.second);
-      const rawOddThird =
-        DEFAULT_ODDS_PARAMS.baseMultiplier /
-        (step.normalizedProbability * positionFactors.third);
-
-      // Apply min/max bounds to position odds
-      step.oddFirst = Math.max(
-        DEFAULT_ODDS_PARAMS.minOdd,
-        Math.min(rawOddFirst, DEFAULT_ODDS_PARAMS.maxOdd),
-      );
-      step.oddSecond = Math.max(
-        DEFAULT_ODDS_PARAMS.minOdd,
-        Math.min(rawOddSecond, DEFAULT_ODDS_PARAMS.maxOdd),
-      );
-      step.oddThird = Math.max(
-        DEFAULT_ODDS_PARAMS.minOdd,
-        Math.min(rawOddThird, DEFAULT_ODDS_PARAMS.maxOdd),
-      );
-    }
-
-    return steps;
+    return strengths.map((s) => s.step);
   }
 
   /**
-   * Get position probability factors based on player tier
+   * Run Monte Carlo simulation to estimate podium probabilities
    *
-   * Strong players (high conservative score) are more likely to be 1st
-   * Weak players (low conservative score) are more likely to be 3rd
+   * Uses Plackett-Luce sampling: for each position, draw a competitor
+   * proportionally to their alpha, then remove them from the pool.
    */
-  private getPositionFactors(
-    conservativeScore: number,
-    allScores: number[],
-  ): { first: number; second: number; third: number } {
-    const sortedScores = [...allScores].sort((a, b) => a - b);
-    const index = sortedScores.indexOf(conservativeScore);
-    const percentile = index / (sortedScores.length - 1 || 1);
+  private runMonteCarloSimulation(
+    competitors: Array<{ id: string; alpha: number }>,
+    numSimulations: number,
+  ): Map<string, { first: number; second: number; third: number }> {
+    const counts = new Map<
+      string,
+      { first: number; second: number; third: number }
+    >();
 
-    if (percentile >= POSITION_FACTORS.THRESHOLDS.topTierPercentile) {
-      return POSITION_FACTORS.TOP_TIER;
-    } else if (percentile <= POSITION_FACTORS.THRESHOLDS.bottomTierPercentile) {
-      return POSITION_FACTORS.BOTTOM_TIER;
-    } else {
-      return POSITION_FACTORS.MID_TIER;
+    for (const c of competitors) {
+      counts.set(c.id, { first: 0, second: 0, third: 0 });
     }
+
+    const positionKeys = ['first', 'second', 'third'] as const;
+    const n = competitors.length;
+
+    for (let sim = 0; sim < numSimulations; sim++) {
+      // Copy alphas for this simulation (we'll zero out selected ones)
+      const alphas = new Float64Array(n);
+      for (let i = 0; i < n; i++) {
+        alphas[i] = competitors[i].alpha;
+      }
+
+      let totalAlpha = alphas.reduce((sum, a) => sum + a, 0);
+
+      const positions = Math.min(MONTE_CARLO_CONFIG.PODIUM_SIZE, n);
+      for (let pos = 0; pos < positions; pos++) {
+        // Draw a competitor proportionally to alpha
+        const rand = Math.random() * totalAlpha;
+        let cumulative = 0;
+        let selectedIdx = n - 1; // Fallback to last
+
+        for (let i = 0; i < n; i++) {
+          if (alphas[i] === 0) continue;
+          cumulative += alphas[i];
+          if (cumulative >= rand) {
+            selectedIdx = i;
+            break;
+          }
+        }
+
+        // Increment counter
+        counts.get(competitors[selectedIdx].id)![positionKeys[pos]]++;
+
+        // Remove from pool
+        totalAlpha -= alphas[selectedIdx];
+        alphas[selectedIdx] = 0;
+      }
+    }
+
+    return counts;
   }
 
   /**
@@ -496,10 +471,6 @@ export class OddsCalculatorService {
    * Returns competitors who meet all eligibility criteria:
    * 1. MIN_LIFETIME_RACES total races (calibration)
    * 2. MIN_RECENT_RACES in last RECENT_WINDOW_DAYS (activity)
-   * 3. MIN_RACES_THIS_WEEK in current betting week
-   *
-   * @param weekId - Betting week UUID
-   * @returns List of eligible and ineligible competitors with their stats
    */
   async getEligibleCompetitors(weekId: string): Promise<{
     weekId: string;
@@ -509,7 +480,6 @@ export class OddsCalculatorService {
       minLifetimeRaces: number;
       minRecentRaces: number;
       recentWindowDays: number;
-      minRacesThisWeek: number;
     };
     competitors: Array<{
       id: string;
@@ -517,14 +487,12 @@ export class OddsCalculatorService {
       lastName: string;
       rating: number;
       rd: number;
-      racesThisWeek: number;
       totalLifetimeRaces: number;
-      recentRacesIn14Days: number;
+      recentRacesInWindow: number;
       isEligible: boolean;
       ineligibilityReason: IneligibilityReason;
     }>;
   }> {
-    // Fetch betting week
     const week = await this.bettingWeekRepository.findOne({
       where: { id: weekId },
     });
@@ -533,37 +501,19 @@ export class OddsCalculatorService {
       throw new Error(`Betting week ${weekId} not found`);
     }
 
-    // Get all competitors with stats
-    const competitorsWithStats = await this.fetchCompetitorsWithStats(week);
+    const competitorsWithStats = await this.fetchCompetitorsWithStats();
 
-    // Map to response format
-    const competitors = await Promise.all(
-      competitorsWithStats.map(async (c) => {
-        // Get races this week count
-        const racesThisWeek = await this.raceResultRepository
-          .createQueryBuilder('result')
-          .innerJoin('result.race', 'race')
-          .where('result.competitorId = :competitorId', {
-            competitorId: c.competitor.id,
-          })
-          .andWhere('race.date >= :startDate', { startDate: week.startDate })
-          .andWhere('race.date <= :endDate', { endDate: week.endDate })
-          .getCount();
-
-        return {
-          id: c.competitor.id,
-          firstName: c.competitor.firstName,
-          lastName: c.competitor.lastName,
-          rating: c.competitor.rating,
-          rd: c.competitor.rd,
-          racesThisWeek,
-          totalLifetimeRaces: c.competitor.totalLifetimeRaces,
-          recentRacesIn14Days: c.recentRacesIn14Days ?? 0,
-          isEligible: c.isEligible,
-          ineligibilityReason: c.ineligibilityReason ?? null,
-        };
-      }),
-    );
+    const competitors = competitorsWithStats.map((c) => ({
+      id: c.competitor.id,
+      firstName: c.competitor.firstName,
+      lastName: c.competitor.lastName,
+      rating: c.competitor.rating,
+      rd: c.competitor.rd,
+      totalLifetimeRaces: c.competitor.totalLifetimeRaces,
+      recentRacesInWindow: c.recentRacesInWindow ?? 0,
+      isEligible: c.isEligible,
+      ineligibilityReason: c.ineligibilityReason ?? null,
+    }));
 
     const eligibleCount = competitors.filter((c) => c.isEligible).length;
 
@@ -579,7 +529,6 @@ export class OddsCalculatorService {
         minLifetimeRaces: ELIGIBILITY_RULES.MIN_LIFETIME_RACES,
         minRecentRaces: ELIGIBILITY_RULES.MIN_RECENT_RACES,
         recentWindowDays: ELIGIBILITY_RULES.RECENT_WINDOW_DAYS,
-        minRacesThisWeek: ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK,
       },
       competitors,
     };

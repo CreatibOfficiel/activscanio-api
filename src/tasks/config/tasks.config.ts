@@ -201,12 +201,6 @@ export const PODIUM_DETERMINATION_CONFIG = {
   scoringMethod: 'conservative' as 'conservative' | 'rating' | 'race_count',
 
   /**
-   * Minimum races required to be eligible for podium
-   * Default: 1 race during the week
-   */
-  minRacesForPodium: 1,
-
-  /**
    * Tie-breaking rules (in order of priority)
    * 1. Higher rating
    * 2. Lower RD (more consistent)

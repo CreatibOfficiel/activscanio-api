@@ -15,13 +15,6 @@ import { OddsCalculationParams } from '../types/odds-calculator.types';
  */
 export const DEFAULT_ODDS_PARAMS: OddsCalculationParams = {
   /**
-   * Base multiplier applied to probabilities
-   * Higher value = generally higher odds
-   * Example: With 10%, probability gives odd of 10 / 0.1 = 100 (before capping)
-   */
-  baseMultiplier: 10,
-
-  /**
    * Minimum odd value (prevents odds too close to 1.0)
    * Ensures minimum return even for heavy favorites
    */
@@ -44,12 +37,6 @@ export const DEFAULT_ODDS_PARAMS: OddsCalculationParams = {
  */
 export const ELIGIBILITY_RULES = {
   /**
-   * Minimum races required in the week to be eligible for podium
-   * This prevents inactive players from being included in betting
-   */
-  MIN_RACES_THIS_WEEK: 1,
-
-  /**
    * Minimum lifetime races required to be pariable (calibration period)
    * New players must complete this many races before being eligible for betting
    */
@@ -65,70 +52,27 @@ export const ELIGIBILITY_RULES = {
    * Rolling window in days for recent activity check
    * Competitors must have MIN_RECENT_RACES within this window
    */
-  RECENT_WINDOW_DAYS: 14,
+  RECENT_WINDOW_DAYS: 30,
 };
 
 /**
- * Position probability factors
+ * Monte Carlo simulation configuration
  *
- * These factors distribute the overall podium probability
- * across the three positions (1st, 2nd, 3rd).
- *
- * The idea: if a player has X% chance of finishing on the podium,
- * their chance of finishing exactly 1st is lower than being anywhere in top 3.
- *
- * Factors are adjusted based on player tier:
- * - Strong players (high score) are more likely to be 1st if on podium
- * - Weak players (low score) are more likely to be 3rd if on podium
+ * Used to estimate P(1st), P(2nd), P(3rd) for each competitor
+ * via repeated random draws weighted by Plackett-Luce strengths.
  */
-export const POSITION_FACTORS = {
-  /**
-   * Default factors for average players
-   * These should sum to 1.0
-   */
-  DEFAULT: {
-    first: 0.33,
-    second: 0.35,
-    third: 0.32,
-  },
+export const MONTE_CARLO_CONFIG = {
+  /** Number of simulation runs */
+  NUM_SIMULATIONS: 50_000,
 
-  /**
-   * Top tier adjustment (top 25% by conservative score)
-   * Strong players more likely to be 1st
-   */
-  TOP_TIER: {
-    first: 0.45,
-    second: 0.32,
-    third: 0.23,
-  },
+  /** Glicko-2 scaling factor (maps rating to logistic scale) */
+  GLICKO_SCALE: 173.7178,
 
-  /**
-   * Mid tier adjustment (middle 50%)
-   * Balanced distribution
-   */
-  MID_TIER: {
-    first: 0.33,
-    second: 0.35,
-    third: 0.32,
-  },
+  /** Whether to incorporate RD via g(phi) dampening */
+  INCORPORATE_RD: true,
 
-  /**
-   * Bottom tier adjustment (bottom 25%)
-   * More likely to be 3rd if on podium
-   */
-  BOTTOM_TIER: {
-    first: 0.22,
-    second: 0.33,
-    third: 0.45,
-  },
-
-  /**
-   * Percentile thresholds for tier assignment
-   */
-  THRESHOLDS: {
-    topTierPercentile: 0.75, // Top 25%
-    bottomTierPercentile: 0.25, // Bottom 25%
-  },
+  /** Number of podium positions to simulate */
+  PODIUM_SIZE: 3,
 };
 
 /**

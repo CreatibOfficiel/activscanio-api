@@ -3,8 +3,7 @@
  *
  * Rules tested:
  * 1. Calibration: MIN_LIFETIME_RACES (5) total races required
- * 2. Recent activity: MIN_RECENT_RACES (2) in last RECENT_WINDOW_DAYS (14) days
- * 3. Weekly activity: MIN_RACES_THIS_WEEK (1) in current betting week
+ * 2. Recent activity: MIN_RECENT_RACES (2) in last RECENT_WINDOW_DAYS (30) days
  */
 
 import { ELIGIBILITY_RULES } from '../../config/odds-calculator.config';
@@ -19,11 +18,7 @@ describe('Eligibility Rules Configuration', () => {
   });
 
   it('should have correct rolling window period', () => {
-    expect(ELIGIBILITY_RULES.RECENT_WINDOW_DAYS).toBe(14);
-  });
-
-  it('should have correct weekly activity threshold', () => {
-    expect(ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK).toBe(1);
+    expect(ELIGIBILITY_RULES.RECENT_WINDOW_DAYS).toBe(30);
   });
 });
 
@@ -59,33 +54,27 @@ describe('Eligibility Logic', () => {
   const checkEligibility = (
     competitor: { totalLifetimeRaces: number },
     recentRaces: Array<{ date: Date }>,
-    racesThisWeekCount: number,
   ): {
     isEligible: boolean;
-    reason: 'calibrating' | 'inactive' | 'no_races_this_week' | null;
+    reason: 'calibrating' | 'inactive' | null;
   } => {
     // Rule 1: Calibration check
     if (competitor.totalLifetimeRaces < ELIGIBILITY_RULES.MIN_LIFETIME_RACES) {
       return { isEligible: false, reason: 'calibrating' };
     }
 
-    // Rule 2: Recent activity check
+    // Rule 2: Recent activity check (30-day window)
     const windowStart = new Date();
     windowStart.setDate(
       windowStart.getDate() - ELIGIBILITY_RULES.RECENT_WINDOW_DAYS,
     );
 
-    const recentRacesIn14Days = recentRaces.filter(
+    const recentRacesInWindow = recentRaces.filter(
       (r) => new Date(r.date) >= windowStart,
     ).length;
 
-    if (recentRacesIn14Days < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
+    if (recentRacesInWindow < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
       return { isEligible: false, reason: 'inactive' };
-    }
-
-    // Rule 3: Weekly activity check
-    if (racesThisWeekCount < ELIGIBILITY_RULES.MIN_RACES_THIS_WEEK) {
-      return { isEligible: false, reason: 'no_races_this_week' };
     }
 
     return { isEligible: true, reason: null };
@@ -96,7 +85,7 @@ describe('Eligibility Logic', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 4 });
       const recentRaces = [createMockRace(1), createMockRace(2)];
 
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
       expect(result.isEligible).toBe(false);
       expect(result.reason).toBe('calibrating');
@@ -105,7 +94,7 @@ describe('Eligibility Logic', () => {
     it('should mark competitor with 0 races as not eligible (calibrating)', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 0 });
 
-      const result = checkEligibility(competitor, [], 0);
+      const result = checkEligibility(competitor, []);
 
       expect(result.isEligible).toBe(false);
       expect(result.reason).toBe('calibrating');
@@ -115,7 +104,7 @@ describe('Eligibility Logic', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 5 });
       const recentRaces = [createMockRace(1), createMockRace(2)];
 
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
       // Should pass calibration, might fail other checks
       expect(result.reason).not.toBe('calibrating');
@@ -125,18 +114,18 @@ describe('Eligibility Logic', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 100 });
       const recentRaces = [createMockRace(1), createMockRace(2)];
 
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
       expect(result.reason).not.toBe('calibrating');
     });
   });
 
-  describe('Recent Activity Rule (14-day rolling window)', () => {
+  describe('Recent Activity Rule (30-day rolling window)', () => {
     it('should mark competitor with only 1 recent race as inactive', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(5)]; // Only 1 race in last 14 days
+      const recentRaces = [createMockRace(5)]; // Only 1 race in last 30 days
 
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
       expect(result.isEligible).toBe(false);
       expect(result.reason).toBe('inactive');
@@ -144,77 +133,55 @@ describe('Eligibility Logic', () => {
 
     it('should mark competitor with no recent races as inactive', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(20), createMockRace(25)]; // All races older than 14 days
+      const recentRaces = [createMockRace(35), createMockRace(40)]; // All races older than 30 days
 
-      const result = checkEligibility(competitor, recentRaces, 1);
-
-      expect(result.isEligible).toBe(false);
-      expect(result.reason).toBe('inactive');
-    });
-
-    it('should pass activity check with exactly 2 races in 14 days', () => {
-      const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(5), createMockRace(10)];
-
-      const result = checkEligibility(competitor, recentRaces, 1);
-
-      expect(result.reason).not.toBe('inactive');
-    });
-
-    it('should pass activity check with races at boundary (14 days ago)', () => {
-      const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [
-        createMockRace(1),
-        createMockRace(14), // Exactly at boundary
-      ];
-
-      const result = checkEligibility(competitor, recentRaces, 1);
-
-      expect(result.reason).not.toBe('inactive');
-    });
-
-    it('should fail activity check with race just outside boundary (15 days)', () => {
-      const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [
-        createMockRace(1),
-        createMockRace(15), // Just outside boundary
-      ];
-
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
       expect(result.isEligible).toBe(false);
       expect(result.reason).toBe('inactive');
     });
-  });
 
-  describe('Weekly Activity Rule', () => {
-    it('should mark competitor with no races this week as ineligible', () => {
+    it('should pass activity check with exactly 2 races in 30 days', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(1), createMockRace(5)];
+      const recentRaces = [createMockRace(5), createMockRace(25)];
 
-      const result = checkEligibility(competitor, recentRaces, 0);
+      const result = checkEligibility(competitor, recentRaces);
 
-      expect(result.isEligible).toBe(false);
-      expect(result.reason).toBe('no_races_this_week');
+      expect(result.reason).not.toBe('inactive');
     });
 
-    it('should pass with exactly 1 race this week', () => {
+    it('should pass activity check with races at boundary (30 days ago)', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(1), createMockRace(5)];
+      const recentRaces = [
+        createMockRace(1),
+        createMockRace(30), // Exactly at boundary
+      ];
 
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
-      expect(result.isEligible).toBe(true);
-      expect(result.reason).toBeNull();
+      expect(result.reason).not.toBe('inactive');
+    });
+
+    it('should fail activity check with race just outside boundary (31 days)', () => {
+      const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
+      const recentRaces = [
+        createMockRace(1),
+        createMockRace(31), // Just outside boundary
+      ];
+
+      const result = checkEligibility(competitor, recentRaces);
+
+      expect(result.isEligible).toBe(false);
+      expect(result.reason).toBe('inactive');
     });
   });
 
   describe('Full Eligibility (all rules combined)', () => {
-    it('should be eligible with 5+ lifetime races, 2+ recent races, and 1+ this week', () => {
+    it('should be eligible with 5+ lifetime races and 2+ recent races in 30 days', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 5 });
       const recentRaces = [createMockRace(1), createMockRace(7)];
 
-      const result = checkEligibility(competitor, recentRaces, 1);
+      const result = checkEligibility(competitor, recentRaces);
 
       expect(result.isEligible).toBe(true);
       expect(result.reason).toBeNull();
@@ -223,29 +190,19 @@ describe('Eligibility Logic', () => {
     it('should check rules in correct order (calibration first)', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 3 });
       // Would fail all rules, but calibration should be checked first
-      const result = checkEligibility(competitor, [], 0);
+      const result = checkEligibility(competitor, []);
 
       expect(result.reason).toBe('calibrating');
     });
 
     it('should check activity after calibration passes', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(20)]; // Only old races
+      const recentRaces = [createMockRace(35)]; // Only old races
 
-      const result = checkEligibility(competitor, recentRaces, 0);
+      const result = checkEligibility(competitor, recentRaces);
 
       // Should fail on inactive, not calibrating
       expect(result.reason).toBe('inactive');
-    });
-
-    it('should check weekly activity last', () => {
-      const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(1), createMockRace(5)];
-
-      const result = checkEligibility(competitor, recentRaces, 0);
-
-      // Should fail on weekly, not others
-      expect(result.reason).toBe('no_races_this_week');
     });
   });
 });

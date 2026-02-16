@@ -12,8 +12,7 @@ import { Competitor } from '../../competitors/competitor.entity';
  */
 export type IneligibilityReason =
   | 'calibrating' // Less than MIN_LIFETIME_RACES total races
-  | 'inactive' // Less than MIN_RECENT_RACES in rolling window
-  | 'no_races_this_week' // No races in current betting week
+  | 'inactive' // Less than MIN_RECENT_RACES in 30-day rolling window
   | null; // Eligible
 
 /**
@@ -22,10 +21,10 @@ export type IneligibilityReason =
 export interface CompetitorWithStats {
   competitor: Competitor;
   recentRaces: RecentRacePerformance[];
-  isEligible: boolean; // Has at least 1 race this week AND meets other criteria
+  isEligible: boolean;
   ineligibilityReason?: IneligibilityReason;
   calibrationProgress?: number; // X out of MIN_LIFETIME_RACES
-  recentRacesIn14Days?: number; // Count of races in rolling window
+  recentRacesInWindow?: number; // Count of races in rolling window
 }
 
 /**
@@ -47,7 +46,12 @@ export interface OddsCalculationStep {
   // Step 1: Base metrics
   rating: number;
   rd: number; // Rating Deviation
-  conservativeScore: number; // rating - 2 * rd
+  conservativeScore: number; // rating - 2 * rd (kept for JSONB compat)
+
+  // Plackett-Luce metrics
+  mu: number; // (rating - 1500) / GLICKO_SCALE
+  phi: number; // rd / GLICKO_SCALE
+  plStrength: number; // exp(mu * g(phi))
 
   // Step 2: Recent stats
   recentRaceCount: number;
@@ -56,15 +60,20 @@ export interface OddsCalculationStep {
   formFactor: number; // Always 1.0 (kept for JSONB compat)
 
   // Step 3: Probability calculation
-  rawProbability: number;
-  adjustedProbability: number; // Same as rawProbability (no form adjustment)
-  normalizedProbability: number; // Sum = 1
+  rawProbability: number; // Softmax P_win
+  adjustedProbability: number; // Same as rawProbability
+  normalizedProbability: number; // Same as rawProbability (softmax already sums to 1)
+
+  // Monte Carlo podium probabilities
+  pFirst: number;
+  pSecond: number;
+  pThird: number;
 
   // Step 4: Final odd
   odd: number;
   cappedOdd: number; // After min/max bounds
 
-  // Position-specific odds
+  // Position-specific odds (from Monte Carlo)
   oddFirst: number;
   oddSecond: number;
   oddThird: number;
@@ -114,6 +123,9 @@ export interface OddMetadata {
   avgRank: number;
   formFactor: number;
   probability: number;
+  mu?: number;
+  phi?: number;
+  plStrength?: number;
 }
 
 /**
@@ -121,7 +133,6 @@ export interface OddMetadata {
  * Allows easy tuning without modifying core logic
  */
 export interface OddsCalculationParams {
-  baseMultiplier: number; // Base multiplier for odds (default: 10)
   minOdd: number; // Minimum odd value (default: 1.1)
   maxOdd: number; // Maximum odd value (default: 50)
   recentRacesCount: number; // Number of recent races to consider (default: 5)

@@ -113,7 +113,7 @@ export class BettingController {
   }
 
   /**
-   * Get eligible competitors for a week (has at least MIN_RACES_THIS_WEEK races)
+   * Get eligible competitors for a week (lifetime calibration + 30-day activity)
    */
   @Public()
   @Get('weeks/:weekId/eligible-competitors')
