@@ -131,6 +131,7 @@ export class BettingController {
   /**
    * Recalculate odds for a week (admin trigger)
    */
+  @Public()
   @Post('weeks/:weekId/recalculate-odds')
   @ApiOperation({ summary: 'Recalculate odds for a betting week' })
   @ApiParam({ name: 'weekId', description: 'Betting week UUID' })
