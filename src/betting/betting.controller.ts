@@ -129,6 +129,18 @@ export class BettingController {
   }
 
   /**
+   * Recalculate odds for a week (admin trigger)
+   */
+  @Post('weeks/:weekId/recalculate-odds')
+  @ApiOperation({ summary: 'Recalculate odds for a betting week' })
+  @ApiParam({ name: 'weekId', description: 'Betting week UUID' })
+  @ApiResponse({ status: 200, description: 'Odds recalculated successfully' })
+  @ApiResponse({ status: 404, description: 'Week not found' })
+  async recalculateOdds(@Param('weekId') weekId: string) {
+    return await this.oddsCalculatorService.calculateOddsForWeek(weekId);
+  }
+
+  /**
    * Create a new betting week (admin only for now)
    */
   @Post('weeks')
