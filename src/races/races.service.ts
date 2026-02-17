@@ -80,6 +80,14 @@ export class RacesService {
 
       const savedRace = await this.raceEventRepository.save(race);
 
+      // Update play streaks BEFORE rating update (rating update overwrites lastRaceDate)
+      try {
+        await this.updateCompetitorsPlayStreak(savedRace.results, raceDate);
+      } catch (error) {
+        this.logger.error('Error updating play streaks:', error.stack);
+        // Non-critical, don't fail the race creation
+      }
+
       // Update competitors' Glicko-2 ratings
       try {
         await this.updateCompetitorsRating(savedRace.results);
@@ -96,14 +104,6 @@ export class RacesService {
         await this.updateCompetitorsRecentPositions(savedRace.results);
       } catch (error) {
         this.logger.error('Error updating recent positions:', error.stack);
-        // Non-critical, don't fail the race creation
-      }
-
-      // Update play streaks
-      try {
-        await this.updateCompetitorsPlayStreak(savedRace.results, raceDate);
-      } catch (error) {
-        this.logger.error('Error updating play streaks:', error.stack);
         // Non-critical, don't fail the race creation
       }
 
