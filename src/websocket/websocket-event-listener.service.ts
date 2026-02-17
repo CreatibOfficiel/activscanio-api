@@ -1,12 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { InjectRepository } from '@nestjs/typeorm';
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../betting/entities/betting-week.entity';
 import { EventsGateway } from './events.gateway';
 
 @Injectable()
 export class WebSocketEventListener {
   private readonly logger = new Logger(WebSocketEventListener.name);
 
-  constructor(private readonly eventsGateway: EventsGateway) {}
+  constructor(
+    private readonly eventsGateway: EventsGateway,
+    @InjectRepository(BettingWeek)
+    private readonly bettingWeekRepository: Repository<BettingWeek>,
+  ) {}
 
   /**
    * Listen to achievement unlocked events and relay to WebSocket
@@ -88,9 +98,28 @@ export class WebSocketEventListener {
    * Listen to race created events (broadcast to all)
    */
   @OnEvent('race.created')
-  handleRaceCreated(payload: { race: any }) {
+  async handleRaceCreated(payload: { race: any }) {
     this.logger.log('Broadcasting race created event to all clients');
-    this.eventsGateway.broadcastRaceAnnouncement(payload.race);
+
+    let bettingOpen = false;
+    try {
+      const now = new Date();
+      const openWeek = await this.bettingWeekRepository.findOne({
+        where: {
+          status: BettingWeekStatus.OPEN,
+          startDate: LessThanOrEqual(now),
+          endDate: MoreThanOrEqual(now),
+        },
+      });
+      bettingOpen = !!openWeek;
+    } catch (error) {
+      this.logger.error('Failed to check betting week status', error);
+    }
+
+    this.eventsGateway.broadcastRaceAnnouncement({
+      ...payload.race,
+      bettingOpen,
+    });
   }
 
   /**
