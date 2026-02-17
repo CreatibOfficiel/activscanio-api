@@ -44,18 +44,18 @@ export class BettingService {
   ) {}
 
   /**
-   * Get current week (status = open)
+   * Get current week (status = open or closed)
    */
   async getCurrentWeek(): Promise<BettingWeek | null> {
     const now = new Date();
 
     return await this.bettingWeekRepository.findOne({
-      where: {
-        status: BettingWeekStatus.OPEN,
-        startDate: LessThanOrEqual(now),
-        endDate: MoreThanOrEqual(now),
-      },
+      where: [
+        { status: BettingWeekStatus.OPEN, startDate: LessThanOrEqual(now), endDate: MoreThanOrEqual(now) },
+        { status: BettingWeekStatus.CLOSED, startDate: LessThanOrEqual(now), endDate: MoreThanOrEqual(now) },
+      ],
       relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
+      order: { startDate: 'DESC' },
     });
   }
 

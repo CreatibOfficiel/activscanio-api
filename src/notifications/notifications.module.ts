@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { NotificationEventListener } from './notification-event-listener.service';
 import { NotificationPreferences } from './notification-preferences.entity';
 import { UsersModule } from '../users/users.module';
 
@@ -13,7 +14,7 @@ import { UsersModule } from '../users/users.module';
     UsersModule,
   ],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
+  providers: [NotificationsService, NotificationEventListener],
   exports: [NotificationsService], // Export for use in other modules (like betting, achievements)
 })
 export class NotificationsModule {}

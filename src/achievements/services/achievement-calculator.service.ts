@@ -577,7 +577,7 @@ export class AchievementCalculatorService {
       competitorBestWinStreak: competitor?.bestWinStreak ?? 0,
       competitorPlayStreak: competitor?.playStreak ?? 0,
       competitorBestPlayStreak: competitor?.bestPlayStreak ?? 0,
-      competitorRating: competitor?.rating ?? 0,
+      competitorRating: competitor ? (competitor.rating - 2 * competitor.rd) : 0,
       competitorAvgRank12: competitor?.avgRank12 ?? 0,
     };
   }

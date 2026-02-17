@@ -25,7 +25,7 @@ export class WebSocketEventListener {
   /**
    * Listen to level up events
    */
-  @OnEvent('user.levelUp')
+  @OnEvent('user.level_up')
   handleLevelUp(payload: { userId: string; newLevel: number; rewards: any[] }) {
     this.logger.log(
       `Relaying level up via WebSocket for user ${payload.userId} to level ${payload.newLevel}`,
