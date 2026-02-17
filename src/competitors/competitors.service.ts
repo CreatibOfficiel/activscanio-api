@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Competitor } from './competitor.entity';
 import { CreateCompetitorDto } from './dtos/create-competitor.dto';
 import { UpdateCompetitorDto } from './dtos/update-competitor.dto';
@@ -29,6 +30,7 @@ export class CompetitorsService {
     private competitorEloSnapshotRepository: CompetitorEloSnapshotRepository,
     private raceResultRepository: RaceResultRepository,
     private ratingCalculationService: RatingCalculationService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /* ░░░░░░░░░░░░   READ   ░░░░░░░░░░░░ */
@@ -48,7 +50,9 @@ export class CompetitorsService {
 
   async create(dto: CreateCompetitorDto): Promise<Competitor> {
     const competitor = this.competitorRepository.create(dto);
-    return this.competitorRepository.save(competitor);
+    const saved = await this.competitorRepository.save(competitor);
+    this.eventEmitter.emit('competitor.created', { competitor: saved });
+    return saved;
   }
 
   /* ░░░░░░░░░░░░   UPDATE   ░░░░░░░░░░░░ */

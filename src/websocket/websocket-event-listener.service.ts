@@ -110,4 +110,15 @@ export class WebSocketEventListener {
     this.logger.log('Broadcasting weekly rankings update');
     this.eventsGateway.broadcastWeeklyRankings(payload.rankings);
   }
+
+  /**
+   * Listen to competitor created events (broadcast to all)
+   */
+  @OnEvent('competitor.created')
+  handleCompetitorCreated(payload: { competitor: any }) {
+    this.logger.log(
+      `Broadcasting competitor created event: ${payload.competitor.id}`,
+    );
+    this.eventsGateway.broadcastCompetitorUpdate(payload.competitor);
+  }
 }

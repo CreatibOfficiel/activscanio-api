@@ -131,6 +131,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Broadcast competitor update to all clients
+   */
+  broadcastCompetitorUpdate(competitor: any) {
+    this.server.emit('competitor:updated', competitor);
+    this.logger.log(
+      `Broadcasted competitor update: ${competitor.id}`,
+    );
+  }
+
+  /**
    * Emit weekly ranking updates to all users
    */
   broadcastWeeklyRankings(rankings: any) {
