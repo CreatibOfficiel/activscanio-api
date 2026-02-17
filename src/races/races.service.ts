@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unused-vars */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Between } from 'typeorm';
 
 import { RaceEvent } from './race-event.entity';
 import { RaceResult } from './race-result.entity';
@@ -32,8 +33,33 @@ export class RacesService {
 
   // CREATE a new race
   async createRace(dto: CreateRaceDto): Promise<RaceEvent> {
+    const raceDate = new Date(dto.date);
+
+    // Idempotence check: prevent duplicate races with same competitors within 60s
+    const competitorIds = dto.results.map((r) => r.competitorId).sort();
+    const windowStart = new Date(raceDate.getTime() - 60_000);
+    const windowEnd = new Date(raceDate.getTime() + 60_000);
+
+    const recentRaces = await this.raceEventRepository.repository.find({
+      where: { date: Between(windowStart, windowEnd) },
+      relations: ['results'],
+    });
+
+    const duplicate = recentRaces.find((race) => {
+      const existingIds = race.results.map((r) => r.competitorId).sort();
+      return (
+        existingIds.length === competitorIds.length &&
+        existingIds.every((id, i) => id === competitorIds[i])
+      );
+    });
+
+    if (duplicate) {
+      throw new ConflictException(
+        `A race with the same competitors already exists within 60s (id: ${duplicate.id})`,
+      );
+    }
+
     try {
-      const raceDate = new Date(dto.date);
 
       const race = new RaceEvent();
       race.date = raceDate;
