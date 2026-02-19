@@ -3,7 +3,7 @@
  *
  * Rules tested:
  * 1. Calibration: MIN_LIFETIME_RACES (5) total races required
- * 2. Recent activity: MIN_RECENT_RACES (2) in last RECENT_WINDOW_DAYS (30) days
+ * 2. Recent activity: MIN_RECENT_RACES (2) in last RECENT_WINDOW_DAYS (14) days
  */
 
 import { ELIGIBILITY_RULES } from '../../config/odds-calculator.config';
@@ -18,7 +18,7 @@ describe('Eligibility Rules Configuration', () => {
   });
 
   it('should have correct rolling window period', () => {
-    expect(ELIGIBILITY_RULES.RECENT_WINDOW_DAYS).toBe(30);
+    expect(ELIGIBILITY_RULES.RECENT_WINDOW_DAYS).toBe(14);
   });
 });
 
@@ -120,10 +120,10 @@ describe('Eligibility Logic', () => {
     });
   });
 
-  describe('Recent Activity Rule (30-day rolling window)', () => {
+  describe('Recent Activity Rule (14-day rolling window)', () => {
     it('should mark competitor with only 1 recent race as inactive', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(5)]; // Only 1 race in last 30 days
+      const recentRaces = [createMockRace(5)]; // Only 1 race in last 14 days
 
       const result = checkEligibility(competitor, recentRaces);
 
@@ -133,7 +133,7 @@ describe('Eligibility Logic', () => {
 
     it('should mark competitor with no recent races as inactive', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(35), createMockRace(40)]; // All races older than 30 days
+      const recentRaces = [createMockRace(20), createMockRace(25)]; // All races older than 14 days
 
       const result = checkEligibility(competitor, recentRaces);
 
@@ -141,20 +141,20 @@ describe('Eligibility Logic', () => {
       expect(result.reason).toBe('inactive');
     });
 
-    it('should pass activity check with exactly 2 races in 30 days', () => {
+    it('should pass activity check with exactly 2 races in 14 days', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
-      const recentRaces = [createMockRace(5), createMockRace(25)];
+      const recentRaces = [createMockRace(5), createMockRace(12)];
 
       const result = checkEligibility(competitor, recentRaces);
 
       expect(result.reason).not.toBe('inactive');
     });
 
-    it('should pass activity check with races at boundary (30 days ago)', () => {
+    it('should pass activity check with races at boundary (14 days ago)', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
       const recentRaces = [
         createMockRace(1),
-        createMockRace(30), // Exactly at boundary
+        createMockRace(14), // Exactly at boundary
       ];
 
       const result = checkEligibility(competitor, recentRaces);
@@ -162,11 +162,11 @@ describe('Eligibility Logic', () => {
       expect(result.reason).not.toBe('inactive');
     });
 
-    it('should fail activity check with race just outside boundary (31 days)', () => {
+    it('should fail activity check with race just outside boundary (15 days)', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 10 });
       const recentRaces = [
         createMockRace(1),
-        createMockRace(31), // Just outside boundary
+        createMockRace(15), // Just outside boundary
       ];
 
       const result = checkEligibility(competitor, recentRaces);
@@ -177,7 +177,7 @@ describe('Eligibility Logic', () => {
   });
 
   describe('Full Eligibility (all rules combined)', () => {
-    it('should be eligible with 5+ lifetime races and 2+ recent races in 30 days', () => {
+    it('should be eligible with 5+ lifetime races and 2+ recent races in 14 days', () => {
       const competitor = createMockCompetitor({ totalLifetimeRaces: 5 });
       const recentRaces = [createMockRace(1), createMockRace(7)];
 

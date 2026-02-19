@@ -52,7 +52,7 @@ export const ELIGIBILITY_RULES = {
    * Rolling window in days for recent activity check
    * Competitors must have MIN_RECENT_RACES within this window
    */
-  RECENT_WINDOW_DAYS: 30,
+  RECENT_WINDOW_DAYS: 14,
 };
 
 /**
