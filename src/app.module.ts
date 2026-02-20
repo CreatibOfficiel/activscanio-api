@@ -34,6 +34,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ImageGenerationModule } from './image-generation/image-generation.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { ExportModule } from './export/export.module';
+import { DuelsModule } from './duels/duels.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { ExportModule } from './export/export.module';
     ImageGenerationModule,
     WebsocketModule,
     ExportModule,
+    DuelsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -115,4 +115,60 @@ export class NotificationEventListener {
       );
     }
   }
+
+  @OnEvent('duel.created')
+  async handleDuelCreated(payload: {
+    duel: any;
+    challengerUser: any;
+    challengedUser: any;
+  }) {
+    try {
+      await this.notificationsService.sendNotification({
+        userIds: [payload.duel.challengedUserId],
+        title: 'Duel recu !',
+        body: `${payload.challengerUser.firstName} t'a defie ! ${payload.duel.stake} pts en jeu. Tu as 1 min pour repondre.`,
+        category: NotificationCategory.BETTING,
+        tag: `duel-received-${payload.duel.id}`,
+        url: '/betting/duels',
+        requireInteraction: true,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send duel created notification`,
+        error,
+      );
+    }
+  }
+
+  @OnEvent('duel.resolved')
+  async handleDuelResolved(payload: { duel: any }) {
+    try {
+      const { duel } = payload;
+      const winnerId = duel.winnerUserId;
+      const loserId = duel.loserUserId;
+
+      await this.notificationsService.sendNotification({
+        userIds: [winnerId],
+        title: 'Duel gagne !',
+        body: `Tu as gagne ton duel ! +${duel.stake} pts`,
+        category: NotificationCategory.BETTING,
+        tag: `duel-resolved-${duel.id}`,
+        url: '/betting/duels',
+      });
+
+      await this.notificationsService.sendNotification({
+        userIds: [loserId],
+        title: 'Duel perdu',
+        body: `Tu as perdu ton duel. -${duel.stake} pts`,
+        category: NotificationCategory.BETTING,
+        tag: `duel-resolved-${duel.id}`,
+        url: '/betting/duels',
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send duel resolved notification`,
+        error,
+      );
+    }
+  }
 }

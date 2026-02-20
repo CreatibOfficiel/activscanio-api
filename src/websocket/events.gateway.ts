@@ -165,6 +165,70 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Emit duel received event to the challenged user
+   */
+  emitDuelReceived(userId: string, data: any) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit('duel:received', data);
+      this.logger.log(`Sent duel:received to user ${userId}`);
+    }
+  }
+
+  /**
+   * Emit duel accepted event to the challenger
+   */
+  emitDuelAccepted(userId: string, data: any) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit('duel:accepted', data);
+      this.logger.log(`Sent duel:accepted to user ${userId}`);
+    }
+  }
+
+  /**
+   * Emit duel declined event to the challenger
+   */
+  emitDuelDeclined(userId: string, data: any) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit('duel:declined', data);
+      this.logger.log(`Sent duel:declined to user ${userId}`);
+    }
+  }
+
+  /**
+   * Emit duel resolved event to both users + broadcast
+   */
+  emitDuelResolved(challengerUserId: string, challengedUserId: string, data: any) {
+    const challengerSocket = this.userSockets.get(challengerUserId);
+    if (challengerSocket) {
+      this.server.to(challengerSocket).emit('duel:resolved', data);
+    }
+    const challengedSocket = this.userSockets.get(challengedUserId);
+    if (challengedSocket) {
+      this.server.to(challengedSocket).emit('duel:resolved', data);
+    }
+    this.server.emit('duel:feed', data);
+    this.logger.log(`Sent duel:resolved to both users + broadcast`);
+  }
+
+  /**
+   * Emit duel cancelled event to both users
+   */
+  emitDuelCancelled(challengerUserId: string, challengedUserId: string, data: any) {
+    const challengerSocket = this.userSockets.get(challengerUserId);
+    if (challengerSocket) {
+      this.server.to(challengerSocket).emit('duel:cancelled', data);
+    }
+    const challengedSocket = this.userSockets.get(challengedUserId);
+    if (challengedSocket) {
+      this.server.to(challengedSocket).emit('duel:cancelled', data);
+    }
+    this.logger.log(`Sent duel:cancelled to both users`);
+  }
+
+  /**
    * Get count of connected clients
    */
   getConnectedClientsCount(): number {
