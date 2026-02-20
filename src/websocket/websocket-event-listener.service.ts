@@ -150,4 +150,79 @@ export class WebSocketEventListener {
     );
     this.eventsGateway.broadcastCompetitorUpdate(payload.competitor);
   }
+
+  /**
+   * Listen to duel created events → notify challenged user
+   */
+  @OnEvent('duel.created')
+  handleDuelCreated(payload: { duel: any; challengerUser: any; challengedUser: any }) {
+    this.logger.log(`Relaying duel:received to user ${payload.duel.challengedUserId}`);
+    this.eventsGateway.emitDuelReceived(payload.duel.challengedUserId, {
+      duelId: payload.duel.id,
+      challenger: {
+        firstName: payload.challengerUser.firstName,
+        lastName: payload.challengerUser.lastName,
+        profilePictureUrl: payload.challengerUser.profilePictureUrl,
+      },
+      stake: payload.duel.stake,
+      expiresAt: payload.duel.expiresAt,
+    });
+  }
+
+  /**
+   * Listen to duel accepted events → notify challenger
+   */
+  @OnEvent('duel.accepted')
+  handleDuelAccepted(payload: { duel: any }) {
+    this.logger.log(`Relaying duel:accepted to user ${payload.duel.challengerUserId}`);
+    this.eventsGateway.emitDuelAccepted(payload.duel.challengerUserId, {
+      duelId: payload.duel.id,
+    });
+  }
+
+  /**
+   * Listen to duel declined events → notify challenger
+   */
+  @OnEvent('duel.declined')
+  handleDuelDeclined(payload: { duel: any }) {
+    this.logger.log(`Relaying duel:declined to user ${payload.duel.challengerUserId}`);
+    this.eventsGateway.emitDuelDeclined(payload.duel.challengerUserId, {
+      duelId: payload.duel.id,
+    });
+  }
+
+  /**
+   * Listen to duel resolved events → notify both users + feed
+   */
+  @OnEvent('duel.resolved')
+  handleDuelResolved(payload: { duel: any }) {
+    this.logger.log(`Relaying duel:resolved for duel ${payload.duel.id}`);
+    this.eventsGateway.emitDuelResolved(
+      payload.duel.challengerUserId,
+      payload.duel.challengedUserId,
+      {
+        duelId: payload.duel.id,
+        winnerUserId: payload.duel.winnerUserId,
+        loserUserId: payload.duel.loserUserId,
+        stake: payload.duel.stake,
+        raceEventId: payload.duel.raceEventId,
+      },
+    );
+  }
+
+  /**
+   * Listen to duel cancelled events → notify both users
+   */
+  @OnEvent('duel.cancelled')
+  handleDuelCancelled(payload: { duel: any; reason: string }) {
+    this.logger.log(`Relaying duel:cancelled for duel ${payload.duel.id}`);
+    this.eventsGateway.emitDuelCancelled(
+      payload.duel.challengerUserId,
+      payload.duel.challengedUserId,
+      {
+        duelId: payload.duel.id,
+        reason: payload.reason,
+      },
+    );
+  }
 }
