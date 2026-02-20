@@ -323,4 +323,87 @@ export class BettingController {
       query.year,
     );
   }
+
+  /**
+   * Get unseen bet result for current user
+   */
+  @Get('bets/unseen-result')
+  @ApiOperation({ summary: 'Get most recent unseen finalized bet result' })
+  @ApiResponse({ status: 200, description: 'Unseen bet result or null' })
+  async getUnseenBetResult(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    const bet = await this.bettingService.getUnseenBetResult(userId);
+    if (!bet) return null;
+
+    const correctPicks = bet.picks.filter((p) => p.isCorrect).length;
+    const hasBoost = bet.picks.some((p) => p.hasBoost);
+    const isPerfectPodium = bet.picks.every((p) => p.isCorrect);
+    const pointsBeforeBonus = bet.picks.reduce(
+      (sum, p) => sum + (p.pointsEarned || 0),
+      0,
+    );
+    const perfectPodiumBonus = isPerfectPodium ? pointsBeforeBonus : 0;
+
+    return {
+      betId: bet.id,
+      weekId: bet.bettingWeekId,
+      status: (bet.pointsEarned ?? 0) > 0 ? 'won' : 'lost',
+      pointsEarned: bet.pointsEarned ?? 0,
+      isPerfectPodium,
+      perfectPodiumBonus,
+      correctPicks,
+      totalPicks: bet.picks.length,
+      hasBoost,
+      picks: bet.picks.map((p) => ({
+        competitorName: p.competitor
+          ? `${p.competitor.firstName} ${p.competitor.lastName}`
+          : 'Unknown',
+        position: p.position,
+        isCorrect: p.isCorrect,
+        oddAtBet: p.oddAtBet,
+        hasBoost: p.hasBoost,
+        pointsEarned: p.pointsEarned ?? 0,
+        usedBogOdd: p.usedBogOdd ?? false,
+      })),
+    };
+  }
+
+  /**
+   * Mark a bet result as seen
+   */
+  @Post('bets/:betId/mark-result-seen')
+  @ApiOperation({ summary: 'Mark a bet result as seen' })
+  @ApiParam({ name: 'betId', description: 'Bet UUID' })
+  @ApiResponse({ status: 200, description: 'Result marked as seen' })
+  async markBetResultSeen(
+    @CurrentUser('clerkId') clerkId: string,
+    @Param('betId') betId: string,
+  ) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    await this.bettingService.markBetResultSeen(userId, betId);
+    return { success: true };
+  }
+
+  /**
+   * Get unseen streak losses for current user
+   */
+  @Get('streaks/unseen-losses')
+  @ApiOperation({ summary: 'Get unseen streak losses (betting + play)' })
+  @ApiResponse({ status: 200, description: 'Unseen streak losses' })
+  async getUnseenStreakLosses(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    return await this.bettingService.getUnseenStreakLosses(userId);
+  }
+
+  /**
+   * Mark all streak losses as seen
+   */
+  @Post('streaks/mark-losses-seen')
+  @ApiOperation({ summary: 'Mark all streak losses as seen' })
+  @ApiResponse({ status: 200, description: 'Streak losses marked as seen' })
+  async markStreakLossesSeen(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    await this.bettingService.markStreakLossesSeen(userId);
+    return { success: true };
+  }
 }

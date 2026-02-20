@@ -115,6 +115,22 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Emit streak lost event to specific user
+   */
+  emitStreakLost(
+    userId: string,
+    data: { type: 'betting' | 'play'; lostValue: number; lostAt: Date },
+  ) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit('streak:lost', data);
+      this.logger.log(
+        `Sent ${data.type} streak lost to user ${userId} (was ${data.lostValue})`,
+      );
+    }
+  }
+
+  /**
    * Broadcast to all connected clients (e.g., race announcements)
    */
   broadcastRaceAnnouncement(race: any) {

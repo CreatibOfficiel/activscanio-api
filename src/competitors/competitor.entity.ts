@@ -104,6 +104,16 @@ export class Competitor {
   @Column({ type: 'date', nullable: true })
   lastPlayStreakWarningDate: string | null;
 
+  // Play streak loss tracking
+  @Column({ type: 'int', nullable: true })
+  playStreakLostValue: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  playStreakLostAt: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  playStreakLossSeenAt: Date | null;
+
   @OneToOne(() => CharacterVariant, (variant) => variant.competitor, {
     nullable: true,
   })

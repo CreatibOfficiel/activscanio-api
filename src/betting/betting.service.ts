@@ -11,6 +11,7 @@ import {
   Between,
   MoreThanOrEqual,
   LessThanOrEqual,
+  IsNull,
   FindOptionsWhere,
 } from 'typeorm';
 import { BettingWeek, BettingWeekStatus } from './entities/betting-week.entity';
@@ -22,6 +23,8 @@ import { CompetitorOdds } from './entities/competitor-odds.entity';
 import { User } from '../users/user.entity';
 import { UserAchievement } from '../achievements/entities/user-achievement.entity';
 import { Achievement } from '../achievements/entities/achievement.entity';
+import { UserStreak } from '../achievements/entities/user-streak.entity';
+import { Competitor } from '../competitors/competitor.entity';
 import { PaginatedResponse } from '../common';
 
 @Injectable()
@@ -41,6 +44,10 @@ export class BettingService {
     private readonly userAchievementRepository: Repository<UserAchievement>,
     @InjectRepository(Achievement)
     private readonly achievementRepository: Repository<Achievement>,
+    @InjectRepository(UserStreak)
+    private readonly userStreakRepository: Repository<UserStreak>,
+    @InjectRepository(Competitor)
+    private readonly competitorRepository: Repository<Competitor>,
   ) {}
 
   /**
@@ -470,5 +477,99 @@ export class BettingService {
     });
 
     return PaginatedResponse.create(bets, total, limit, offset);
+  }
+
+  /**
+   * Get the most recent finalized bet with unseen result for a user
+   */
+  async getUnseenBetResult(userId: string): Promise<Bet | null> {
+    return await this.betRepository.findOne({
+      where: {
+        userId,
+        isFinalized: true,
+        resultSeenAt: IsNull(),
+      },
+      relations: ['picks', 'picks.competitor', 'bettingWeek'],
+      order: { placedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Mark a bet result as seen
+   */
+  async markBetResultSeen(userId: string, betId: string): Promise<void> {
+    await this.betRepository.update(
+      { id: betId, userId },
+      { resultSeenAt: new Date() },
+    );
+  }
+
+  /**
+   * Get unseen streak losses for a user (both betting and play)
+   */
+  async getUnseenStreakLosses(userId: string): Promise<{
+    bettingStreakLoss: { lostValue: number; lostAt: Date } | null;
+    playStreakLoss: { lostValue: number; lostAt: Date } | null;
+  }> {
+    // Check betting streak loss
+    const userStreak = await this.userStreakRepository.findOne({
+      where: { userId },
+    });
+
+    let bettingStreakLoss: { lostValue: number; lostAt: Date } | null = null;
+    if (
+      userStreak?.bettingStreakLostValue &&
+      userStreak.bettingStreakLostAt &&
+      !userStreak.bettingStreakLossSeenAt
+    ) {
+      bettingStreakLoss = {
+        lostValue: userStreak.bettingStreakLostValue,
+        lostAt: userStreak.bettingStreakLostAt,
+      };
+    }
+
+    // Check play streak loss (via competitor linked to user)
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    let playStreakLoss: { lostValue: number; lostAt: Date } | null = null;
+
+    if (user?.competitorId) {
+      const competitor = await this.competitorRepository.findOne({
+        where: { id: user.competitorId },
+      });
+
+      if (
+        competitor?.playStreakLostValue &&
+        competitor.playStreakLostAt &&
+        !competitor.playStreakLossSeenAt
+      ) {
+        playStreakLoss = {
+          lostValue: competitor.playStreakLostValue,
+          lostAt: competitor.playStreakLostAt,
+        };
+      }
+    }
+
+    return { bettingStreakLoss, playStreakLoss };
+  }
+
+  /**
+   * Mark all streak losses as seen for a user
+   */
+  async markStreakLossesSeen(userId: string): Promise<void> {
+    const now = new Date();
+
+    // Mark betting streak loss as seen
+    await this.userStreakRepository.update(
+      { userId },
+      { bettingStreakLossSeenAt: now },
+    );
+
+    // Mark play streak loss as seen (via competitor linked to user)
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (user?.competitorId) {
+      await this.competitorRepository.update(user.competitorId, {
+        playStreakLossSeenAt: now,
+      });
+    }
   }
 }

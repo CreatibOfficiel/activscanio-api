@@ -30,6 +30,7 @@ import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { UserAchievement } from '../achievements/entities/user-achievement.entity';
 import { Achievement } from '../achievements/entities/achievement.entity';
+import { UserStreak } from '../achievements/entities/user-streak.entity';
 import { UsersModule } from '../users/users.module';
 import { AchievementsModule } from '../achievements/achievements.module';
 import { ImageGenerationModule } from '../image-generation/image-generation.module';
@@ -50,6 +51,7 @@ import { ImageGenerationModule } from '../image-generation/image-generation.modu
       User,
       UserAchievement,
       Achievement,
+      UserStreak,
     ]),
     ScheduleModule.forRoot(),
     UsersModule,

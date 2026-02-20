@@ -9,6 +9,7 @@ import { CompetitorRepository } from './repositories/competitor.repository';
 import { CompetitorEloSnapshotRepository } from './repositories/competitor-elo-snapshot.repository';
 import { RaceResult } from '../races/race-result.entity';
 import { RaceResultRepository } from '../races/repositories/race-result.repository';
+import { User } from '../users/user.entity';
 import { RacesModule } from 'src/races/races.module';
 import { RatingModule } from 'src/rating/rating.module';
 import { UsersModule } from 'src/users/users.module';
@@ -16,7 +17,7 @@ import { BettingModule } from 'src/betting/betting.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Competitor, CompetitorEloSnapshot, RaceResult]),
+    TypeOrmModule.forFeature([Competitor, CompetitorEloSnapshot, RaceResult, User]),
     forwardRef(() => RacesModule),
     BettingModule,
     RatingModule,
