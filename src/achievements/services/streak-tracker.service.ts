@@ -90,6 +90,18 @@ export class StreakTrackerService {
         this.logger.log(
           `User ${userId}: Monthly streak broken (was ${userStreak.currentMonthlyStreak})`,
         );
+
+        // Track the lost streak for notification
+        userStreak.bettingStreakLostValue = userStreak.currentMonthlyStreak;
+        userStreak.bettingStreakLostAt = new Date();
+        userStreak.bettingStreakLossSeenAt = null;
+
+        // Emit streak lost event
+        this.eventEmitter.emit('streak.betting_lost', {
+          userId,
+          lostValue: userStreak.currentMonthlyStreak,
+          lostAt: new Date(),
+        });
       }
 
       userStreak.currentMonthlyStreak = 1;
@@ -302,10 +314,35 @@ export class StreakTrackerService {
 
   /**
    * Reset monthly streaks for all users (called by cron on 1st of month)
+   * Before resetting, saves streak loss values and emits events for users with active streaks
    */
   async resetMonthlyStreaks(): Promise<number> {
     this.logger.log('Resetting monthly streaks for all users...');
 
+    // Find users with active streaks before resetting
+    const activeStreaks = await this.userStreakRepository.find({
+      where: {},
+    });
+
+    const usersWithStreaks = activeStreaks.filter(
+      (s) => s.currentMonthlyStreak > 0,
+    );
+
+    // Save streak loss values and emit events
+    for (const streak of usersWithStreaks) {
+      streak.bettingStreakLostValue = streak.currentMonthlyStreak;
+      streak.bettingStreakLostAt = new Date();
+      streak.bettingStreakLossSeenAt = null;
+      await this.userStreakRepository.save(streak);
+
+      this.eventEmitter.emit('streak.betting_lost', {
+        userId: streak.userId,
+        lostValue: streak.currentMonthlyStreak,
+        lostAt: new Date(),
+      });
+    }
+
+    // Now reset all monthly streaks
     const result = await this.userStreakRepository.update(
       {},
       {
@@ -316,7 +353,7 @@ export class StreakTrackerService {
     );
 
     this.logger.log(
-      `Monthly streaks reset completed: ${result.affected || 0} users affected`,
+      `Monthly streaks reset completed: ${result.affected || 0} users affected (${usersWithStreaks.length} had active streaks)`,
     );
 
     return result.affected || 0;

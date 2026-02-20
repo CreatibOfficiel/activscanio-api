@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Competitor } from '../competitor.entity';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import { RaceResult } from '../../races/race-result.entity';
+import { User } from '../../users/user.entity';
 import { businessDaysBetween } from '../utils/business-days';
 
 /**
@@ -16,11 +18,19 @@ import { businessDaysBetween } from '../utils/business-days';
  */
 @Injectable()
 export class CompetitorRepository extends BaseRepository<Competitor> {
+  private readonly eventEmitter: EventEmitter2;
+  private readonly userRepository: Repository<User>;
+
   constructor(
     @InjectRepository(Competitor)
     repository: Repository<Competitor>,
+    @InjectRepository(User)
+    userRepository: Repository<User>,
+    eventEmitter: EventEmitter2,
   ) {
     super(repository, 'Competitor');
+    this.eventEmitter = eventEmitter;
+    this.userRepository = userRepository;
   }
 
   /**
@@ -298,6 +308,32 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
         playStreak += 1;
       } else {
         // 2+ missed weekdays — streak broken
+        if (playStreak > 0) {
+          // Track the lost streak for notification
+          competitor.playStreakLostValue = playStreak;
+          competitor.playStreakLostAt = new Date();
+          competitor.playStreakLossSeenAt = null;
+
+          await this.repository.update(competitorId, {
+            playStreakLostValue: playStreak,
+            playStreakLostAt: new Date(),
+            playStreakLossSeenAt: null,
+          });
+
+          // Find the user linked to this competitor
+          const user = await this.userRepository.findOne({
+            where: { competitorId },
+          });
+
+          if (user) {
+            this.eventEmitter.emit('streak.play_lost', {
+              userId: user.id,
+              lostValue: playStreak,
+              lostAt: new Date(),
+            });
+          }
+        }
+
         playStreak = 1;
       }
     }

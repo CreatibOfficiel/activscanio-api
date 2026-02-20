@@ -58,6 +58,9 @@ export class Bet {
   @OneToMany(() => BetPick, (pick) => pick.bet, { cascade: true, eager: true })
   picks: BetPick[];
 
+  @Column({ type: 'timestamptz', nullable: true })
+  resultSeenAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

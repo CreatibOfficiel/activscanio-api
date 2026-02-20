@@ -64,11 +64,49 @@ export class WebSocketEventListener {
    * Listen to bet finalized events
    */
   @OnEvent('bet.finalized')
-  handleBetFinalized(payload: { userId: string; bet: any }) {
+  handleBetFinalized(payload: { userId: string; [key: string]: any }) {
     this.logger.log(
       `Relaying bet finalized via WebSocket for user ${payload.userId}`,
     );
-    this.eventsGateway.emitBetFinalized(payload.userId, payload.bet);
+    this.eventsGateway.emitBetFinalized(payload.userId, payload);
+  }
+
+  /**
+   * Listen to betting streak lost events
+   */
+  @OnEvent('streak.betting_lost')
+  handleBettingStreakLost(payload: {
+    userId: string;
+    lostValue: number;
+    lostAt: Date;
+  }) {
+    this.logger.log(
+      `Relaying betting streak lost via WebSocket for user ${payload.userId} (was ${payload.lostValue})`,
+    );
+    this.eventsGateway.emitStreakLost(payload.userId, {
+      type: 'betting',
+      lostValue: payload.lostValue,
+      lostAt: payload.lostAt,
+    });
+  }
+
+  /**
+   * Listen to play streak lost events
+   */
+  @OnEvent('streak.play_lost')
+  handlePlayStreakLost(payload: {
+    userId: string;
+    lostValue: number;
+    lostAt: Date;
+  }) {
+    this.logger.log(
+      `Relaying play streak lost via WebSocket for user ${payload.userId} (was ${payload.lostValue})`,
+    );
+    this.eventsGateway.emitStreakLost(payload.userId, {
+      type: 'play',
+      lostValue: payload.lostValue,
+      lostAt: payload.lostAt,
+    });
   }
 
   /**

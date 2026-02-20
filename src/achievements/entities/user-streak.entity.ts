@@ -64,6 +64,16 @@ export class UserStreak {
   @Column({ type: 'int', nullable: true })
   lastWinYear: number | null;
 
+  // Betting streak loss tracking
+  @Column({ type: 'int', nullable: true })
+  bettingStreakLostValue: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  bettingStreakLostAt: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  bettingStreakLossSeenAt: Date | null;
+
   // Metadata
   @Column({ type: 'int', default: 0 })
   totalWeeksParticipated: number;

@@ -166,7 +166,7 @@ export class BettingFinalizerService {
     // 3. Fetch only non-finalized bets for this week (prevents double finalization)
     const bets = await this.betRepository.find({
       where: { bettingWeekId: weekId, isFinalized: false },
-      relations: ['picks'],
+      relations: ['picks', 'picks.competitor'],
     });
 
     if (bets.length === 0) {
@@ -456,17 +456,33 @@ export class BettingFinalizerService {
         );
       }
 
-      // Emit event for achievement calculation
+      // Emit event for achievement calculation + WebSocket relay
       this.eventEmitter.emit('bet.finalized', {
         userId: bet.userId,
         betId: bet.id,
         weekId: bet.bettingWeekId,
+        status: calculation.finalPoints > 0 ? 'won' : 'lost',
         pointsEarned: calculation.finalPoints,
         isPerfectPodium: calculation.isPerfectPodium,
+        perfectPodiumBonus: calculation.perfectPodiumBonus,
         correctPicks: correctPicksCount,
         totalPicks: calculation.picks.length,
         hasBoost,
         highestOdd,
+        picks: calculation.picks.map((p) => {
+          const betPick = bet.picks.find((bp) => bp.id === p.pickId);
+          return {
+            competitorName: betPick?.competitor
+              ? `${betPick.competitor.firstName} ${betPick.competitor.lastName}`
+              : 'Unknown',
+            position: p.position,
+            isCorrect: p.isCorrect,
+            oddAtBet: p.oddAtBet,
+            hasBoost: p.hasBoost,
+            pointsEarned: p.pointsEarned,
+            usedBogOdd: p.usedBogOdd,
+          };
+        }),
       });
 
       // 🎉 PERFECT SCORE CELEBRATION (60 points)
