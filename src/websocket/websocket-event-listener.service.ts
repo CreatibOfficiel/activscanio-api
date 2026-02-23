@@ -190,6 +190,45 @@ export class WebSocketEventListener {
   }
 
   /**
+   * Listen to live bet detection events → notify bettor
+   */
+  @OnEvent('liveBet.detected')
+  handleLiveBetDetected(payload: { userId: string; liveBet: any }) {
+    this.logger.log(
+      `Relaying liveBet:detected to user ${payload.userId}`,
+    );
+    this.eventsGateway.emitLiveBetDetected(payload.userId, {
+      liveBetId: payload.liveBet.id,
+      status: payload.liveBet.status,
+      detectedCharacters: payload.liveBet.detectedCharacters,
+      detectionExpiresAt: payload.liveBet.detectionExpiresAt,
+    });
+  }
+
+  /**
+   * Listen to live bet resolved events → notify bettor + broadcast
+   */
+  @OnEvent('liveBet.resolved')
+  handleLiveBetResolved(payload: { userId: string; liveBet: any }) {
+    this.logger.log(
+      `Relaying liveBet:resolved to user ${payload.userId}`,
+    );
+    this.eventsGateway.emitLiveBetResolved(payload.userId, {
+      liveBetId: payload.liveBet.id,
+      status: payload.liveBet.status,
+      pointsEarned: payload.liveBet.pointsEarned,
+      competitorId: payload.liveBet.competitorId,
+      oddAtBet: payload.liveBet.oddAtBet,
+    });
+    this.eventsGateway.broadcastLiveBetResult({
+      liveBetId: payload.liveBet.id,
+      userId: payload.userId,
+      status: payload.liveBet.status,
+      pointsEarned: payload.liveBet.pointsEarned,
+    });
+  }
+
+  /**
    * Listen to duel created events → notify challenged user
    */
   @OnEvent('duel.created')

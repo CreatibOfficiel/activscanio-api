@@ -35,6 +35,7 @@ import { ImageGenerationModule } from './image-generation/image-generation.modul
 import { WebsocketModule } from './websocket/websocket.module';
 import { ExportModule } from './export/export.module';
 import { DuelsModule } from './duels/duels.module';
+import { LiveBettingModule } from './live-betting/live-betting.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { DuelsModule } from './duels/duels.module';
     WebsocketModule,
     ExportModule,
     DuelsModule,
+    LiveBettingModule,
   ],
   controllers: [AppController],
   providers: [

@@ -229,6 +229,36 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Emit live bet detection result to specific user
+   */
+  emitLiveBetDetected(userId: string, data: any) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit('liveBet:detected', data);
+      this.logger.log(`Sent liveBet:detected to user ${userId}`);
+    }
+  }
+
+  /**
+   * Emit live bet resolved to specific user
+   */
+  emitLiveBetResolved(userId: string, data: any) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit('liveBet:resolved', data);
+      this.logger.log(`Sent liveBet:resolved to user ${userId}`);
+    }
+  }
+
+  /**
+   * Broadcast live bet result to all (after resolution)
+   */
+  broadcastLiveBetResult(data: any) {
+    this.server.emit('liveBet:result', data);
+    this.logger.log('Broadcasted liveBet:result to all clients');
+  }
+
+  /**
    * Get count of connected clients
    */
   getConnectedClientsCount(): number {
