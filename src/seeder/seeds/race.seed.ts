@@ -188,6 +188,7 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
         raceCount: stats.raceCount,
         avgRank12: Math.round((stats.totalRank / stats.raceCount) * 100) / 100,
         rating: Math.round(stats.rating * 100) / 100,
+        rd: stats.raceCount >= 5 ? 70 : 350,
         lastRaceDate: stats.lastRaceDate,
         winStreak: stats.winStreak,
         currentMonthRaceCount: seededRandom.int(0, stats.raceCount),
