@@ -64,7 +64,7 @@ export class LiveBet {
   @Column({ type: 'timestamptz' })
   expiresAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   raceEventId: string | null;
 
   @ManyToOne(() => RaceEvent, { nullable: true })
@@ -81,7 +81,7 @@ export class LiveBet {
   @Column({ type: 'float', nullable: true })
   pointsEarned: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   cancellationReason: string | null;
 
   @CreateDateColumn()
