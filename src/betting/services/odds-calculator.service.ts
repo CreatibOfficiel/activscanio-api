@@ -104,7 +104,7 @@ export class OddsCalculatorService {
       probability: step.normalizedProbability,
       isEligible: step.isEligible,
       metadata: {
-        elo: step.rating,
+        elo: step.conservativeScore,
         rd: step.rd,
         recentWins: step.recentRaceCount,
         winStreak: step.winStreak,
