@@ -41,6 +41,7 @@ export const sanitizeCompetitor = (c: Competitor) => {
       ? {
           id: c.characterVariant.id,
           label: c.characterVariant.label,
+          imageUrl: c.characterVariant.imageUrl,
           baseCharacter: c.characterVariant.baseCharacter
             ? {
                 id: c.characterVariant.baseCharacter.id,
