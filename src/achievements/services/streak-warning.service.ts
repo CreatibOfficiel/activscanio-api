@@ -268,34 +268,34 @@ export class StreakWarningService {
     if (urgency === 'urgent') {
       return {
         title: 'DERNIER JOUR pour parier !',
-        body: `Ta serie de ${streak} semaine(s) se termine ce soir. Parie maintenant !`,
+        body: `Ta série de ${streak} semaine${streak > 1 ? 's' : ''} se termine ce soir. Parie maintenant !`,
       };
     }
 
     // Early (Monday)
     if (streak === 1) {
       return {
-        title: 'Ta serie est en jeu !',
-        body: 'Tu as parie 1 semaine d\'affilee. Place ton prono avant ce soir !',
+        title: 'Ta série est en jeu !',
+        body: 'Tu as parié 1 semaine d\'affilée. Place ton prono avant ce soir !',
       };
     }
     if (streak <= 4) {
       return {
         title: `${streak} semaines de suite !`,
-        body: 'Belle serie ! N\'oublie pas de parier cette semaine.',
+        body: 'Belle série ! N\'oublie pas de parier cette semaine.',
       };
     }
     if (streak <= 9) {
       const nextMilestone = streak < 5 ? 5 : 10;
       return {
-        title: `Serie de ${streak} semaines`,
-        body: `Tu es a ${nextMilestone - streak} semaine(s) du prochain palier. Continue !`,
+        title: `Série de ${streak} semaines`,
+        body: `Tu es à ${nextMilestone - streak} semaine${nextMilestone - streak > 1 ? 's' : ''} du prochain palier. Continue !`,
       };
     }
     // 10+
     return {
-      title: `Serie LEGENDAIRE : ${streak} sem.`,
-      body: 'Ne laisse pas cette serie historique s\'arreter !',
+      title: `Série LEGENDAIRE : ${streak} sem.`,
+      body: 'Ne laisse pas cette série historique s\'arrêter !',
     };
   }
 
@@ -304,19 +304,19 @@ export class StreakWarningService {
   ): { title: string; body: string } {
     if (streak <= 3) {
       return {
-        title: `Serie de ${streak}j en danger !`,
+        title: `Série de ${streak}j en danger !`,
         body: 'Dernier jour pour la sauver. Fais une course !',
       };
     }
     if (streak <= 9) {
       return {
-        title: `Serie de ${streak} jours en danger !`,
-        body: 'Dernier jour avant la perte. Une course et c\'est sauve !',
+        title: `Série de ${streak} jours en danger !`,
+        body: 'Dernier jour avant la perte. Une course et c\'est sauvé !',
       };
     }
     // 10+
     return {
-      title: `${streak} jours de serie en peril !`,
+      title: `${streak} jours de série en péril !`,
       body: `Ne perds pas ${streak} jours d'effort ! Joue aujourd'hui.`,
     };
   }
