@@ -68,7 +68,19 @@ export class LiveBettingService {
     // Get oddFirst for the competitor
     const odd = await this.getOddForCompetitor(competitorId);
 
+    // Check user has enough points to cover potential loss
     const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const ranking = await this.bettorRankingRepository.findOne({
+      where: { userId: user.id, month, year },
+    });
+    const currentPoints = ranking?.totalPoints ?? 0;
+    if (currentPoints < odd) {
+      throw new BadRequestException(
+        `Pas assez de points (${currentPoints}) pour couvrir la cote (${odd}). Il vous faut au moins ${Math.ceil(odd)} points.`,
+      );
+    }
     const expiresAt = new Date(
       now.getTime() + LIVE_BETTING_CONFIG.SESSION_EXPIRY_SECONDS * 1000,
     );
