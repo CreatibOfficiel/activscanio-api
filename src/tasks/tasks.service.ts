@@ -46,6 +46,10 @@ import { StreakTrackerService } from '../achievements/services/streak-tracker.se
 import { StreakWarningService } from '../achievements/services/streak-warning.service';
 import { ELIGIBILITY_RULES } from '../betting/config/odds-calculator.config';
 import {
+  classifyCompetitor,
+  calculateConservativeScore,
+} from '../competitors/utils/competitor-classification';
+import {
   BETTING_CRON_SCHEDULES,
   TASK_EXECUTION_CONFIG,
   TASK_DESCRIPTIONS,
@@ -680,67 +684,32 @@ export class TasksService {
   /**
    * Determine the top 3 competitors for a week (podium)
    *
-   * Algorithm:
-   * 1. Filter eligible competitors (same criteria as odds: lifetime races + 30-day activity)
-   * 2. Score based on conservative score (rating - 2*rd)
-   * 3. Sort by score descending
-   * 4. Apply tie-breakers if needed
-   * 5. Return top 3
+   * Uses the same classification as the leaderboard:
+   * - confirmed = !provisional && !inactive
+   * - Sort by conservative score (rating - 2*rd) descending
+   * - Apply tie-breakers if needed
+   * - Return top 3 confirmed competitors
    */
   private async determinePodium(
     week: BettingWeek,
   ): Promise<Competitor[] | null> {
-    // Fetch all competitors
     const allCompetitors = await this.competitorRepository.find();
 
-    // Apply the same eligibility criteria as odds calculation:
-    // 1. Calibration: totalLifetimeRaces >= MIN_LIFETIME_RACES
-    // 2. Recent activity: >= MIN_RECENT_RACES in last RECENT_WINDOW_DAYS (30 days)
-    const windowStart = new Date();
-    windowStart.setDate(
-      windowStart.getDate() - ELIGIBILITY_RULES.RECENT_WINDOW_DAYS,
-    );
+    // Filter to confirmed competitors only (same criteria as leaderboard)
+    const confirmedCompetitors = allCompetitors.filter((c) => {
+      const { confirmed } = classifyCompetitor(c.raceCount, c.rd, c.lastRaceDate);
+      return confirmed;
+    });
 
-    const eligibilityChecks = await Promise.all(
-      allCompetitors.map(async (competitor) => {
-        // Rule 1: Calibration
-        if (
-          competitor.totalLifetimeRaces < ELIGIBILITY_RULES.MIN_LIFETIME_RACES
-        ) {
-          return { competitor, isEligible: false };
-        }
-
-        // Rule 2: Recent activity (rolling 30-day window)
-        const recentRacesCount = await this.raceResultRepository
-          .createQueryBuilder('result')
-          .innerJoin('result.race', 'race')
-          .where('result.competitorId = :competitorId', {
-            competitorId: competitor.id,
-          })
-          .andWhere('race.date >= :windowStart', { windowStart })
-          .getCount();
-
-        if (recentRacesCount < ELIGIBILITY_RULES.MIN_RECENT_RACES) {
-          return { competitor, isEligible: false };
-        }
-
-        return { competitor, isEligible: true };
-      }),
-    );
-
-    const eligibleCompetitors = eligibilityChecks
-      .filter((c) => c.isEligible)
-      .map((c) => c.competitor);
-
-    if (eligibleCompetitors.length < 3) {
+    if (confirmedCompetitors.length < 3) {
       this.logger.warn(
-        `Insufficient eligible competitors for podium: ${eligibleCompetitors.length} (need 3)`,
+        `Insufficient confirmed competitors for podium: ${confirmedCompetitors.length} (need 3)`,
       );
       return null;
     }
 
     // Score and sort competitors
-    const scored = eligibleCompetitors.map((competitor) => ({
+    const scored = confirmedCompetitors.map((competitor) => ({
       competitor,
       score: this.calculatePodiumScore(competitor),
     }));
