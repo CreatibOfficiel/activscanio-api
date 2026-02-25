@@ -51,6 +51,7 @@ export interface AchievementCondition {
   operator: AchievementConditionOperator;
   value: number;
   scope?: AchievementScope;
+  minCount?: { metric: string; value: number };
 }
 
 @Entity('achievements')

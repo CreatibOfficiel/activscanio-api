@@ -146,6 +146,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       operator: AchievementConditionOperator.GTE,
       value: 50,
       scope: AchievementScope.LIFETIME,
+      minCount: { metric: 'betsPlaced', value: 20 },
     },
   },
   {
@@ -163,6 +164,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       operator: AchievementConditionOperator.GTE,
       value: 75,
       scope: AchievementScope.LIFETIME,
+      minCount: { metric: 'betsPlaced', value: 20 },
     },
   },
 
@@ -424,6 +426,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       operator: AchievementConditionOperator.LTE,
       value: 5,
       scope: AchievementScope.MONTHLY,
+      minCount: { metric: 'betsPlaced', value: 3 },
     },
   },
   {
@@ -441,6 +444,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       operator: AchievementConditionOperator.LTE,
       value: 3,
       scope: AchievementScope.MONTHLY,
+      minCount: { metric: 'betsPlaced', value: 3 },
     },
   },
   {
@@ -458,6 +462,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       operator: AchievementConditionOperator.EQ,
       value: 1,
       scope: AchievementScope.MONTHLY,
+      minCount: { metric: 'betsPlaced', value: 3 },
     },
   },
   {
@@ -1235,6 +1240,7 @@ export const ACHIEVEMENT_DEFINITIONS = [
       operator: AchievementConditionOperator.LTE,
       value: 3,
       scope: AchievementScope.LIFETIME,
+      minCount: { metric: 'competitorRaceCount', value: 12 },
     },
   },
 ];

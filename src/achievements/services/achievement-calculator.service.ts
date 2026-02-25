@@ -247,6 +247,16 @@ export class AchievementCalculatorService {
     condition: AchievementCondition,
     userStats: UserStats,
   ): boolean {
+    // Check minimum threshold first (e.g., "50% win rate on 20+ bets")
+    if (condition.minCount) {
+      const minValue = this.getMetricValue(
+        userStats,
+        condition.minCount.metric,
+        condition.scope,
+      );
+      if (minValue < condition.minCount.value) return false;
+    }
+
     const actualValue = this.getMetricValue(
       userStats,
       condition.metric,
