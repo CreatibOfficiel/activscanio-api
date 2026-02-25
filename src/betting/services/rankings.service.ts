@@ -34,6 +34,9 @@ export class RankingsService {
       rank: number;
       userId: string;
       userName: string;
+      profilePictureUrl: string | null;
+      firstName: string | null;
+      lastName: string | null;
       totalPoints: number;
       betsPlaced: number;
       betsWon: number;
@@ -76,6 +79,9 @@ export class RankingsService {
         ? `${r.user.firstName || ''} ${r.user.lastName || ''}`.trim() ||
           r.user.email
         : 'Unknown',
+      profilePictureUrl: r.user?.profilePictureUrl ?? null,
+      firstName: r.user?.firstName ?? null,
+      lastName: r.user?.lastName ?? null,
       totalPoints: r.totalPoints,
       betsPlaced: r.betsPlaced,
       betsWon: r.betsWon,
@@ -112,6 +118,9 @@ export class RankingsService {
       rank: number;
       userId: string;
       userName: string;
+      profilePictureUrl: string | null;
+      firstName: string | null;
+      lastName: string | null;
       totalPoints: number;
       betsPlaced: number;
       betsWon: number;
