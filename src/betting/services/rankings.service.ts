@@ -52,6 +52,8 @@ export class RankingsService {
     const queryBuilder = this.bettorRankingRepository
       .createQueryBuilder('ranking')
       .leftJoinAndSelect('ranking.user', 'user')
+      .leftJoin('user.competitor', 'competitor')
+      .addSelect(['competitor.profilePictureUrl'])
       .leftJoin('user_streaks', 'streak', 'streak.userId = ranking.userId')
       .addSelect(['streak.currentMonthlyStreak', 'streak.currentWinStreak']);
 
@@ -79,7 +81,7 @@ export class RankingsService {
         ? `${r.user.firstName || ''} ${r.user.lastName || ''}`.trim() ||
           r.user.email
         : 'Unknown',
-      profilePictureUrl: r.user?.profilePictureUrl ?? null,
+      profilePictureUrl: r.user?.profilePictureUrl ?? r.user?.competitor?.profilePictureUrl ?? null,
       firstName: r.user?.firstName ?? null,
       lastName: r.user?.lastName ?? null,
       totalPoints: r.totalPoints,
