@@ -8,7 +8,11 @@ import {
   Param,
   Query,
   ForbiddenException,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CompetitorsService } from './competitors.service';
 import { RacesService } from 'src/races/races.service';
 import { UsersService } from 'src/users/users.service';
@@ -73,6 +77,24 @@ export class CompetitorsController {
   ) {
     await this.assertCompetitorOwnership(id, clerkId);
     const updated = await this.competitorsService.update(id, dto);
+    return sanitizeCompetitor(updated);
+  }
+
+  @Post(':id/profile-picture')
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadProfilePicture(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser('clerkId') clerkId: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image is required');
+    }
+    await this.assertCompetitorOwnership(id, clerkId);
+    const updated = await this.competitorsService.updateProfilePicture(
+      id,
+      file,
+    );
     return sanitizeCompetitor(updated);
   }
 

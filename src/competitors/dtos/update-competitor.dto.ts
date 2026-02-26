@@ -1,11 +1,11 @@
 import {
   IsOptional,
   IsString,
-  IsUrl,
   IsInt,
   IsNumber,
   IsUUID,
   ValidateIf,
+  Matches,
 } from 'class-validator';
 
 export class UpdateCompetitorDto {
@@ -18,7 +18,10 @@ export class UpdateCompetitorDto {
   lastName?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
+  @Matches(/^(https?:\/\/|\/images\/)/, {
+    message: 'profilePictureUrl must be a valid URL or internal path',
+  })
   profilePictureUrl?: string;
 
   @IsOptional()

@@ -10,6 +10,7 @@ import { CompetitorRepository } from './repositories/competitor.repository';
 import { CompetitorEloSnapshotRepository } from './repositories/competitor-elo-snapshot.repository';
 import { RaceResultRepository } from '../races/repositories/race-result.repository';
 import { RatingCalculationService } from '../rating/rating-calculation.service';
+import { UploadService } from '../upload/upload.service';
 import {
   CompetitorNotFoundException,
   EntityNotFoundException,
@@ -31,6 +32,7 @@ export class CompetitorsService {
     private raceResultRepository: RaceResultRepository,
     private ratingCalculationService: RatingCalculationService,
     private eventEmitter: EventEmitter2,
+    private uploadService: UploadService,
   ) {}
 
   /* ░░░░░░░░░░░░   READ   ░░░░░░░░░░░░ */
@@ -102,6 +104,29 @@ export class CompetitorsService {
         return em.save(competitor);
       },
     );
+  }
+
+  async updateProfilePicture(
+    id: string,
+    file: Express.Multer.File,
+  ): Promise<Competitor> {
+    const competitor = await this.competitorRepository.findOne(id, [
+      'characterVariant',
+      'characterVariant.baseCharacter',
+    ]);
+    if (!competitor) throw new CompetitorNotFoundException(id);
+
+    // Remove old internal profile image if exists
+    if (competitor.profilePictureUrl) {
+      this.uploadService.removeProfileImage(competitor.profilePictureUrl);
+    }
+
+    // Move uploaded file to profiles directory
+    competitor.profilePictureUrl = this.uploadService.moveToProfiles(
+      file.filename,
+    );
+
+    return this.competitorRepository.save(competitor);
   }
 
   async updateRatingsForRace(raceResults: RaceResult[]) {
