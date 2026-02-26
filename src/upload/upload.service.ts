@@ -33,7 +33,8 @@ export class UploadService {
   moveToProfiles(filename: string): string {
     const src = this.getFilePath(filename);
     const dest = path.join(this.profilesDir, filename);
-    fs.renameSync(src, dest);
+    fs.copyFileSync(src, dest);
+    fs.unlinkSync(src);
     return `${this.publicImageUrl}/profiles/${filename}`;
   }
 
