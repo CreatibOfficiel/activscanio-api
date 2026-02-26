@@ -81,7 +81,7 @@ export class RankingsService {
         ? `${r.user.firstName || ''} ${r.user.lastName || ''}`.trim() ||
           r.user.email
         : 'Unknown',
-      profilePictureUrl: r.user?.profilePictureUrl ?? r.user?.competitor?.profilePictureUrl ?? null,
+      profilePictureUrl: r.user?.competitor?.profilePictureUrl ?? r.user?.profilePictureUrl ?? null,
       firstName: r.user?.firstName ?? null,
       lastName: r.user?.lastName ?? null,
       totalPoints: r.totalPoints,
