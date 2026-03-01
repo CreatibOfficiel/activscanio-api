@@ -54,45 +54,10 @@ export class AchievementCronService {
     }
   }
 
-  /**
-   * Monthly cron job to check ranking-based achievements
-   * Runs on the 1st of each month at 3:00 AM
-   *
-   * Checks:
-   * - Ranking medals (bronze/silver/gold) based on previous month rankings
-   *
-   * Note: This runs on the 1st to give time for final rankings to be calculated
-   * after the last week of the previous month is finalized.
-   */
-  @Cron('0 3 1 * *', {
-    name: 'monthly-ranking-achievements-check',
-    timeZone: 'Europe/Paris',
-  })
-  async checkMonthlyRankingAchievements(): Promise<void> {
-    this.logger.log('Starting monthly ranking achievements check...');
-
-    const startTime = Date.now();
-
-    try {
-      // We only check ranking achievements here since they're month-specific
-      // The checkAllUsersTemporaryAchievements already handles this, but we
-      // can be more explicit to ensure rankings are fresh for the new month
-      await this.temporaryAchievementService.checkAllUsersTemporaryAchievements();
-
-      const duration = Date.now() - startTime;
-      this.logger.log(
-        `Monthly ranking achievements check completed in ${duration}ms`,
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(
-        `Error during monthly ranking achievements check: ${errorMessage}`,
-        errorStack,
-      );
-    }
-  }
+  // Note: The old monthly cron ('0 3 1 * *') for ranking achievements has been removed.
+  // Rankings are now season-based (4-week cycles), not month-based.
+  // The daily cron at 2 AM already calls checkAllUsersTemporaryAchievements()
+  // which checks ranking, performance, and streak achievements.
 
   /**
    * Manual trigger for temporary achievements check

@@ -193,7 +193,7 @@ export class CompetitorsService {
   }
 
   /**
-   * Reset monthly stats (called 1st of each month by cron)
+   * Reset season stats (called at each season transition by handleCreateWeek)
    */
   async resetMonthlyStats(): Promise<void> {
     await this.competitorRepository.resetMonthlyStats();

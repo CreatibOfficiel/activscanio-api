@@ -18,7 +18,7 @@ export class UserStreak {
   @Index()
   userId: string;
 
-  // Monthly streak (resets 1st of each month)
+  // Season streak (resets at each 4-week season transition)
   @Column({ type: 'int', default: 0 })
   @Index()
   currentMonthlyStreak: number;

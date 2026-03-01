@@ -11,10 +11,10 @@ import { businessDaysBetween } from '../utils/business-days';
 /**
  * Competitor repository with domain-specific queries
  *
- * Gestion de l'État des Compétiteurs:
- * - markAsActiveThisWeek: Appelé après la création d'une course
- * - resetWeeklyActivity: Appelé par cron tous les lundis
- * - resetMonthlyStats: Appelé par cron le 1er du mois
+ * Competitor State Management:
+ * - markAsActiveThisWeek: Called after a race is created
+ * - resetWeeklyActivity: Called by cron every Monday
+ * - resetMonthlyStats: Called at each season transition (1st week of a 4-week cycle)
  */
 @Injectable()
 export class CompetitorRepository extends BaseRepository<Competitor> {
@@ -112,8 +112,13 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
           conservativeScore: ratings.rating - 2 * ratings.rd,
           raceCount: c.raceCount + 1,
           lastRaceDate: new Date(),
+          // avgRank12 is a seasonal average: uses currentMonthRaceCount (already
+          // incremented by markAsActiveThisWeek before updateManyRatings runs)
           avgRank12:
-            c.avgRank12 + (result.rank12 - c.avgRank12) / (c.raceCount + 1),
+            c.currentMonthRaceCount > 0
+              ? c.avgRank12 +
+                (result.rank12 - c.avgRank12) / c.currentMonthRaceCount
+              : result.rank12,
           lifetimeAvgRank:
             c.lifetimeAvgRank +
             (result.rank12 - c.lifetimeAvgRank) / (c.totalLifetimeRaces + 1),
@@ -149,15 +154,23 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
   }
 
   /**
-   * Reset monthly stats for all competitors using soft reset (75/25)
-   * Called by cron on the 1st of each month
+   * Reset season stats for all competitors using soft reset (75/25)
+   * Called at season transition (first week of each 4-week season)
    *
    * Soft reset formula:
    * - rating = 0.75 × oldRating + 0.25 × 1500
-   * - rd = min(oldRd + 50, 350)
-   * - vol, raceCount, currentMonthRaceCount, winStreak, avgRank12 reset to defaults
-   * - totalLifetimeRaces is NEVER reset (tracks all-time races)
-   * - recentPositions and formFactor are preserved (based on actual race history)
+   * - rd = min(oldRd + 50, 350) — increased uncertainty for new season
+   * - vol resets to default (0.06)
+   * - currentMonthRaceCount, winStreak reset to 0
+   *
+   * NOT reset (intentional):
+   * - raceCount: lifetime total, used for confirmed/provisional classification.
+   *   Resetting it would make all competitors "provisional" (raceCount < 5)
+   *   for ~5 weeks, preventing any podium formation. The RD increase already
+   *   handles rating uncertainty per Glicko-2 best practices.
+   * - avgRank12: running lifetime average, stays consistent with raceCount.
+   * - totalLifetimeRaces: all-time counter
+   * - recentPositions, formFactor: based on actual race history
    */
   async resetMonthlyStats(): Promise<void> {
     await this.repository
@@ -167,15 +180,15 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
         rating: () => '0.75 * "rating" + 0.25 * 1500',
         rd: () => 'LEAST("rd" + 50, 350)',
         vol: 0.06,
-        raceCount: 0,
         currentMonthRaceCount: 0,
         winStreak: 0,
-        avgRank12: 0,
+        // Note: raceCount is NOT reset — keeps competitors "confirmed" across seasons.
+        // Note: avgRank12 is NOT reset — stays consistent with lifetime raceCount.
         // Note: totalLifetimeRaces is intentionally NOT reset
         // Note: recentPositions is preserved (based on actual race history)
       })
       .execute();
-    this.logger.log('Soft reset (75/25) monthly stats for all competitors');
+    this.logger.log('Soft reset (75/25) season stats for all competitors');
   }
 
   /**
