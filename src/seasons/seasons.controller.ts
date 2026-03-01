@@ -36,6 +36,33 @@ export class SeasonsController {
   }
 
   /**
+   * GET /seasons/:year/:month/highlights
+   * Get season highlights for the recap modal
+   */
+  @Public()
+  @Get(':year/:month/highlights')
+  @ApiOperation({ summary: 'Get season highlights for the wrapped recap' })
+  @ApiParam({ name: 'year', description: 'Season year', example: '2026' })
+  @ApiParam({
+    name: 'month',
+    description: 'Season month (1-12)',
+    example: '2',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Season highlights (perfect scores, upsets, streaks, etc.)',
+  })
+  async getSeasonHighlights(
+    @Param('year') year: string,
+    @Param('month') month: string,
+  ) {
+    return await this.seasonsService.getSeasonHighlights(
+      parseInt(month),
+      parseInt(year),
+    );
+  }
+
+  /**
    * GET /seasons/:year/:month/competitors
    * Get competitor rankings for a season
    */

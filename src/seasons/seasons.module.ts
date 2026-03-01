@@ -7,6 +7,7 @@ import { ArchivedCompetitorRanking } from './entities/archived-competitor-rankin
 import { Competitor } from '../competitors/competitor.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
 import { Bet } from '../betting/entities/bet.entity';
+import { BetPick } from '../betting/entities/bet-pick.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 
 @Module({
@@ -17,6 +18,7 @@ import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
       Competitor,
       BettingWeek,
       Bet,
+      BetPick,
       BettorRanking,
     ]),
   ],
