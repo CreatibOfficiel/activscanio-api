@@ -111,11 +111,11 @@ export class ExportService {
       take: 100,
     });
 
-    // Get rankings history (last 12 months)
+    // Get rankings history (last 13 seasons)
     const rankings = await this.rankingRepository.find({
       where: { userId },
-      order: { month: 'DESC', year: 'DESC' },
-      take: 12,
+      order: { seasonNumber: 'DESC', year: 'DESC' },
+      take: 13,
     });
 
     // Calculate stats from bets
@@ -212,7 +212,7 @@ export class ExportService {
     limit: number = 100,
   ): Promise<string> {
     const rankings = await this.rankingRepository.find({
-      where: { month, year },
+      where: { seasonNumber: month, year },
       order: { rank: 'ASC' },
       take: limit,
     });

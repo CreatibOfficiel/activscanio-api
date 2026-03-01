@@ -7,6 +7,8 @@ import { UserAchievement } from '../entities/user-achievement.entity';
 import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 import { Bet } from '../../betting/entities/bet.entity';
 import { UserStreak } from '../entities/user-streak.entity';
+import { SeasonUtils } from '../../betting/utils/season-utils';
+import { WeekUtils } from '../../betting/services/week-manager.service';
 
 /**
  * TemporaryAchievementService
@@ -57,16 +59,16 @@ export class TemporaryAchievementService {
    */
   async checkRankingAchievements(userId: string): Promise<void> {
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
+    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const currentYear = now.getFullYear();
 
-    // Get user's current ranking for this month
+    // Get user's current ranking for this season
     const ranking = await this.bettorRankingRepository.findOne({
-      where: { userId, month: currentMonth, year: currentYear },
+      where: { userId, seasonNumber: currentSeason, year: currentYear },
     });
 
     if (!ranking) {
-      // User has no ranking this month, revoke all medals
+      // User has no ranking this season, revoke all medals
       await this.revokeAchievement(
         userId,
         'bronze_medal',

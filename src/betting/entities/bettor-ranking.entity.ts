@@ -11,7 +11,7 @@ import {
 import { User } from '../../users/user.entity';
 
 @Entity('bettor_rankings')
-@Index(['userId', 'month', 'year'], { unique: true })
+@Index(['userId', 'seasonNumber', 'year'], { unique: true })
 export class BettorRanking {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -25,6 +25,9 @@ export class BettorRanking {
 
   @Column({ type: 'int' })
   month: number;
+
+  @Column({ type: 'int' })
+  seasonNumber: number;
 
   @Column({ type: 'int' })
   year: number;

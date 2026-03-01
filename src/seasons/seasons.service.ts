@@ -8,6 +8,8 @@ import { BettingWeek } from '../betting/entities/betting-week.entity';
 import { Bet } from '../betting/entities/bet.entity';
 import { BetPick } from '../betting/entities/bet-pick.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
+import { SeasonUtils } from '../betting/utils/season-utils';
+import { WeekUtils } from '../betting/services/week-manager.service';
 
 export interface SeasonHighlights {
   perfectScores: { userName: string; week: number; points: number }[];
@@ -51,10 +53,13 @@ export class SeasonsService {
 
   /**
    * Archive the current season
-   * Called by monthly cron job
+   * Called during season transition (first week of new season)
    */
-  async archiveSeason(month: number, year: number): Promise<SeasonArchive> {
-    this.logger.log(`Archiving season ${month}/${year}...`);
+  async archiveSeason(
+    seasonNumber: number,
+    year: number,
+  ): Promise<SeasonArchive> {
+    this.logger.log(`Archiving season ${seasonNumber}/${year}...`);
 
     // Use transaction for atomicity
     const queryRunner =
@@ -63,36 +68,32 @@ export class SeasonsService {
     await queryRunner.startTransaction();
 
     try {
-      // Calculate date range
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+      // Calculate date range from the season's weeks
+      const seasonWeeks = SeasonUtils.getSeasonWeeks(seasonNumber);
+      const startDate = WeekUtils.getMondayOfWeek(year, seasonWeeks.start);
+      const endDate = WeekUtils.getSundayOfWeek(year, seasonWeeks.end);
 
       // Gather statistics
       const competitors = await queryRunner.manager.find(Competitor);
 
-      // Note: totalRaces is set to 0 as there is currently no direct relation
-      // between BettingWeek and Race entities in the database schema.
-      // To implement race counting per season:
-      // 1. Add a `weekId` foreign key to the Race entity, OR
-      // 2. Add a `raceCount` field to BettingWeek that increments on race creation
-      // For now, this metric is not tracked at the season level.
       const totalRaces = 0;
 
       const bets = await queryRunner.manager.count(Bet, {
         where: {
-          bettingWeek: { month, year },
+          bettingWeek: { seasonNumber, year },
         },
       });
 
       const bettorRankings = await queryRunner.manager.count(BettorRanking, {
-        where: { month, year },
+        where: { seasonNumber, year },
       });
 
       // Create season archive
       const archive = queryRunner.manager.create(SeasonArchive, {
-        month,
+        month: seasonNumber, // backward compat
+        seasonNumber,
         year,
-        seasonName: this.getSeasonName(month, year),
+        seasonName: this.getSeasonName(seasonNumber, year),
         startDate,
         endDate,
         totalCompetitors: competitors.length,
@@ -113,20 +114,23 @@ export class SeasonsService {
       // Link betting weeks to archive
       await queryRunner.manager.update(
         BettingWeek,
-        { month, year },
+        { seasonNumber, year },
         { seasonArchiveId: archive.id },
       );
 
       await queryRunner.commitTransaction();
 
       this.logger.log(
-        `Season ${month}/${year} archived successfully (ID: ${archive.id})`,
+        `Season ${seasonNumber}/${year} archived successfully (ID: ${archive.id})`,
       );
 
       return archive;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Failed to archive season ${month}/${year}:`, error);
+      this.logger.error(
+        `Failed to archive season ${seasonNumber}/${year}:`,
+        error,
+      );
       throw error;
     } finally {
       await queryRunner.release();
@@ -236,16 +240,19 @@ export class SeasonsService {
    */
   async getAllSeasons(): Promise<SeasonArchive[]> {
     return await this.seasonArchiveRepository.find({
-      order: { year: 'DESC', month: 'DESC' },
+      order: { year: 'DESC', seasonNumber: 'DESC' },
     });
   }
 
   /**
-   * Get a specific season
+   * Get a specific season by seasonNumber (or legacy month)
    */
-  async getSeason(month: number, year: number): Promise<SeasonArchive | null> {
+  async getSeason(
+    seasonNumber: number,
+    year: number,
+  ): Promise<SeasonArchive | null> {
     return await this.seasonArchiveRepository.findOne({
-      where: { month, year },
+      where: { seasonNumber, year },
       relations: ['competitorRankings'],
     });
   }
@@ -266,11 +273,11 @@ export class SeasonsService {
    * Get bettor rankings for a season
    */
   async getBettorRankings(
-    month: number,
+    seasonNumber: number,
     year: number,
   ): Promise<BettorRanking[]> {
     return await this.bettorRankingRepository.find({
-      where: { month, year },
+      where: { seasonNumber, year },
       order: { rank: 'ASC' },
       relations: ['user'],
     });
@@ -279,9 +286,12 @@ export class SeasonsService {
   /**
    * Get betting weeks for a season
    */
-  async getBettingWeeks(month: number, year: number): Promise<BettingWeek[]> {
+  async getBettingWeeks(
+    seasonNumber: number,
+    year: number,
+  ): Promise<BettingWeek[]> {
     return await this.bettingWeekRepository.find({
-      where: { month, year },
+      where: { seasonNumber, year },
       order: { weekNumber: 'ASC' },
     });
   }
@@ -290,7 +300,7 @@ export class SeasonsService {
    * Get season highlights for the "Wrapped" recap
    */
   async getSeasonHighlights(
-    month: number,
+    seasonNumber: number,
     year: number,
   ): Promise<SeasonHighlights> {
     // Perfect scores (60 pts)
@@ -303,7 +313,10 @@ export class SeasonsService {
         'week.seasonWeekNumber AS week',
         'bet.pointsEarned AS points',
       ])
-      .where('week.month = :month AND week.year = :year', { month, year })
+      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
+        seasonNumber,
+        year,
+      })
       .andWhere('bet.pointsEarned = 60')
       .andWhere('bet.isFinalized = true')
       .orderBy('week.seasonWeekNumber', 'ASC')
@@ -320,14 +333,19 @@ export class SeasonsService {
         'week.seasonWeekNumber AS week',
         'bet.pointsEarned AS points',
       ])
-      .where('week.month = :month AND week.year = :year', { month, year })
+      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
+        seasonNumber,
+        year,
+      })
       .andWhere('bet.isFinalized = true')
       .groupBy('bet.id')
       .addGroupBy('user.firstName')
       .addGroupBy('user.lastName')
       .addGroupBy('week.seasonWeekNumber')
       .addGroupBy('bet.pointsEarned')
-      .having('COUNT(pick.id) = SUM(CASE WHEN pick.isCorrect = true THEN 1 ELSE 0 END)')
+      .having(
+        'COUNT(pick.id) = SUM(CASE WHEN pick.isCorrect = true THEN 1 ELSE 0 END)',
+      )
       .andHaving('COUNT(pick.id) = 3')
       .orderBy('week.seasonWeekNumber', 'ASC')
       .getRawMany();
@@ -342,7 +360,10 @@ export class SeasonsService {
         'week.seasonWeekNumber AS week',
         'bet.pointsEarned AS points',
       ])
-      .where('week.month = :month AND week.year = :year', { month, year })
+      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
+        seasonNumber,
+        year,
+      })
       .andWhere('bet.isFinalized = true')
       .andWhere('bet.pointsEarned IS NOT NULL')
       .orderBy('bet.pointsEarned', 'DESC')
@@ -362,7 +383,10 @@ export class SeasonsService {
         'pick.oddAtBet AS odd',
         'week.seasonWeekNumber AS week',
       ])
-      .where('week.month = :month AND week.year = :year', { month, year })
+      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
+        seasonNumber,
+        year,
+      })
       .andWhere('pick.isCorrect = true')
       .orderBy('pick.oddAtBet', 'DESC')
       .limit(1)
@@ -376,16 +400,16 @@ export class SeasonsService {
         "CONCAT(user.firstName, ' ', user.lastName) AS \"userName\"",
         'ranking.weeklyParticipationStreak AS streak',
       ])
-      .where('ranking.month = :month AND ranking.year = :year', {
-        month,
-        year,
-      })
+      .where(
+        'ranking."seasonNumber" = :seasonNumber AND ranking.year = :year',
+        { seasonNumber, year },
+      )
       .orderBy('ranking.weeklyParticipationStreak', 'DESC')
       .limit(1)
       .getRawOne();
 
     // Longest win streak (from archived competitor rankings)
-    const season = await this.getSeason(month, year);
+    const season = await this.getSeason(seasonNumber, year);
     let longestWinStreak: SeasonHighlights['longestWinStreak'] = null;
     let mostRaces: SeasonHighlights['mostRaces'] = null;
 
@@ -470,21 +494,7 @@ export class SeasonsService {
   /**
    * Generate season name
    */
-  private getSeasonName(month: number, year: number): string {
-    const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return `${monthNames[month - 1]} ${year}`;
+  private getSeasonName(seasonNumber: number, year: number): string {
+    return `Saison ${seasonNumber} - ${year}`;
   }
 }

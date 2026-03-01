@@ -14,6 +14,7 @@ import {
   seededRandom,
   calculateSimpleOdds,
 } from '../utils/seed-helpers';
+import { SeasonUtils } from 'src/betting/utils/season-utils';
 
 const logger = new Logger('BettingWeekSeed');
 
@@ -84,6 +85,7 @@ export async function seedBettingWeeks(
       weekNumber,
       year,
       month: startDate.getMonth() + 1,
+      seasonNumber: SeasonUtils.getSeasonNumber(weekNumber),
       startDate,
       endDate,
       status,

@@ -55,6 +55,9 @@ export class User {
   @Column({ type: 'int', nullable: true })
   lastBoostUsedYear: number | null;
 
+  @Column({ type: 'int', nullable: true })
+  lastBoostUsedSeason: number | null;
+
   // Gamification fields
   @Column({ type: 'int', default: 0 })
   @Index()

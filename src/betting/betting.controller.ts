@@ -206,7 +206,7 @@ export class BettingController {
               id: bet.user.id,
               firstName: bet.user.firstName,
               lastName: bet.user.lastName,
-              profilePictureUrl: bet.user.profilePictureUrl,
+              profilePictureUrl: bet.user.competitor?.profilePictureUrl ?? bet.user.profilePictureUrl,
               level: bet.user.level,
               currentTitle: bet.user.currentTitle,
             }
@@ -299,15 +299,21 @@ export class BettingController {
   }
 
   /**
-   * Get monthly rankings
+   * Get season rankings (accepts both ?season= and ?month= for backward compat)
    */
   @Public()
   @Get('rankings/monthly')
-  @ApiOperation({ summary: 'Get monthly rankings for bettors' })
+  @ApiOperation({ summary: 'Get season rankings for bettors' })
+  @ApiQuery({
+    name: 'season',
+    required: false,
+    description: 'Filter by season (1-13)',
+    example: '1',
+  })
   @ApiQuery({
     name: 'month',
     required: false,
-    description: 'Filter by month (1-12)',
+    description: 'Alias for season (backward compat)',
     example: '1',
   })
   @ApiQuery({
@@ -316,11 +322,21 @@ export class BettingController {
     description: 'Filter by year',
     example: '2024',
   })
-  @ApiResponse({ status: 200, description: 'Monthly rankings with stats' })
-  async getMonthlyRankings(@Query() query: QueryBettingDto) {
+  @ApiResponse({ status: 200, description: 'Season rankings with stats' })
+  async getMonthlyRankings(
+    @Query('season') season?: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    const seasonNumber = season
+      ? parseInt(season, 10)
+      : month
+        ? parseInt(month, 10)
+        : undefined;
+    const yearNumber = year ? parseInt(year, 10) : undefined;
     return await this.rankingsService.getMonthlyRankings(
-      query.month,
-      query.year,
+      seasonNumber,
+      yearNumber,
     );
   }
 

@@ -9,13 +9,16 @@ import {
 import { ArchivedCompetitorRanking } from './archived-competitor-ranking.entity';
 
 @Entity('season_archives')
-@Index(['month', 'year'], { unique: true })
+@Index(['seasonNumber', 'year'], { unique: true })
 export class SeasonArchive {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ type: 'int' })
   month: number;
+
+  @Column({ type: 'int' })
+  seasonNumber: number;
 
   @Column({ type: 'int' })
   year: number;

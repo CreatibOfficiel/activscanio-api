@@ -13,6 +13,8 @@ import { ImageStorageService } from '../image-generation/services/image-storage.
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { SeasonUtils } from '../betting/utils/season-utils';
+import { WeekUtils } from '../betting/services/week-manager.service';
 import { UserAchievement } from '../achievements/entities/user-achievement.entity';
 import { User } from '../users/user.entity';
 import { Bet } from '../betting/entities/bet.entity';
@@ -130,12 +132,13 @@ export class ShareController {
         finalizedBets.length > 0 ? (betsWon / finalizedBets.length) * 100 : 0;
 
       // Get current ranking (if available)
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
+      const currentYear = now.getFullYear();
       const ranking = (await this.userRepository.manager.findOne(
         'bettor_rankings',
         {
-          where: { userId, month: currentMonth, year: currentYear },
+          where: { userId, seasonNumber: currentSeason, year: currentYear },
         },
       )) as any;
 

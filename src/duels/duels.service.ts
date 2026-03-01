@@ -13,6 +13,8 @@ import { User, UserRole } from '../users/user.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 import { RaceEvent } from '../races/race-event.entity';
 import { RaceResult } from '../races/race-result.entity';
+import { SeasonUtils } from '../betting/utils/season-utils';
+import { WeekUtils } from '../betting/services/week-manager.service';
 import { CreateDuelDto } from './dtos/create-duel.dto';
 
 const PENDING_EXPIRY_MS = 60 * 1000; // 1 minute to accept
@@ -92,7 +94,8 @@ export class DuelsService {
 
     // Check balance
     const now = new Date();
-    const ranking = await this.getBettorRanking(challenger.id, now.getMonth() + 1, now.getFullYear());
+    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
+    const ranking = await this.getBettorRanking(challenger.id, currentSeason, now.getFullYear());
     if ((ranking?.totalPoints ?? 0) < dto.stake) {
       throw new BadRequestException('Insufficient betting points');
     }
@@ -153,7 +156,8 @@ export class DuelsService {
 
     // Check balance
     const now = new Date();
-    const ranking = await this.getBettorRanking(user.id, now.getMonth() + 1, now.getFullYear());
+    const acceptSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
+    const ranking = await this.getBettorRanking(user.id, acceptSeason, now.getFullYear());
     if ((ranking?.totalPoints ?? 0) < duel.stake) {
       throw new BadRequestException('Insufficient betting points');
     }
@@ -268,7 +272,7 @@ export class DuelsService {
     const resultsByCompetitor = new Map(results.map((r) => [r.competitorId, r]));
 
     const now = new Date();
-    const month = now.getMonth() + 1;
+    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const year = now.getFullYear();
 
     for (const duel of acceptedDuels) {
@@ -309,7 +313,7 @@ export class DuelsService {
       await this.duelRepository.save(duel);
 
       // Transfer points
-      await this.transferPoints(duel.winnerUserId, duel.loserUserId, duel.stake, month, year);
+      await this.transferPoints(duel.winnerUserId, duel.loserUserId, duel.stake, seasonNumber, year);
 
       this.eventEmitter.emit('duel.resolved', { duel });
       this.logger.log(
@@ -322,17 +326,17 @@ export class DuelsService {
     winnerUserId: string,
     loserUserId: string,
     stake: number,
-    month: number,
+    seasonNumber: number,
     year: number,
   ): Promise<void> {
     // Winner: +stake
     await this.bettorRankingRepository.query(
-      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
-       VALUES ($1, $2, $3, $4, 0, 0, 0, 0, 0)
-       ON CONFLICT ("userId", "month", "year")
+      `INSERT INTO bettor_rankings ("userId", "month", "seasonNumber", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
+       VALUES ($1, $2, $2, $3, $4, 0, 0, 0, 0, 0)
+       ON CONFLICT ("userId", "seasonNumber", "year")
        DO UPDATE SET "totalPoints" = bettor_rankings."totalPoints" + $4,
                      "updatedAt" = NOW()`,
-      [winnerUserId, month, year, stake],
+      [winnerUserId, seasonNumber, year, stake],
     );
 
     // Loser: -stake (floor at 0)
@@ -340,8 +344,8 @@ export class DuelsService {
       `UPDATE bettor_rankings
        SET "totalPoints" = GREATEST(0, "totalPoints" - $1),
            "updatedAt" = NOW()
-       WHERE "userId" = $2 AND "month" = $3 AND "year" = $4`,
-      [stake, loserUserId, month, year],
+       WHERE "userId" = $2 AND "seasonNumber" = $3 AND "year" = $4`,
+      [stake, loserUserId, seasonNumber, year],
     );
   }
 
@@ -377,11 +381,11 @@ export class DuelsService {
 
   private async getBettorRanking(
     userId: string,
-    month: number,
+    seasonNumber: number,
     year: number,
   ): Promise<BettorRanking | null> {
     return this.bettorRankingRepository.findOne({
-      where: { userId, month, year },
+      where: { userId, seasonNumber, year },
     });
   }
 }

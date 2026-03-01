@@ -193,7 +193,11 @@ export class BettingFinalizerService {
     const calculations = await this.processBets(bets, podium, finalOddsMap);
 
     // 6. Update bettor rankings
-    await this.updateBettorRankings(week.month, week.year, calculations);
+    await this.updateBettorRankings(
+      week.seasonNumber,
+      week.year,
+      calculations,
+    );
 
     // 7. Calculate stats
     const totalPointsDistributed = calculations.reduce(
@@ -656,14 +660,16 @@ export class BettingFinalizerService {
   }
 
   /**
-   * Update bettor rankings for the month
+   * Update bettor rankings for the season
    */
   private async updateBettorRankings(
-    month: number,
+    seasonNumber: number,
     year: number,
     calculations: BetCalculation[],
   ): Promise<void> {
-    this.logger.log(`Updating bettor rankings for ${month}/${year}...`);
+    this.logger.log(
+      `Updating bettor rankings for season ${seasonNumber}/${year}...`,
+    );
 
     // Update or create ranking records per bet
     for (const calc of calculations) {
@@ -672,7 +678,7 @@ export class BettingFinalizerService {
 
       await this.upsertBettorRanking(
         calc.userId,
-        month,
+        seasonNumber,
         year,
         calc.finalPoints,
         hasCorrectPick ? 1 : 0,
@@ -683,7 +689,7 @@ export class BettingFinalizerService {
 
     if (SCORING_LOGGER_CONFIG.logRankingUpdates) {
       this.logger.log(
-        `Updated rankings for ${calculations.length} bets in ${month}/${year}`,
+        `Updated rankings for ${calculations.length} bets in season ${seasonNumber}/${year}`,
       );
     }
   }
@@ -694,7 +700,7 @@ export class BettingFinalizerService {
    */
   private async upsertBettorRanking(
     userId: string,
-    month: number,
+    seasonNumber: number,
     year: number,
     pointsToAdd: number,
     betWon: number,
@@ -702,27 +708,29 @@ export class BettingFinalizerService {
     boostUsed: number,
   ): Promise<void> {
     await this.bettorRankingRepository.query(
-      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
-       VALUES ($1, $2, $3, $4, 1, $5, $6, $7, 0)
-       ON CONFLICT ("userId", "month", "year")
+      `INSERT INTO bettor_rankings ("userId", "month", "seasonNumber", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
+       VALUES ($1, $2, $2, $3, $4, 1, $5, $6, $7, 0)
+       ON CONFLICT ("userId", "seasonNumber", "year")
        DO UPDATE SET "totalPoints" = bettor_rankings."totalPoints" + $4,
                      "betsPlaced" = bettor_rankings."betsPlaced" + 1,
                      "betsWon" = bettor_rankings."betsWon" + $5,
                      "perfectBets" = bettor_rankings."perfectBets" + $6,
                      "boostsUsed" = bettor_rankings."boostsUsed" + $7,
                      "updatedAt" = NOW()`,
-      [userId, month, year, pointsToAdd, betWon, perfectBet, boostUsed],
+      [userId, seasonNumber, year, pointsToAdd, betWon, perfectBet, boostUsed],
     );
   }
 
   /**
-   * Recalculate all ranks for a given month
+   * Recalculate all ranks for a given season
    *
    * This should be called after all bets are finalized to assign proper ranks.
    * Ranks are based on total points (highest = rank 1).
    */
-  async recalculateRanks(month: number, year: number): Promise<void> {
-    this.logger.log(`Recalculating ranks for ${month}/${year}...`);
+  async recalculateRanks(seasonNumber: number, year: number): Promise<void> {
+    this.logger.log(
+      `Recalculating ranks for season ${seasonNumber}/${year}...`,
+    );
 
     // Atomic rank recalculation using a single SQL UPDATE with window function
     await this.bettorRankingRepository.query(
@@ -731,13 +739,15 @@ export class BettingFinalizerService {
        FROM (
          SELECT id, RANK() OVER (ORDER BY "totalPoints" DESC) AS new_rank
          FROM bettor_rankings
-         WHERE month = $1 AND year = $2
+         WHERE "seasonNumber" = $1 AND year = $2
        ) sub
        WHERE br.id = sub.id`,
-      [month, year],
+      [seasonNumber, year],
     );
 
-    this.logger.log(`Ranks recalculated atomically for ${month}/${year}`);
+    this.logger.log(
+      `Ranks recalculated atomically for season ${seasonNumber}/${year}`,
+    );
   }
 
   /**

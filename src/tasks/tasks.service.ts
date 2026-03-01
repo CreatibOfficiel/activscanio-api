@@ -6,14 +6,17 @@
  *
  * Weekly Tasks:
  * - Monday 00:00: Reset weekly activity flags
- * - Monday 00:05: Create new betting week
+ * - Monday 00:05: Create new betting week (+ season transition if first week of season)
  * - Tuesday 00:00 (Monday midnight): Close current week
  * - Sunday 20:00: Determine podium + finalize week + calculate points
- * - Sunday 20:03: Recalculate monthly rankings
+ * - Sunday 20:03: Recalculate season rankings
  *
- * Monthly Tasks:
- * - 1st 00:00: Reset ELO and race counts
- * - 1st 00:05: Archive monthly stats
+ * Season transition (triggered by handleCreateWeek on first week of a 4-week season):
+ * 1. Archive previous season
+ * 2. Archive competitor monthly stats (ELO snapshot)
+ * 3. Reset boost availability
+ * 4. Reset monthly streaks
+ * 5. Reset monthly stats (ELO + race counts)
  *
  * Design Principles:
  * - Robust error handling with retries
@@ -26,8 +29,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WeekManagerService } from '../betting/services/week-manager.service';
+import {
+  WeekManagerService,
+  WeekUtils,
+} from '../betting/services/week-manager.service';
 import { BettingFinalizerService } from '../betting/services/betting-finalizer.service';
+import { SeasonUtils } from '../betting/utils/season-utils';
 import { RankingsService } from '../betting/services/rankings.service';
 import { OddsCalculatorService } from '../betting/services/odds-calculator.service';
 import { CompetitorsService } from '../competitors/competitors.service';
@@ -138,9 +145,27 @@ export class TasksService {
         );
       }
 
+      // Check if this week starts a new season — run transition BEFORE creating the week
+      const now = new Date();
+      const currentWeekNumber = WeekUtils.getISOWeek(now);
+      const currentYear = now.getFullYear();
+
+      if (SeasonUtils.isFirstWeekOfSeason(currentWeekNumber)) {
+        const currentSeasonNumber =
+          SeasonUtils.getSeasonNumber(currentWeekNumber);
+        const prev = SeasonUtils.getPreviousSeason(
+          currentSeasonNumber,
+          currentYear,
+        );
+        this.logger.log(
+          `🔄 Season transition: season ${prev.seasonNumber}/${prev.year} → season ${currentSeasonNumber}/${currentYear}`,
+        );
+        await this.performSeasonTransition(prev.seasonNumber, prev.year);
+      }
+
       const week = await this.weekManagerService.createCurrentWeek();
       this.logger.log(
-        `✅ Week created successfully: ${week.year}-W${week.weekNumber}`,
+        `✅ Week created successfully: ${week.year}-W${week.weekNumber} (season ${week.seasonNumber})`,
       );
     } catch (error) {
       this.logger.error(
@@ -148,6 +173,76 @@ export class TasksService {
         error.stack,
       );
       await this.retryTask(() => this.weekManagerService.createCurrentWeek());
+    }
+  }
+
+  /**
+   * Perform the full season transition sequence.
+   * Called on the Monday of the first week of each new season,
+   * AFTER Sunday's finalization has completed.
+   */
+  private async performSeasonTransition(
+    prevSeasonNumber: number,
+    prevYear: number,
+  ): Promise<void> {
+    // 1. Archive previous season
+    try {
+      await this.seasonsService.archiveSeason(prevSeasonNumber, prevYear);
+      this.logger.log(
+        `✅ Season ${prevSeasonNumber}/${prevYear} archived successfully`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to archive season: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // 2. Archive monthly stats (ELO snapshot before reset)
+    try {
+      await this.archiveSeasonStats(prevSeasonNumber, prevYear);
+      this.logger.log('✅ Season stats archived successfully');
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to archive season stats: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // 3. Reset boost availability
+    try {
+      await this.resetBoostAvailability();
+      this.logger.log('✅ Boost availability reset for all users');
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to reset boost availability: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // 4. Reset monthly streaks
+    try {
+      const affectedUsers =
+        await this.streakTrackerService.resetMonthlyStreaks();
+      this.logger.log(
+        `✅ Season streaks reset successfully for ${affectedUsers} users`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to reset season streaks: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // 5. Reset monthly stats (ELO + race counts)
+    try {
+      await this.competitorsService.resetMonthlyStats();
+      this.logger.log('✅ Season stats reset successfully');
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to reset season stats: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -296,7 +391,7 @@ export class TasksService {
   }
 
   /**
-   * Recalculate monthly rankings
+   * Recalculate season rankings
    * Runs every Sunday at 20:03 UTC
    */
   @Cron(BETTING_CRON_SCHEDULES.RECALCULATE_RANKINGS, {
@@ -317,11 +412,14 @@ export class TasksService {
 
     try {
       const now = new Date();
-      const month = now.getMonth() + 1;
+      const weekNumber = WeekUtils.getISOWeek(now);
+      const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
       const year = now.getFullYear();
 
-      await this.bettingFinalizerService.recalculateRanks(month, year);
-      this.logger.log(`✅ Rankings recalculated for ${month}/${year}`);
+      await this.bettingFinalizerService.recalculateRanks(seasonNumber, year);
+      this.logger.log(
+        `✅ Rankings recalculated for season ${seasonNumber}/${year}`,
+      );
     } catch (error) {
       this.logger.error(
         `❌ Failed to recalculate rankings: ${error.message}`,
@@ -332,172 +430,20 @@ export class TasksService {
     }
   }
 
-  /* ==================== MONTHLY TASKS ==================== */
+  /* ==================== SEASON TRANSITION HELPERS ==================== */
 
   /**
-   * Archive previous season
-   * Runs on 1st of every month at 00:01 UTC (BEFORE reset)
+   * Reset boost availability for all users (called during season transition)
    */
-  @Cron(BETTING_CRON_SCHEDULES.ARCHIVE_SEASON, {
-    name: 'archive-season',
-    timeZone: TASK_EXECUTION_CONFIG.timezone,
-  })
-  async handleArchiveSeason(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.archiveSeason) {
-      this.logger.warn('Task "archive-season" is disabled');
-      return;
-    }
-
-    this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.archiveSeason}`);
-
-    try {
-      const now = new Date();
-      const previousMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-      const year =
-        now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-
-      await this.seasonsService.archiveSeason(previousMonth, year);
-      this.logger.log(
-        `✅ Season ${previousMonth}/${year} archived successfully`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed to archive season: ${error.message}`,
-        error.stack,
-      );
-    }
-  }
-
-  /**
-   * Reset boost availability for all users
-   * Runs on 1st of every month at 00:03 UTC
-   */
-  @Cron(BETTING_CRON_SCHEDULES.RESET_BOOST_AVAILABILITY, {
-    name: 'reset-boost-availability',
-    timeZone: TASK_EXECUTION_CONFIG.timezone,
-  })
-  async handleResetBoostAvailability(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.resetBoostAvailability) {
-      this.logger.warn('Task "reset-boost-availability" is disabled');
-      return;
-    }
-
-    this.logger.log(
-      `🚀 Starting task: ${TASK_DESCRIPTIONS.resetBoostAvailability}`,
+  private async resetBoostAvailability(): Promise<void> {
+    await this.userRepository.update(
+      {},
+      {
+        lastBoostUsedMonth: null,
+        lastBoostUsedYear: null,
+        lastBoostUsedSeason: null,
+      },
     );
-
-    try {
-      await this.userRepository.update(
-        {},
-        {
-          lastBoostUsedMonth: null,
-          lastBoostUsedYear: null,
-        },
-      );
-
-      this.logger.log('✅ Boost availability reset for all users');
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed to reset boost availability: ${error.message}`,
-        error.stack,
-      );
-    }
-  }
-
-  /**
-   * Reset monthly streaks for all users
-   * Runs on 1st of every month at 00:04 UTC
-   */
-  @Cron(BETTING_CRON_SCHEDULES.RESET_MONTHLY_STREAKS, {
-    name: 'reset-monthly-streaks',
-    timeZone: TASK_EXECUTION_CONFIG.timezone,
-  })
-  async handleResetMonthlyStreaks(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.resetMonthlyStreaks) {
-      this.logger.warn('Task "reset-monthly-streaks" is disabled');
-      return;
-    }
-
-    this.logger.log(
-      `🚀 Starting task: ${TASK_DESCRIPTIONS.resetMonthlyStreaks}`,
-    );
-
-    try {
-      const affectedUsers =
-        await this.streakTrackerService.resetMonthlyStreaks();
-      this.logger.log(
-        `✅ Monthly streaks reset successfully for ${affectedUsers} users`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed to reset monthly streaks: ${error.message}`,
-        error.stack,
-      );
-      await this.retryTask(() =>
-        this.streakTrackerService.resetMonthlyStreaks(),
-      );
-    }
-  }
-
-  /**
-   * Reset monthly stats (ELO + race counts)
-   * Runs on 1st of every month at 00:05 UTC (AFTER archiving)
-   */
-  @Cron(BETTING_CRON_SCHEDULES.RESET_MONTHLY_STATS, {
-    name: 'reset-monthly-stats',
-    timeZone: TASK_EXECUTION_CONFIG.timezone,
-  })
-  async handleResetMonthlyStats(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.resetMonthlyStats) {
-      this.logger.warn('Task "reset-monthly-stats" is disabled');
-      return;
-    }
-
-    if (!this.acquireTaskLock('reset-monthly-stats')) return;
-
-    this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.resetMonthlyStats}`);
-
-    try {
-      await this.competitorsService.resetMonthlyStats();
-      this.logger.log('✅ Monthly stats reset successfully');
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed to reset monthly stats: ${error.message}`,
-        error.stack,
-      );
-      await this.retryTask(() => this.competitorsService.resetMonthlyStats());
-    } finally {
-      this.releaseTaskLock('reset-monthly-stats');
-    }
-  }
-
-  /**
-   * Archive monthly stats (save snapshot before reset)
-   * Runs on 1st of every month at 00:05 UTC
-   */
-  @Cron(BETTING_CRON_SCHEDULES.ARCHIVE_MONTHLY_STATS, {
-    name: 'archive-monthly-stats',
-    timeZone: TASK_EXECUTION_CONFIG.timezone,
-  })
-  async handleArchiveMonthlyStats(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.archiveMonthlyStats) {
-      this.logger.warn('Task "archive-monthly-stats" is disabled');
-      return;
-    }
-
-    this.logger.log(
-      `🚀 Starting task: ${TASK_DESCRIPTIONS.archiveMonthlyStats}`,
-    );
-
-    try {
-      await this.archiveMonthlyStats();
-      this.logger.log('✅ Monthly stats archived successfully');
-    } catch (error) {
-      this.logger.error(
-        `❌ Failed to archive monthly stats: ${error.message}`,
-        error.stack,
-      );
-    }
   }
 
   /* ==================== RANK SNAPSHOT TASKS ==================== */
@@ -766,22 +712,21 @@ export class TasksService {
   }
 
   /**
-   * Archive monthly stats for all competitors
+   * Archive season stats for all competitors
    */
-  private async archiveMonthlyStats(): Promise<void> {
-    const now = new Date();
-    const previousMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-    const year =
-      now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-
-    this.logger.log(`Archiving stats for ${previousMonth}/${year}`);
+  private async archiveSeasonStats(
+    seasonNumber: number,
+    year: number,
+  ): Promise<void> {
+    this.logger.log(`Archiving stats for season ${seasonNumber}/${year}`);
 
     const competitors = await this.competitorRepository.find();
 
     for (const competitor of competitors) {
       const stats = this.competitorMonthlyStatsRepository.create({
         competitorId: competitor.id,
-        month: previousMonth,
+        month: seasonNumber, // keep month field populated for backward compat
+        seasonNumber,
         year,
         finalRating: competitor.rating,
         finalRd: competitor.rd,

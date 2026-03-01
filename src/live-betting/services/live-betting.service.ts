@@ -18,6 +18,8 @@ import { RaceResult } from '../../races/race-result.entity';
 import { CharacterDetectorService } from './character-detector.service';
 import { UploadService } from '../../upload/upload.service';
 import { LIVE_BETTING_CONFIG } from '../config/live-betting.config';
+import { SeasonUtils } from '../../betting/utils/season-utils';
+import { WeekUtils } from '../../betting/services/week-manager.service';
 import * as fs from 'fs';
 
 @Injectable()
@@ -240,7 +242,7 @@ export class LiveBettingService {
     const raceCompetitorIds = new Set(results.map((r) => r.competitorId));
 
     const now = new Date();
-    const month = now.getMonth() + 1;
+    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const year = now.getFullYear();
 
     for (const liveBet of activeBets) {
@@ -292,7 +294,7 @@ export class LiveBettingService {
         await this.addPoints(
           liveBet.userId,
           liveBet.oddAtBet,
-          month,
+          seasonNumber,
           year,
           true,
         );
@@ -300,7 +302,7 @@ export class LiveBettingService {
         await this.subtractPoints(
           liveBet.userId,
           liveBet.oddAtBet,
-          month,
+          seasonNumber,
           year,
         );
       }
@@ -449,37 +451,36 @@ export class LiveBettingService {
   private async addPoints(
     userId: string,
     points: number,
-    month: number,
+    seasonNumber: number,
     year: number,
     isWin: boolean,
   ): Promise<void> {
     await this.bettorRankingRepository.query(
-      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
-       VALUES ($1, $2, $3, $4, 1, $5, 0, 0, 0)
-       ON CONFLICT ("userId", "month", "year")
+      `INSERT INTO bettor_rankings ("userId", "month", "seasonNumber", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
+       VALUES ($1, $2, $2, $3, $4, 1, $5, 0, 0, 0)
+       ON CONFLICT ("userId", "seasonNumber", "year")
        DO UPDATE SET "totalPoints" = bettor_rankings."totalPoints" + $4,
                      "betsPlaced" = bettor_rankings."betsPlaced" + 1,
                      "betsWon" = bettor_rankings."betsWon" + $5,
                      "updatedAt" = NOW()`,
-      [userId, month, year, points, isWin ? 1 : 0],
+      [userId, seasonNumber, year, points, isWin ? 1 : 0],
     );
   }
 
   private async subtractPoints(
     userId: string,
     points: number,
-    month: number,
+    seasonNumber: number,
     year: number,
   ): Promise<void> {
-    // First ensure the row exists
     await this.bettorRankingRepository.query(
-      `INSERT INTO bettor_rankings ("userId", "month", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
-       VALUES ($1, $2, $3, 0, 1, 0, 0, 0, 0)
-       ON CONFLICT ("userId", "month", "year")
+      `INSERT INTO bettor_rankings ("userId", "month", "seasonNumber", "year", "totalPoints", "betsPlaced", "betsWon", "perfectBets", "boostsUsed", "rank")
+       VALUES ($1, $2, $2, $3, 0, 1, 0, 0, 0, 0)
+       ON CONFLICT ("userId", "seasonNumber", "year")
        DO UPDATE SET "totalPoints" = GREATEST(0, bettor_rankings."totalPoints" - $4),
                      "betsPlaced" = bettor_rankings."betsPlaced" + 1,
                      "updatedAt" = NOW()`,
-      [userId, month, year, points],
+      [userId, seasonNumber, year, points],
     );
   }
 }

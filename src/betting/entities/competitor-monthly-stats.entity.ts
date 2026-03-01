@@ -10,7 +10,7 @@ import {
 import { Competitor } from '../../competitors/competitor.entity';
 
 @Entity('competitor_monthly_stats')
-@Index(['competitorId', 'month', 'year'], { unique: true })
+@Index(['competitorId', 'seasonNumber', 'year'], { unique: true })
 export class CompetitorMonthlyStats {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -24,6 +24,9 @@ export class CompetitorMonthlyStats {
 
   @Column({ type: 'int' })
   month: number;
+
+  @Column({ type: 'int' })
+  seasonNumber: number;
 
   @Column({ type: 'int' })
   year: number;

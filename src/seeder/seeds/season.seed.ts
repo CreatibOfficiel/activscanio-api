@@ -67,6 +67,7 @@ export async function seedSeasonArchives(
 
     const archive = new SeasonArchive();
     archive.month = month;
+    archive.seasonNumber = month; // Approximate mapping for seed data
     archive.year = year;
     archive.seasonName = seasonNames[i - 1] || `Season ${i}`;
     archive.startDate = startDate;

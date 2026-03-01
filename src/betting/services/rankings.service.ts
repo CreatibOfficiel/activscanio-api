@@ -3,6 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BettorRanking } from '../entities/bettor-ranking.entity';
+import { SeasonUtils } from '../utils/season-utils';
+import { WeekUtils } from './week-manager.service';
 
 @Injectable()
 export class RankingsService {
@@ -14,20 +16,21 @@ export class RankingsService {
   ) {}
 
   /**
-   * Get monthly rankings for bettors
+   * Get season rankings for bettors
    *
-   * Returns all bettor rankings for a specific month/year,
+   * Returns all bettor rankings for a specific season/year,
    * ordered by rank (ascending) and total points (descending).
    *
-   * @param month - Month (1-12), optional
+   * @param seasonNumber - Season (1-13), optional. Also accepts month (1-12) for backward compat.
    * @param year - Year (e.g., 2024), optional
    * @returns List of bettor rankings
    */
   async getMonthlyRankings(
-    month?: number,
+    seasonNumber?: number,
     year?: number,
   ): Promise<{
     month?: number;
+    seasonNumber?: number;
     year?: number;
     count: number;
     rankings: Array<{
@@ -57,9 +60,11 @@ export class RankingsService {
       .leftJoin('user_streaks', 'streak', 'streak.userId = ranking.userId')
       .addSelect(['streak.currentMonthlyStreak', 'streak.currentWinStreak']);
 
-    // Apply filters
-    if (month !== undefined) {
-      queryBuilder.andWhere('ranking.month = :month', { month });
+    // Apply filters using seasonNumber
+    if (seasonNumber !== undefined) {
+      queryBuilder.andWhere('ranking.seasonNumber = :seasonNumber', {
+        seasonNumber,
+      });
     }
 
     if (year !== undefined) {
@@ -96,11 +101,12 @@ export class RankingsService {
     }));
 
     this.logger.log(
-      `Found ${formattedRankings.length} bettor rankings${month ? ` for ${month}/${year}` : ''}`,
+      `Found ${formattedRankings.length} bettor rankings${seasonNumber ? ` for season ${seasonNumber}/${year}` : ''}`,
     );
 
     return {
-      month,
+      month: seasonNumber,
+      seasonNumber,
       year,
       count: formattedRankings.length,
       rankings: formattedRankings,
@@ -108,12 +114,13 @@ export class RankingsService {
   }
 
   /**
-   * Get current month rankings
+   * Get current season rankings
    *
-   * Returns rankings for the current month.
+   * Returns rankings for the current 4-week season.
    */
   async getCurrentMonthRankings(): Promise<{
     month: number;
+    seasonNumber: number;
     year: number;
     count: number;
     rankings: Array<{
@@ -135,13 +142,15 @@ export class RankingsService {
     }>;
   }> {
     const now = new Date();
-    const month = now.getMonth() + 1; // JavaScript months are 0-indexed
+    const weekNumber = WeekUtils.getISOWeek(now);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
     const year = now.getFullYear();
 
-    const result = await this.getMonthlyRankings(month, year);
+    const result = await this.getMonthlyRankings(seasonNumber, year);
 
     return {
-      month,
+      month: seasonNumber,
+      seasonNumber,
       year,
       count: result.count,
       rankings: result.rankings,
@@ -150,19 +159,20 @@ export class RankingsService {
 
   /**
    * Snapshot weekly ranks for all bettors.
-   * Called by cron every Sunday at 23:58 (after RECALCULATE_RANKINGS).
+   * Called by cron every Sunday at 20:05 (after RECALCULATE_RANKINGS).
    *
-   * Calculates current rank based on totalPoints for the current month
+   * Calculates current rank based on totalPoints for the current season
    * and stores it in previousWeekRank for trend calculation.
    */
   async snapshotWeeklyRanks(): Promise<void> {
     const now = new Date();
-    const month = now.getMonth() + 1;
+    const weekNumber = WeekUtils.getISOWeek(now);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
     const year = now.getFullYear();
 
-    // Get all bettor rankings for current month, sorted by totalPoints
+    // Get all bettor rankings for current season, sorted by totalPoints
     const rankings = await this.bettorRankingRepository.find({
-      where: { month, year },
+      where: { seasonNumber, year },
       order: { totalPoints: 'DESC' },
     });
 
@@ -174,7 +184,7 @@ export class RankingsService {
     }
 
     this.logger.log(
-      `Snapshotted weekly ranks for ${rankings.length} bettors (${month}/${year})`,
+      `Snapshotted weekly ranks for ${rankings.length} bettors (season ${seasonNumber}/${year})`,
     );
   }
 }

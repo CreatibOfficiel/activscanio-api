@@ -22,11 +22,12 @@ import {
   BettingWeekStatus,
 } from '../entities/betting-week.entity';
 import { OddsCalculatorService } from './odds-calculator.service';
+import { SeasonUtils } from '../utils/season-utils';
 
 /**
  * Week calculation utilities
  */
-class WeekUtils {
+export class WeekUtils {
   /**
    * Get ISO week number for a date
    * ISO weeks start on Monday and week 1 contains Jan 4th
@@ -85,9 +86,9 @@ export class WeekManagerService {
    * Create a new betting week for the current week
    *
    * This method is idempotent - it will not create duplicates.
-   * Intended to be called by a cron job every Monday 00:00.
+   * Intended to be called by a cron job every Monday 00:05.
    *
-   * If it's the first ISO week of the month, the week is created in
+   * If it's the first week of the 4-week season, the week is created in
    * CALIBRATION status (betting blocked for ELO stabilization).
    *
    * @returns The created or existing week
@@ -96,9 +97,10 @@ export class WeekManagerService {
     const now = new Date();
     const year = now.getFullYear();
     const weekNumber = WeekUtils.getISOWeek(now);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
 
     this.logger.log(
-      `Creating betting week for ${year}-W${weekNumber.toString().padStart(2, '0')}`,
+      `Creating betting week for ${year}-W${weekNumber.toString().padStart(2, '0')} (season ${seasonNumber})`,
     );
 
     // Check if week already exists
@@ -116,8 +118,8 @@ export class WeekManagerService {
     const endDate = WeekUtils.getSundayOfWeek(year, weekNumber);
     const month = WeekUtils.getWeekMonth(year, weekNumber);
 
-    // Check if this is the first ISO week of the month (calibration week)
-    let isCalibrationWeek = this.isFirstWeekOfMonth(startDate);
+    // Check if this is the first week of the season (calibration week)
+    let isCalibrationWeek = SeasonUtils.isFirstWeekOfSeason(weekNumber);
 
     // If this is the very first week ever created, force calibration
     if (!isCalibrationWeek) {
@@ -152,6 +154,7 @@ export class WeekManagerService {
       weekNumber,
       year,
       month,
+      seasonNumber,
       startDate,
       endDate,
       status,
@@ -163,7 +166,7 @@ export class WeekManagerService {
 
     if (isCalibrationWeek) {
       this.logger.log(
-        `Created CALIBRATION week ${year}-W${weekNumber} (first week of month ${month}): betting blocked`,
+        `Created CALIBRATION week ${year}-W${weekNumber} (first week of season ${seasonNumber}): betting blocked`,
       );
     } else {
       this.logger.log(
@@ -175,20 +178,6 @@ export class WeekManagerService {
     await this.calculateInitialOdds(savedWeek.id);
 
     return savedWeek;
-  }
-
-  /**
-   * Check if a date falls in the first ISO week of its month
-   *
-   * A week is considered the "first week of the month" if its Monday
-   * is on or before the 7th day of the month.
-   *
-   * @param mondayOfWeek - The Monday of the week to check
-   * @returns true if this is the first ISO week of the month
-   */
-  private isFirstWeekOfMonth(mondayOfWeek: Date): boolean {
-    const dayOfMonth = mondayOfWeek.getDate();
-    return dayOfMonth <= 7;
   }
 
   /**
@@ -360,11 +349,25 @@ export class WeekManagerService {
   }
 
   /**
-   * Get all weeks for a given month
+   * Get all weeks for a given month (backward compat)
    */
   async getWeeksByMonth(month: number, year: number): Promise<BettingWeek[]> {
     return await this.bettingWeekRepository.find({
       where: { month, year },
+      relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
+      order: { weekNumber: 'ASC' },
+    });
+  }
+
+  /**
+   * Get all weeks for a given season
+   */
+  async getWeeksBySeason(
+    seasonNumber: number,
+    year: number,
+  ): Promise<BettingWeek[]> {
+    return await this.bettingWeekRepository.find({
+      where: { seasonNumber, year },
       relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
       order: { weekNumber: 'ASC' },
     });

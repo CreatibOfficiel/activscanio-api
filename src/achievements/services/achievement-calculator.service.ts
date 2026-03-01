@@ -17,6 +17,8 @@ import { Bet } from '../../betting/entities/bet.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { RaceCreatedEvent } from '../../races/events/race-created.event';
 import { XPLevelService, XPSource } from './xp-level.service';
+import { SeasonUtils } from '../../betting/utils/season-utils';
+import { WeekUtils } from '../../betting/services/week-manager.service';
 import {
   BetFinalizedContext,
   UserStats,
@@ -379,7 +381,7 @@ export class AchievementCalculatorService {
    */
   private async getUserStats(userId: string): Promise<UserStats> {
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
+    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const currentYear = now.getFullYear();
 
     // Get all user bets
@@ -388,9 +390,9 @@ export class AchievementCalculatorService {
       relations: ['picks'],
     });
 
-    // Get current month ranking
+    // Get current season ranking
     const currentMonthRanking = await this.bettorRankingRepository.findOne({
-      where: { userId, month: currentMonth, year: currentYear },
+      where: { userId, seasonNumber: currentSeason, year: currentYear },
     });
 
     // Get all historical rankings for best rank
@@ -445,36 +447,35 @@ export class AchievementCalculatorService {
       );
     }).length;
 
-    // Calculate consecutive boost months
-    const boostsByMonth = new Map<string, boolean>();
+    // Calculate consecutive boost seasons
+    const boostsBySeason = new Map<string, boolean>();
     allBets.forEach((bet) => {
       const hasBoost = bet.picks.some((pick) => pick.hasBoost);
       if (hasBoost) {
         const betDate = new Date(bet.createdAt);
-        const monthKey = `${betDate.getFullYear()}-${betDate.getMonth() + 1}`;
-        boostsByMonth.set(monthKey, true);
+        const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate));
+        const seasonKey = `${betDate.getFullYear()}-${betSeason}`;
+        boostsBySeason.set(seasonKey, true);
       }
     });
 
-    // Count consecutive months with boosts (from current month backwards)
+    // Count consecutive seasons with boosts (from current season backwards)
     let consecutiveBoostMonths = 0;
     let checkYear = currentYear;
-    let checkMonth = currentMonth;
+    let checkSeason = currentSeason;
     while (true) {
-      const monthKey = `${checkYear}-${checkMonth}`;
-      if (boostsByMonth.has(monthKey)) {
+      const seasonKey = `${checkYear}-${checkSeason}`;
+      if (boostsBySeason.has(seasonKey)) {
         consecutiveBoostMonths++;
-        // Go to previous month
-        checkMonth--;
-        if (checkMonth === 0) {
-          checkMonth = 12;
-          checkYear--;
-        }
+        // Go to previous season
+        const prev = SeasonUtils.getPreviousSeason(checkSeason, checkYear);
+        checkSeason = prev.seasonNumber;
+        checkYear = prev.year;
       } else {
         break;
       }
-      // Safety: don't go back more than 24 months
-      if (consecutiveBoostMonths >= 24) break;
+      // Safety: don't go back more than 26 seasons
+      if (consecutiveBoostMonths >= 26) break;
     }
 
     // Calculate comeback bets (winning after 3+ consecutive losses)
@@ -501,11 +502,12 @@ export class AchievementCalculatorService {
       }
     }
 
-    // Monthly stats
+    // Season stats (filter bets belonging to the current season)
     const monthlyBets = allBets.filter((bet) => {
       const betDate = new Date(bet.createdAt);
+      const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate));
       return (
-        betDate.getMonth() + 1 === currentMonth &&
+        betSeason === currentSeason &&
         betDate.getFullYear() === currentYear
       );
     });
@@ -532,7 +534,7 @@ export class AchievementCalculatorService {
     let consecutiveMonthlyWins = 0;
     const sortedRankings = allRankings.sort((a, b) => {
       if (a.year !== b.year) return b.year - a.year;
-      return b.month - a.month;
+      return b.seasonNumber - a.seasonNumber;
     });
 
     for (const ranking of sortedRankings) {

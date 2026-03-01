@@ -26,6 +26,8 @@ import { Achievement } from '../achievements/entities/achievement.entity';
 import { UserStreak } from '../achievements/entities/user-streak.entity';
 import { Competitor } from '../competitors/competitor.entity';
 import { PaginatedResponse } from '../common';
+import { SeasonUtils } from './utils/season-utils';
+import { WeekUtils } from './services/week-manager.service';
 
 @Injectable()
 export class BettingService {
@@ -184,7 +186,7 @@ export class BettingService {
       throw new BadRequestException('You can only boost one competitor');
     }
 
-    // Check monthly boost limit
+    // Check season boost limit
     if (boostCount === 1) {
       const user = await this.userRepository.findOne({ where: { id: userId } });
 
@@ -192,15 +194,17 @@ export class BettingService {
         throw new NotFoundException('User not found');
       }
 
-      const currentMonth = new Date().getMonth() + 1; // getMonth() returns 0-11, we need 1-12
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const currentWeek = WeekUtils.getISOWeek(now);
+      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek);
+      const currentYear = now.getFullYear();
 
       if (
-        user.lastBoostUsedMonth === currentMonth &&
+        user.lastBoostUsedSeason === currentSeason &&
         user.lastBoostUsedYear === currentYear
       ) {
         throw new BadRequestException(
-          'You have already used your monthly boost. Boost resets at the start of each month.',
+          'You have already used your season boost. Boost resets at the start of each season.',
         );
       }
     }
@@ -276,25 +280,28 @@ export class BettingService {
 
     // Atomically consume the boost to prevent race conditions (M2)
     if (boostCount === 1) {
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const currentWeek = WeekUtils.getISOWeek(now);
+      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek);
+      const currentYear = now.getFullYear();
       const result = await this.userRepository
         .createQueryBuilder()
         .update()
         .set({
-          lastBoostUsedMonth: currentMonth,
+          lastBoostUsedSeason: currentSeason,
+          lastBoostUsedMonth: currentSeason, // backward compat
           lastBoostUsedYear: currentYear,
         })
         .where('id = :userId', { userId })
         .andWhere(
-          '("lastBoostUsedMonth" IS NULL OR "lastBoostUsedMonth" != :month OR "lastBoostUsedYear" != :year)',
-          { month: currentMonth, year: currentYear },
+          '("lastBoostUsedSeason" IS NULL OR "lastBoostUsedSeason" != :season OR "lastBoostUsedYear" != :year)',
+          { season: currentSeason, year: currentYear },
         )
         .execute();
 
       if (result.affected === 0) {
         throw new BadRequestException(
-          'You have already used your monthly boost. Boost resets at the start of each month.',
+          'You have already used your season boost. Boost resets at the start of each season.',
         );
       }
     }
@@ -430,23 +437,36 @@ export class BettingService {
       throw new NotFoundException('User not found');
     }
 
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
+    const currentWeek = WeekUtils.getISOWeek(now);
+    const currentSeason = SeasonUtils.getSeasonNumber(currentWeek);
+    const currentYear = now.getFullYear();
 
     const canUseBoost = !(
-      user.lastBoostUsedMonth === currentMonth &&
+      user.lastBoostUsedSeason === currentSeason &&
       user.lastBoostUsedYear === currentYear
     );
 
-    const lastUsed = user.lastBoostUsedMonth
+    const lastUsed = user.lastBoostUsedSeason
       ? {
-          month: user.lastBoostUsedMonth,
+          season: user.lastBoostUsedSeason,
+          month: user.lastBoostUsedSeason, // backward compat
           year: user.lastBoostUsedYear!,
         }
       : null;
 
-    // Calculate first day of next month
-    const resetsOn = new Date(currentYear, currentMonth, 1); // Month is 0-indexed in Date constructor
+    // Calculate the Monday of the first week of the next season
+    const nextSeason =
+      currentSeason === 13
+        ? { seasonNumber: 1, year: currentYear + 1 }
+        : { seasonNumber: currentSeason + 1, year: currentYear };
+    const nextSeasonWeeks = SeasonUtils.getSeasonWeeks(
+      nextSeason.seasonNumber,
+    );
+    const resetsOn = WeekUtils.getMondayOfWeek(
+      nextSeason.year,
+      nextSeasonWeeks.start,
+    );
 
     return {
       canUseBoost,
@@ -470,7 +490,7 @@ export class BettingService {
 
     const [bets, total] = await this.betRepository.findAndCount({
       where,
-      relations: ['user', 'picks', 'picks.competitor', 'bettingWeek'],
+      relations: ['user', 'user.competitor', 'picks', 'picks.competitor', 'bettingWeek'],
       order: { placedAt: 'DESC' },
       take: limit,
       skip: offset,

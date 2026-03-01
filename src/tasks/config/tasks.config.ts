@@ -46,40 +46,15 @@ export const BETTING_CRON_SCHEDULES = {
   FINALIZE_WEEK: '0 0 20 * * 0',
 
   /**
-   * Recalculate monthly rankings
+   * Recalculate season rankings
    * Every Sunday at 20:03 UTC (after all finalization)
    */
   RECALCULATE_RANKINGS: '0 3 20 * * 0',
 
-  /**
-   * Archive previous season (BEFORE reset)
-   * 1st of every month at 00:01 UTC
-   */
-  ARCHIVE_SEASON: '0 1 0 1 * *',
-
-  /**
-   * Archive monthly stats (save ELO snapshot BEFORE reset)
-   * 1st of every month at 00:02 UTC
-   */
-  ARCHIVE_MONTHLY_STATS: '0 2 0 1 * *',
-
-  /**
-   * Reset boost availability for all users
-   * 1st of every month at 00:03 UTC
-   */
-  RESET_BOOST_AVAILABILITY: '0 3 0 1 * *',
-
-  /**
-   * Reset monthly streaks for all users
-   * 1st of every month at 00:04 UTC
-   */
-  RESET_MONTHLY_STREAKS: '0 4 0 1 * *',
-
-  /**
-   * Reset monthly stats (ELO + race counts)
-   * 1st of every month at 00:05 UTC (AFTER archiving)
-   */
-  RESET_MONTHLY_STATS: '0 5 0 1 * *',
+  // Season transition tasks (archive, reset boosts, streaks, ELO) are now
+  // triggered by handleCreateWeek on the first week of each 4-week season,
+  // instead of running on the 1st of every month. This guarantees the reset
+  // happens AFTER the last Sunday finalization of the previous season.
 
   /**
    * Snapshot competitor ranks (daily)
@@ -131,11 +106,6 @@ export const TASK_EXECUTION_CONFIG = {
     closeWeek: true,
     finalizeWeek: true,
     recalculateRankings: true,
-    archiveSeason: true,
-    resetBoostAvailability: true,
-    resetMonthlyStreaks: true,
-    resetMonthlyStats: true,
-    archiveMonthlyStats: true,
     snapshotCompetitorRanks: true,
     snapshotBettorRanks: true,
     bettingStreakWarningEarly: true,
@@ -163,15 +133,10 @@ export const TASK_EXECUTION_CONFIG = {
  */
 export const TASK_DESCRIPTIONS = {
   resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:00)',
-  createWeek: 'Create new betting week (Monday 00:05)',
+  createWeek: 'Create new betting week + season transition if needed (Monday 00:05)',
   closeWeek: 'Close betting week (Tuesday 00:00 = Monday midnight)',
   finalizeWeek: 'Finalize betting week and calculate points (Sunday 20:00)',
-  recalculateRankings: 'Recalculate monthly rankings (Sunday 20:03)',
-  archiveSeason: 'Archive previous season (1st 00:01)',
-  resetBoostAvailability: 'Reset boost availability for all users (1st 00:03)',
-  resetMonthlyStreaks: 'Reset monthly streaks for all users (1st 00:04)',
-  resetMonthlyStats: 'Reset monthly ELO and race counts (1st 00:05)',
-  archiveMonthlyStats: 'Archive monthly stats snapshot (1st 00:02)',
+  recalculateRankings: 'Recalculate season rankings (Sunday 20:03)',
   snapshotCompetitorRanks: 'Snapshot competitor ranks for trends (Mon-Fri 00:00)',
   snapshotBettorRanks: 'Snapshot bettor ranks for trends (Sunday 20:05)',
   bettingStreakWarningEarly: 'Betting streak warning (Monday 18:00)',
