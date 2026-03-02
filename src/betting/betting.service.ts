@@ -195,9 +195,9 @@ export class BettingService {
       }
 
       const now = new Date();
-      const currentWeek = WeekUtils.getISOWeek(now);
-      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek);
       const currentYear = now.getFullYear();
+      const currentWeek = WeekUtils.getISOWeek(now);
+      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek, currentYear);
 
       if (
         user.lastBoostUsedSeason === currentSeason &&
@@ -281,9 +281,9 @@ export class BettingService {
     // Atomically consume the boost to prevent race conditions (M2)
     if (boostCount === 1) {
       const now = new Date();
-      const currentWeek = WeekUtils.getISOWeek(now);
-      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek);
       const currentYear = now.getFullYear();
+      const currentWeek = WeekUtils.getISOWeek(now);
+      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek, currentYear);
       const result = await this.userRepository
         .createQueryBuilder()
         .update()
@@ -438,9 +438,9 @@ export class BettingService {
     }
 
     const now = new Date();
-    const currentWeek = WeekUtils.getISOWeek(now);
-    const currentSeason = SeasonUtils.getSeasonNumber(currentWeek);
     const currentYear = now.getFullYear();
+    const currentWeek = WeekUtils.getISOWeek(now);
+    const currentSeason = SeasonUtils.getSeasonNumber(currentWeek, currentYear);
 
     const canUseBoost = !(
       user.lastBoostUsedSeason === currentSeason &&
@@ -456,10 +456,7 @@ export class BettingService {
       : null;
 
     // Calculate the Monday of the first week of the next season
-    const nextSeason =
-      currentSeason === 13
-        ? { seasonNumber: 1, year: currentYear + 1 }
-        : { seasonNumber: currentSeason + 1, year: currentYear };
+    const nextSeason = { seasonNumber: currentSeason + 1, year: currentYear };
     const nextSeasonWeeks = SeasonUtils.getSeasonWeeks(
       nextSeason.seasonNumber,
     );

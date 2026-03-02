@@ -242,8 +242,8 @@ export class LiveBettingService {
     const raceCompetitorIds = new Set(results.map((r) => r.competitorId));
 
     const now = new Date();
-    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const year = now.getFullYear();
+    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), year);
 
     for (const liveBet of activeBets) {
       if (liveBet.expiresAt < now) continue; // already expired, skip

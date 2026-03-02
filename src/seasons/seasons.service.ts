@@ -318,7 +318,7 @@ export class SeasonsService {
     const rankings = await this.bettorRankingRepository.find({
       where: { seasonNumber, year },
       order: { rank: 'ASC' },
-      relations: ['user'],
+      relations: ['user', 'user.competitor'],
     });
 
     return rankings.map((r) => ({
@@ -326,7 +326,7 @@ export class SeasonsService {
       userName: r.user
         ? `${r.user.firstName} ${r.user.lastName}`.trim()
         : 'Inconnu',
-      profilePictureUrl: r.user?.profilePictureUrl ?? null,
+      profilePictureUrl: r.user?.competitor?.profilePictureUrl ?? r.user?.profilePictureUrl ?? null,
       rank: r.rank,
       totalPoints: r.totalPoints,
       betsPlaced: r.betsPlaced,

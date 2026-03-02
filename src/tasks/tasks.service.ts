@@ -150,9 +150,9 @@ export class TasksService {
       const currentWeekNumber = WeekUtils.getISOWeek(now);
       const currentYear = now.getFullYear();
 
-      if (SeasonUtils.isFirstWeekOfSeason(currentWeekNumber)) {
+      if (SeasonUtils.isFirstWeekOfSeason(currentWeekNumber, currentYear)) {
         const currentSeasonNumber =
-          SeasonUtils.getSeasonNumber(currentWeekNumber);
+          SeasonUtils.getSeasonNumber(currentWeekNumber, currentYear);
         const prev = SeasonUtils.getPreviousSeason(
           currentSeasonNumber,
           currentYear,
@@ -413,8 +413,8 @@ export class TasksService {
     try {
       const now = new Date();
       const weekNumber = WeekUtils.getISOWeek(now);
-      const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
       const year = now.getFullYear();
+      const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
 
       await this.bettingFinalizerService.recalculateRanks(seasonNumber, year);
       this.logger.log(

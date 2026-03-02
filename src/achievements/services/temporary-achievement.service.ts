@@ -59,8 +59,8 @@ export class TemporaryAchievementService {
    */
   async checkRankingAchievements(userId: string): Promise<void> {
     const now = new Date();
-    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const currentYear = now.getFullYear();
+    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), currentYear);
 
     // Get user's current ranking for this season
     const ranking = await this.bettorRankingRepository.findOne({

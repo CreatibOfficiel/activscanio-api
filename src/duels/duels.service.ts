@@ -94,7 +94,7 @@ export class DuelsService {
 
     // Check balance
     const now = new Date();
-    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
+    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), now.getFullYear());
     const ranking = await this.getBettorRanking(challenger.id, currentSeason, now.getFullYear());
     if ((ranking?.totalPoints ?? 0) < dto.stake) {
       throw new BadRequestException('Insufficient betting points');
@@ -156,7 +156,7 @@ export class DuelsService {
 
     // Check balance
     const now = new Date();
-    const acceptSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
+    const acceptSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), now.getFullYear());
     const ranking = await this.getBettorRanking(user.id, acceptSeason, now.getFullYear());
     if ((ranking?.totalPoints ?? 0) < duel.stake) {
       throw new BadRequestException('Insufficient betting points');
@@ -272,8 +272,8 @@ export class DuelsService {
     const resultsByCompetitor = new Map(results.map((r) => [r.competitorId, r]));
 
     const now = new Date();
-    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const year = now.getFullYear();
+    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), year);
 
     for (const duel of acceptedDuels) {
       const challengerResult = resultsByCompetitor.get(duel.challengerCompetitorId);

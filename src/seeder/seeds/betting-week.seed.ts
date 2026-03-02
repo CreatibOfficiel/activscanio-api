@@ -85,7 +85,7 @@ export async function seedBettingWeeks(
       weekNumber,
       year,
       month: startDate.getMonth() + 1,
-      seasonNumber: SeasonUtils.getSeasonNumber(weekNumber),
+      seasonNumber: SeasonUtils.getSeasonNumber(weekNumber, year),
       startDate,
       endDate,
       status,

@@ -381,8 +381,8 @@ export class AchievementCalculatorService {
    */
   private async getUserStats(userId: string): Promise<UserStats> {
     const now = new Date();
-    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now));
     const currentYear = now.getFullYear();
+    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), currentYear);
 
     // Get all user bets
     const allBets = await this.betRepository.find({
@@ -453,7 +453,7 @@ export class AchievementCalculatorService {
       const hasBoost = bet.picks.some((pick) => pick.hasBoost);
       if (hasBoost) {
         const betDate = new Date(bet.createdAt);
-        const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate));
+        const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate), betDate.getFullYear());
         const seasonKey = `${betDate.getFullYear()}-${betSeason}`;
         boostsBySeason.set(seasonKey, true);
       }
@@ -505,7 +505,7 @@ export class AchievementCalculatorService {
     // Season stats (filter bets belonging to the current season)
     const monthlyBets = allBets.filter((bet) => {
       const betDate = new Date(bet.createdAt);
-      const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate));
+      const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate), betDate.getFullYear());
       return (
         betSeason === currentSeason &&
         betDate.getFullYear() === currentYear

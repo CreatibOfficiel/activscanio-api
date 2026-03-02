@@ -97,7 +97,7 @@ export class WeekManagerService {
     const now = new Date();
     const year = now.getFullYear();
     const weekNumber = WeekUtils.getISOWeek(now);
-    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
 
     this.logger.log(
       `Creating betting week for ${year}-W${weekNumber.toString().padStart(2, '0')} (season ${seasonNumber})`,
@@ -119,7 +119,7 @@ export class WeekManagerService {
     const month = WeekUtils.getWeekMonth(year, weekNumber);
 
     // Check if this is the first week of the season (calibration week)
-    let isCalibrationWeek = SeasonUtils.isFirstWeekOfSeason(weekNumber);
+    let isCalibrationWeek = SeasonUtils.isFirstWeekOfSeason(weekNumber, year);
 
     // If this is the very first week ever created, force calibration
     if (!isCalibrationWeek) {
@@ -143,11 +143,11 @@ export class WeekManagerService {
       ? BettingWeekStatus.CALIBRATION
       : BettingWeekStatus.OPEN;
 
-    // Calculate sequential season week number (only count non-calibration weeks)
+    // Calculate sequential season week number (per-season, only count non-calibration weeks)
     const seasonWeekNumber = isCalibrationWeek
       ? 0
       : (await this.bettingWeekRepository.count({
-          where: { isCalibrationWeek: false },
+          where: { seasonNumber, year, isCalibrationWeek: false },
         })) + 1;
 
     const week = this.bettingWeekRepository.create({

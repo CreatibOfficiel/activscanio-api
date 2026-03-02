@@ -142,9 +142,9 @@ export class RankingsService {
     }>;
   }> {
     const now = new Date();
-    const weekNumber = WeekUtils.getISOWeek(now);
-    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
     const year = now.getFullYear();
+    const weekNumber = WeekUtils.getISOWeek(now);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
 
     const result = await this.getMonthlyRankings(seasonNumber, year);
 
@@ -166,9 +166,9 @@ export class RankingsService {
    */
   async snapshotWeeklyRanks(): Promise<void> {
     const now = new Date();
-    const weekNumber = WeekUtils.getISOWeek(now);
-    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber);
     const year = now.getFullYear();
+    const weekNumber = WeekUtils.getISOWeek(now);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
 
     // Get all bettor rankings for current season, sorted by totalPoints
     const rankings = await this.bettorRankingRepository.find({
