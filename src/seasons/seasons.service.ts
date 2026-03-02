@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, QueryRunner } from 'typeorm';
+import { In, Repository, QueryRunner, Between } from 'typeorm';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';
 import { Competitor } from '../competitors/competitor.entity';
@@ -8,6 +8,7 @@ import { BettingWeek } from '../betting/entities/betting-week.entity';
 import { Bet } from '../betting/entities/bet.entity';
 import { BetPick } from '../betting/entities/bet-pick.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
+import { RaceEvent } from '../races/race-event.entity';
 import { SeasonUtils } from '../betting/utils/season-utils';
 import { WeekUtils } from '../betting/services/week-manager.service';
 
@@ -28,6 +29,7 @@ export interface SeasonHighlights {
   longestParticipationStreak: { userName: string; streak: number } | null;
   longestWinStreak: { competitorName: string; streak: number } | null;
   mostRaces: { competitorName: string; count: number } | null;
+  bestRaceScorers: { competitorName: string; maxScore: number; perfectCount: number }[] | null;
 }
 
 @Injectable()
@@ -76,7 +78,15 @@ export class SeasonsService {
       // Gather statistics
       const competitors = await queryRunner.manager.find(Competitor);
 
-      const totalRaces = 0;
+      // Only count competitors who actually raced this season
+      const activeCompetitors = competitors.filter(
+        (c) => c.currentMonthRaceCount > 0,
+      );
+
+      // Count races within the season date range
+      const totalRaces = await queryRunner.manager.count(RaceEvent, {
+        where: { date: Between(startDate, endDate) },
+      });
 
       const bets = await queryRunner.manager.count(Bet, {
         where: {
@@ -96,7 +106,7 @@ export class SeasonsService {
         seasonName: this.getSeasonName(seasonNumber, year),
         startDate,
         endDate,
-        totalCompetitors: competitors.length,
+        totalCompetitors: activeCompetitors.length,
         totalBettors: bettorRankings,
         totalRaces,
         totalBets: bets,
@@ -145,19 +155,32 @@ export class SeasonsService {
     archive: SeasonArchive,
     competitors: Competitor[],
   ): Promise<void> {
-    // Determine provisional status for each competitor (same logic as sanitize-competitor.ts)
-    const withStatus = competitors.map((c) => ({
-      competitor: c,
-      score: c.rating - 2 * c.rd,
-      provisional: c.raceCount < 5 || c.rd > 150,
-    }));
+    // Determine status for each competitor (same logic as competitor-classification.ts)
+    const INACTIVE_THRESHOLD_MS = 8 * 24 * 60 * 60 * 1000; // 8 days
+    const seasonEndTime = archive.endDate.getTime();
 
-    // Separate confirmed (ranked) and calibrating (provisional) competitors
+    const withStatus = competitors.map((c) => {
+      const provisional = c.raceCount < 5 || c.rd > 150;
+      const inactive =
+        !provisional &&
+        (!c.lastRaceDate ||
+          seasonEndTime - new Date(c.lastRaceDate).getTime() >
+            INACTIVE_THRESHOLD_MS);
+
+      return {
+        competitor: c,
+        score: c.rating - 2 * c.rd,
+        provisional,
+        inactive,
+      };
+    });
+
+    // Separate into confirmed (ranked), inactive, and calibrating (provisional)
     const confirmed = withStatus
-      .filter((c) => !c.provisional)
+      .filter((c) => !c.provisional && !c.inactive)
       .sort((a, b) => b.score - a.score);
     const calibrating = withStatus
-      .filter((c) => c.provisional)
+      .filter((c) => c.provisional || c.inactive)
       .sort((a, b) => b.score - a.score);
 
     // Pre-calculate ranks with ties on the full confirmed list
@@ -188,7 +211,7 @@ export class SeasonsService {
           finalRating: competitor.rating,
           finalRd: competitor.rd,
           finalVol: competitor.vol,
-          totalRaces: competitor.raceCount,
+          totalRaces: competitor.currentMonthRaceCount,
           winStreak: competitor.winStreak,
           avgRank12: competitor.avgRank12,
         });
@@ -217,7 +240,7 @@ export class SeasonsService {
           finalRating: competitor.rating,
           finalRd: competitor.rd,
           finalVol: competitor.vol,
-          totalRaces: competitor.raceCount,
+          totalRaces: competitor.currentMonthRaceCount,
           winStreak: competitor.winStreak,
           avgRank12: competitor.avgRank12,
         });
@@ -258,29 +281,56 @@ export class SeasonsService {
   }
 
   /**
-   * Get competitor rankings for a season
+   * Get competitor rankings for a season, enriched with profile pictures
+   * and character images from the live competitor data
    */
-  async getCompetitorRankings(
-    seasonId: string,
-  ): Promise<ArchivedCompetitorRanking[]> {
-    return await this.archivedCompetitorRankingRepository.find({
+  async getCompetitorRankings(seasonId: string) {
+    const rankings = await this.archivedCompetitorRankingRepository.find({
       where: { seasonArchiveId: seasonId },
       order: { rank: 'ASC' },
+    });
+
+    // Fetch live competitor data for profile pics and character images
+    const competitorIds = rankings.map((r) => r.competitorId);
+    const competitors = await this.competitorRepository.find({
+      where: { id: In(competitorIds) },
+      relations: ['characterVariant'],
+    });
+    const competitorMap = new Map(competitors.map((c) => [c.id, c]));
+
+    return rankings.map((r) => {
+      const competitor = competitorMap.get(r.competitorId);
+      return {
+        ...r,
+        profilePictureUrl: competitor?.profilePictureUrl ?? null,
+        characterImageUrl: competitor?.characterVariant?.imageUrl ?? null,
+      };
     });
   }
 
   /**
-   * Get bettor rankings for a season
+   * Get bettor rankings for a season (enriched with user info)
    */
   async getBettorRankings(
     seasonNumber: number,
     year: number,
-  ): Promise<BettorRanking[]> {
-    return await this.bettorRankingRepository.find({
+  ) {
+    const rankings = await this.bettorRankingRepository.find({
       where: { seasonNumber, year },
       order: { rank: 'ASC' },
       relations: ['user'],
     });
+
+    return rankings.map((r) => ({
+      userId: r.userId,
+      userName: r.user
+        ? `${r.user.firstName} ${r.user.lastName}`.trim()
+        : 'Inconnu',
+      profilePictureUrl: r.user?.profilePictureUrl ?? null,
+      rank: r.rank,
+      totalPoints: r.totalPoints,
+      betsPlaced: r.betsPlaced,
+    }));
   }
 
   /**
@@ -452,6 +502,38 @@ export class SeasonsService {
       }
     }
 
+    // Best race scorers (perfect 60-point races)
+    let bestRaceScorers: SeasonHighlights['bestRaceScorers'] = null;
+
+    if (season) {
+      const bestRaceScorersRaw = await this.seasonArchiveRepository.manager
+        .createQueryBuilder()
+        .select([
+          'CONCAT(c."firstName", \' \', c."lastName") AS "competitorName"',
+          'MAX(rr.score) AS "maxScore"',
+          'SUM(CASE WHEN rr.score = 60 THEN 1 ELSE 0 END) AS "perfectCount"',
+        ])
+        .from('race_results', 'rr')
+        .innerJoin('races', 'r', 'r.id = rr."raceId"')
+        .innerJoin('competitors', 'c', 'c.id = rr."competitorId"')
+        .where('r.date BETWEEN :startDate AND :endDate', {
+          startDate: season.startDate,
+          endDate: season.endDate,
+        })
+        .groupBy('c.id, c."firstName", c."lastName"')
+        .having('MAX(rr.score) = 60')
+        .orderBy('"perfectCount"', 'DESC')
+        .getRawMany();
+
+      if (bestRaceScorersRaw?.length > 0) {
+        bestRaceScorers = bestRaceScorersRaw.map((r) => ({
+          competitorName: r.competitorName,
+          maxScore: Number(r.maxScore),
+          perfectCount: Number(r.perfectCount),
+        }));
+      }
+    }
+
     return {
       perfectScores: perfectScores.map((r) => ({
         userName: r.userName,
@@ -488,6 +570,7 @@ export class SeasonsService {
           : null,
       longestWinStreak,
       mostRaces,
+      bestRaceScorers,
     };
   }
 
