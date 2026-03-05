@@ -76,7 +76,20 @@ export class RankingsService {
       .orderBy('ranking.rank', 'ASC', 'NULLS LAST')
       .addOrderBy('ranking.totalPoints', 'DESC');
 
-    const rankings = await queryBuilder.getMany();
+    const { entities: rankings, raw } =
+      await queryBuilder.getRawAndEntities();
+
+    // Build a map of raw streak data by userId
+    const streakMap = new Map<
+      string,
+      { monthlyStreak: number; winStreak: number }
+    >();
+    for (const row of raw) {
+      streakMap.set(row.ranking_userId, {
+        monthlyStreak: row.streak_currentMonthlyStreak ?? 0,
+        winStreak: row.streak_currentWinStreak ?? 0,
+      });
+    }
 
     // Calculate win rate and format response
     const formattedRankings = rankings.map((r) => ({
@@ -95,8 +108,8 @@ export class RankingsService {
       perfectBets: r.perfectBets,
       boostsUsed: r.boostsUsed,
       winRate: r.betsPlaced > 0 ? (r.betsWon / r.betsPlaced) * 100 : 0,
-      currentMonthlyStreak: (r as any).streak_currentMonthlyStreak || 0,
-      currentWinStreak: (r as any).streak_currentWinStreak || 0,
+      currentMonthlyStreak: streakMap.get(r.userId)?.monthlyStreak ?? 0,
+      currentWinStreak: streakMap.get(r.userId)?.winStreak ?? 0,
       previousWeekRank: r.previousWeekRank ?? null,
     }));
 
