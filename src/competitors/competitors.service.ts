@@ -141,7 +141,7 @@ export class CompetitorsService {
         raceResults,
       );
 
-    // Compute and persist rating deltas BEFORE updateManyRatings mutates competitors
+    // Compute and persist rating deltas + ELO snapshots BEFORE updateManyRatings mutates competitors
     for (const result of raceResults) {
       const competitor = competitors.find((c) => c.id === result.competitorId);
       const newRatings = updatedRatings.get(result.competitorId);
@@ -149,6 +149,12 @@ export class CompetitorsService {
         const oldConservative = competitor.rating - 2 * competitor.rd;
         const newConservative = newRatings.rating - 2 * newRatings.rd;
         result.ratingDelta = newConservative - oldConservative;
+        result.ratingBefore = competitor.rating;
+        result.rdBefore = competitor.rd;
+        result.volBefore = competitor.vol;
+        result.ratingAfter = newRatings.rating;
+        result.rdAfter = newRatings.rd;
+        result.volAfter = newRatings.vol;
       }
     }
     await this.raceResultRepository.saveMany(raceResults);
