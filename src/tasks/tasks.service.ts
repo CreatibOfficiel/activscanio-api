@@ -187,7 +187,9 @@ export class TasksService {
   ): Promise<void> {
     // 1. Archive previous season
     try {
-      await this.seasonsService.archiveSeason(prevSeasonNumber, prevYear);
+      await this.retryTask(() =>
+        this.seasonsService.archiveSeason(prevSeasonNumber, prevYear),
+      );
       this.logger.log(
         `✅ Season ${prevSeasonNumber}/${prevYear} archived successfully`,
       );
@@ -200,7 +202,9 @@ export class TasksService {
 
     // 2. Archive monthly stats (ELO snapshot before reset)
     try {
-      await this.archiveSeasonStats(prevSeasonNumber, prevYear);
+      await this.retryTask(() =>
+        this.archiveSeasonStats(prevSeasonNumber, prevYear),
+      );
       this.logger.log('✅ Season stats archived successfully');
     } catch (error) {
       this.logger.error(
@@ -211,7 +215,7 @@ export class TasksService {
 
     // 3. Reset boost availability
     try {
-      await this.resetBoostAvailability();
+      await this.retryTask(() => this.resetBoostAvailability());
       this.logger.log('✅ Boost availability reset for all users');
     } catch (error) {
       this.logger.error(
@@ -232,11 +236,14 @@ export class TasksService {
         `❌ Failed to reset season streaks: ${error.message}`,
         error.stack,
       );
+      await this.retryTask(() =>
+        this.streakTrackerService.resetMonthlyStreaks(),
+      );
     }
 
-    // 5. Reset monthly stats (ELO + race counts)
+    // 5. Reset monthly stats (ELO + race counts + totalWins)
     try {
-      await this.competitorsService.resetMonthlyStats();
+      await this.retryTask(() => this.competitorsService.resetMonthlyStats());
       this.logger.log('✅ Season stats reset successfully');
     } catch (error) {
       this.logger.error(
