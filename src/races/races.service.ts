@@ -130,6 +130,12 @@ export class RacesService {
     }
   }
 
+  // GET /races/latest-today
+  async getLatestToday(): Promise<{ date: string } | null> {
+    const race = await this.raceEventRepository.findLatestToday();
+    return race ? { date: race.date.toISOString() } : null;
+  }
+
   // GET /races/:raceId
   async findOne(raceId: string): Promise<RaceEvent> {
     const race = await this.raceEventRepository.findOneWithResults(raceId);

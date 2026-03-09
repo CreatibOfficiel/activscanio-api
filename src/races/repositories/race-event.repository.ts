@@ -104,6 +104,22 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     return result?.bestScore ?? null;
   }
 
+  /**
+   * Find the most recent race created today (UTC)
+   */
+  async findLatestToday(): Promise<RaceEvent | null> {
+    const now = new Date();
+    const startOfDay = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+
+    return this.repository
+      .createQueryBuilder('r')
+      .where('r.date >= :startOfDay', { startOfDay })
+      .orderBy('r.date', 'DESC')
+      .getOne();
+  }
+
   async findSimilar(raceId: string, limit: number = 3): Promise<RaceEvent[]> {
     // Get reference race
     const refRace = await this.repository.findOne({

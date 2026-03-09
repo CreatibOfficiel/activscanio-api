@@ -53,6 +53,12 @@ export class RacesController {
     }
   }
 
+  // GET /races/latest-today
+  @Get('latest-today')
+  async getLatestToday() {
+    return this.racesService.getLatestToday();
+  }
+
   // GET /races/:raceId/similar
   @Get(':raceId/similar')
   async findSimilarRaces(@Param('raceId') raceId: string) {
