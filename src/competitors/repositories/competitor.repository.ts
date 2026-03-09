@@ -182,6 +182,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
           'LEAST(SQRT("rd" * "rd" + "vol" * "vol" * 173.7178 * 173.7178), 350)',
         currentMonthRaceCount: 0,
         winStreak: 0,
+        totalWins: 0,
         // Note: raceCount is NOT reset — keeps competitors "confirmed" across seasons.
         // Note: avgRank12 is NOT reset — stays consistent with lifetime raceCount.
         // Note: totalLifetimeRaces is intentionally NOT reset

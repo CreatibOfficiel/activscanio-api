@@ -7,7 +7,9 @@ import { RaceEvent } from './race-event.entity';
 import { RaceResult } from './race-result.entity';
 import { CreateRaceDto } from './dtos/create-race.dto';
 import { RaceCreatedEvent } from './events';
-import { RaceEventRepository } from './repositories/race-event.repository';
+import { RaceEventRepository, PaginatedRacesResult } from './repositories/race-event.repository';
+import { SeasonUtils } from '../betting/utils/season-utils';
+import { WeekUtils } from '../betting/services/week-manager.service';
 import {
   RaceEventNotFoundException,
   InvalidRaceDataException,
@@ -145,6 +147,61 @@ export class RacesService {
     }
 
     return race;
+  }
+
+  // GET /races/count
+  async getStats(): Promise<{ total: number; weekly: number }> {
+    const [total, weekly] = await Promise.all([
+      this.raceEventRepository.countAll(),
+      this.raceEventRepository.countWeekly(),
+    ]);
+    return { total, weekly };
+  }
+
+  // GET /races/paginated
+  async findPaginated(options: {
+    limit: number;
+    cursor?: string;
+    period?: string;
+    competitorId?: string;
+  }): Promise<PaginatedRacesResult> {
+    const { limit, cursor, period, competitorId } = options;
+    let dateFrom: Date | undefined;
+    let dateTo: Date | undefined;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    switch (period) {
+      case 'today':
+        dateFrom = todayStart;
+        break;
+      case 'week': {
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(weekStart.getDate() - 7);
+        dateFrom = weekStart;
+        break;
+      }
+      case 'season': {
+        const weekNumber = WeekUtils.getISOWeek(now);
+        const year = now.getFullYear();
+        const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
+        const seasonWeeks = SeasonUtils.getSeasonWeeks(seasonNumber);
+        dateFrom = WeekUtils.getMondayOfWeek(year, seasonWeeks.start);
+        const endMonday = WeekUtils.getMondayOfWeek(year, seasonWeeks.end);
+        dateTo = new Date(endMonday.getTime() + 6 * 86400000 + 86399999); // Sunday 23:59:59
+        break;
+      }
+      // 'all' or undefined: no date filter
+    }
+
+    return this.raceEventRepository.findPaginated({
+      limit,
+      cursor,
+      dateFrom,
+      dateTo,
+      competitorId,
+    });
   }
 
   // GET /races?recent=true

@@ -53,6 +53,29 @@ export class RacesController {
     }
   }
 
+  // GET /races/count
+  @Get('count')
+  async count() {
+    return this.racesService.getStats();
+  }
+
+  // GET /races/paginated
+  @Get('paginated')
+  async findPaginated(
+    @Query('limit') limitStr: string,
+    @Query('cursor') cursor?: string,
+    @Query('period') period?: string,
+    @Query('competitorId') competitorId?: string,
+  ) {
+    const limit = Math.min(parseInt(limitStr, 10) || 20, 50);
+    return this.racesService.findPaginated({
+      limit,
+      cursor: cursor || undefined,
+      period: period || undefined,
+      competitorId: competitorId || undefined,
+    });
+  }
+
   // GET /races/latest-today
   @Get('latest-today')
   async getLatestToday() {

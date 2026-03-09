@@ -4,6 +4,12 @@ import { Repository } from 'typeorm';
 import { RaceEvent } from '../race-event.entity';
 import { BaseRepository } from '../../common/repositories/base.repository';
 
+export interface PaginatedRacesResult {
+  races: RaceEvent[];
+  nextCursor: string | null;
+  total: number;
+}
+
 /**
  * Race event repository with domain-specific queries
  */
@@ -107,6 +113,92 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
   /**
    * Find the most recent race created today (UTC)
    */
+  async countAll(): Promise<number> {
+    return this.repository.count();
+  }
+
+  async countWeekly(): Promise<number> {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+    return this.repository
+      .createQueryBuilder('r')
+      .where('r.date >= :weekAgo', { weekAgo })
+      .getCount();
+  }
+
+  async findPaginated(options: {
+    limit: number;
+    cursor?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    competitorId?: string;
+  }): Promise<PaginatedRacesResult> {
+    const { limit, cursor, dateFrom, dateTo, competitorId } = options;
+
+    const qb = this.repository
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.results', 'res')
+      .orderBy('r.date', 'DESC')
+      .addOrderBy('r.id', 'DESC');
+
+    if (cursor) {
+      // cursor format: "date|id"
+      const [cursorDate, cursorId] = cursor.split('|');
+      qb.andWhere(
+        '(r.date < :cursorDate OR (r.date = :cursorDate AND r.id < :cursorId))',
+        { cursorDate: new Date(cursorDate), cursorId },
+      );
+    }
+
+    if (dateFrom) {
+      qb.andWhere('r.date >= :dateFrom', { dateFrom });
+    }
+    if (dateTo) {
+      qb.andWhere('r.date <= :dateTo', { dateTo });
+    }
+
+    if (competitorId) {
+      qb.andWhere((subQb) => {
+        const sub = subQb
+          .subQuery()
+          .select('rr."raceEventId"')
+          .from('race_results', 'rr')
+          .where('rr."competitorId" = :competitorId')
+          .getQuery();
+        return `r.id IN ${sub}`;
+      }).setParameter('competitorId', competitorId);
+    }
+
+    // Fetch one extra to know if there's a next page
+    const races = await qb.take(limit + 1).getMany();
+
+    let nextCursor: string | null = null;
+    if (races.length > limit) {
+      races.pop();
+      const last = races[races.length - 1];
+      nextCursor = `${last.date.toISOString()}|${last.id}`;
+    }
+
+    // Count total matching races (without cursor/limit)
+    const countQb = this.repository.createQueryBuilder('r');
+    if (dateFrom) countQb.andWhere('r.date >= :dateFrom', { dateFrom });
+    if (dateTo) countQb.andWhere('r.date <= :dateTo', { dateTo });
+    if (competitorId) {
+      countQb.andWhere((subQb) => {
+        const sub = subQb
+          .subQuery()
+          .select('rr."raceEventId"')
+          .from('race_results', 'rr')
+          .where('rr."competitorId" = :competitorId')
+          .getQuery();
+        return `r.id IN ${sub}`;
+      }).setParameter('competitorId', competitorId);
+    }
+    const total = await countQb.getCount();
+
+    return { races, nextCursor, total };
+  }
+
   async findLatestToday(): Promise<RaceEvent | null> {
     const now = new Date();
     const startOfDay = new Date(
