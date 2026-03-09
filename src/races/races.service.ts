@@ -150,12 +150,44 @@ export class RacesService {
   }
 
   // GET /races/count
-  async getStats(): Promise<{ total: number; weekly: number }> {
-    const [total, weekly] = await Promise.all([
+  async getStats(): Promise<{
+    total: number;
+    weekly: number;
+    mostActive: {
+      competitorId: string;
+      firstName: string;
+      lastName: string;
+      profilePictureUrl: string;
+      raceCount: number;
+    } | null;
+  }> {
+    const [total, weekly, mostActiveRaw] = await Promise.all([
       this.raceEventRepository.countAll(),
       this.raceEventRepository.countWeekly(),
+      this.raceEventRepository.findMostActiveCompetitor(),
     ]);
-    return { total, weekly };
+
+    let mostActive: {
+      competitorId: string;
+      firstName: string;
+      lastName: string;
+      profilePictureUrl: string;
+      raceCount: number;
+    } | null = null;
+    if (mostActiveRaw) {
+      const competitor = await this.competitorsService.findOne(mostActiveRaw.competitorId);
+      if (competitor) {
+        mostActive = {
+          competitorId: competitor.id,
+          firstName: competitor.firstName,
+          lastName: competitor.lastName,
+          profilePictureUrl: competitor.profilePictureUrl,
+          raceCount: mostActiveRaw.raceCount,
+        };
+      }
+    }
+
+    return { total, weekly, mostActive };
   }
 
   // GET /races/paginated

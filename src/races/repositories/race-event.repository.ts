@@ -126,6 +126,24 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
       .getCount();
   }
 
+  async findMostActiveCompetitor(): Promise<{ competitorId: string; raceCount: number } | null> {
+    const result = await this.repository.manager
+      .createQueryBuilder()
+      .select('rr."competitorId"', 'competitorId')
+      .addSelect('COUNT(*)', 'raceCount')
+      .from('race_results', 'rr')
+      .groupBy('rr."competitorId"')
+      .orderBy('"raceCount"', 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    if (!result) return null;
+    return {
+      competitorId: result.competitorId,
+      raceCount: parseInt(result.raceCount, 10),
+    };
+  }
+
   async findPaginated(options: {
     limit: number;
     cursor?: string;
