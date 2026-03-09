@@ -16,6 +16,7 @@ export class RatingCalculationService {
   private readonly DEFAULT_RATING = 1500;
   private readonly DEFAULT_RD = 350;
   private readonly DEFAULT_VOL = 0.06;
+  private readonly MIN_RD = 30; // Glickman-recommended floor to prevent rating freeze
 
   /**
    * Calculate updated ratings for all competitors in a race
@@ -89,7 +90,7 @@ export class RatingCalculationService {
       const player = players.get(competitor.id)!;
       updatedRatings.set(competitor.id, {
         rating: player.getRating(),
-        rd: player.getRd(),
+        rd: Math.max(player.getRd(), this.MIN_RD),
         vol: player.getVol(),
       });
     });

@@ -178,8 +178,8 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
       .update(Competitor)
       .set({
         rating: () => '0.75 * "rating" + 0.25 * 1500',
-        rd: () => 'LEAST("rd" + 50, 150)',
-        vol: 0.06,
+        rd: () =>
+          'LEAST(SQRT("rd" * "rd" + "vol" * "vol" * 173.7178 * 173.7178), 350)',
         currentMonthRaceCount: 0,
         winStreak: 0,
         // Note: raceCount is NOT reset — keeps competitors "confirmed" across seasons.
