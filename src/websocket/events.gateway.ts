@@ -119,7 +119,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   emitStreakLost(
     userId: string,
-    data: { type: 'betting' | 'play'; lostValue: number; lostAt: Date },
+    data: { type: 'betting' | 'play'; lostValue: number; lostAt: Date; missedDays?: string[] },
   ) {
     const socketId = this.userSockets.get(userId);
     if (socketId) {

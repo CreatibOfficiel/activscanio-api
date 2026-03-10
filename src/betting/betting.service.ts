@@ -526,7 +526,7 @@ export class BettingService {
    */
   async getUnseenStreakLosses(userId: string): Promise<{
     bettingStreakLoss: { lostValue: number; lostAt: Date } | null;
-    playStreakLoss: { lostValue: number; lostAt: Date } | null;
+    playStreakLoss: { lostValue: number; lostAt: Date; missedDays: string[] } | null;
   }> {
     // Check betting streak loss
     const userStreak = await this.userStreakRepository.findOne({
@@ -547,7 +547,7 @@ export class BettingService {
 
     // Check play streak loss (via competitor linked to user)
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    let playStreakLoss: { lostValue: number; lostAt: Date } | null = null;
+    let playStreakLoss: { lostValue: number; lostAt: Date; missedDays: string[] } | null = null;
 
     if (user?.competitorId) {
       const competitor = await this.competitorRepository.findOne({
@@ -562,6 +562,9 @@ export class BettingService {
         playStreakLoss = {
           lostValue: competitor.playStreakLostValue,
           lostAt: competitor.playStreakLostAt,
+          missedDays: competitor.playStreakMissedDays
+            ? competitor.playStreakMissedDays.split(',')
+            : [],
         };
       }
     }

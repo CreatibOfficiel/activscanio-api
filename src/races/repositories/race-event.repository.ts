@@ -118,11 +118,14 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
   }
 
   async countWeekly(): Promise<number> {
+    // Monday 00:00 UTC of the current week
     const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+    const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const diff = day === 0 ? 6 : day - 1; // days since Monday
+    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diff));
     return this.repository
       .createQueryBuilder('r')
-      .where('r.date >= :weekAgo', { weekAgo })
+      .where('r.date >= :monday', { monday })
       .getCount();
   }
 

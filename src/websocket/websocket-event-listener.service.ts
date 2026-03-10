@@ -98,6 +98,7 @@ export class WebSocketEventListener {
     userId: string;
     lostValue: number;
     lostAt: Date;
+    missedDays?: string[];
   }) {
     this.logger.log(
       `Relaying play streak lost via WebSocket for user ${payload.userId} (was ${payload.lostValue})`,
@@ -106,6 +107,7 @@ export class WebSocketEventListener {
       type: 'play',
       lostValue: payload.lostValue,
       lostAt: payload.lostAt,
+      missedDays: payload.missedDays,
     });
   }
 

@@ -114,6 +114,9 @@ export class Competitor {
   @Column({ type: 'timestamptz', nullable: true })
   playStreakLossSeenAt: Date | null;
 
+  @Column({ type: 'text', nullable: true })
+  playStreakMissedDays: string | null;
+
   @OneToOne(() => CharacterVariant, (variant) => variant.competitor, {
     nullable: true,
   })
