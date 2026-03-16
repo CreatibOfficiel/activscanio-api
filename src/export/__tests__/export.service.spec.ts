@@ -388,7 +388,7 @@ describe('ExportService', () => {
       expect(csv).toContain('user-123');
       expect(csv).toContain('450');
       expect(rankingRepository.find).toHaveBeenCalledWith({
-        where: { month: 1, year: 2024 },
+        where: { seasonNumber: 1, year: 2024 },
         order: { rank: 'ASC' },
         take: 100,
       });

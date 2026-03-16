@@ -27,6 +27,7 @@ describe('OnboardingService', () => {
     where: jest.fn().mockReturnThis(),
     orWhere: jest.fn().mockReturnThis(),
     leftJoinAndSelect: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
   };
@@ -108,7 +109,7 @@ describe('OnboardingService', () => {
 
       expect(competitorRepository.createQueryBuilder).toHaveBeenCalledWith('c');
       expect(mockQueryBuilder.where).toHaveBeenCalled();
-      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(10);
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(20);
       expect(result).toEqual(mockCompetitors);
     });
 

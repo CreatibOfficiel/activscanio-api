@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
 import { BettingWeek } from '../../betting/entities/betting-week.entity';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
@@ -319,41 +319,49 @@ export class StreakTrackerService {
   async resetMonthlyStreaks(): Promise<number> {
     this.logger.log('Resetting monthly streaks for all users...');
 
-    // Find users with active streaks before resetting
+    // 1. Find users with active streaks BEFORE resetting (for loss notifications)
     const activeStreaks = await this.userStreakRepository.find({
-      where: {},
+      where: [
+        { currentMonthlyStreak: MoreThan(0) },
+        { currentLifetimeStreak: MoreThan(0) },
+      ],
     });
 
-    const usersWithStreaks = activeStreaks.filter(
-      (s) => s.currentMonthlyStreak > 0,
-    );
-
-    // Save streak loss values and emit events
-    for (const streak of usersWithStreaks) {
-      streak.bettingStreakLostValue = streak.currentMonthlyStreak;
-      streak.bettingStreakLostAt = new Date();
-      streak.bettingStreakLossSeenAt = null;
-      await this.userStreakRepository.save(streak);
-
-      this.eventEmitter.emit('streak.betting_lost', {
-        userId: streak.userId,
-        lostValue: streak.currentMonthlyStreak,
-        lostAt: new Date(),
-      });
-    }
-
-    // Now reset all monthly streaks
+    // 2. Reset ALL streaks first (the critical operation)
     const result = await this.userStreakRepository.update(
       {},
       {
         currentMonthlyStreak: 0,
         monthlyStreakStartedAt: null,
         lastBetWeekNumber: null,
+        currentLifetimeStreak: 0,
+        lifetimeStreakStartedAt: null,
       },
     );
 
+    // 3. Set loss tracking fields for users who had active streaks
+    const now = new Date();
+    for (const streak of activeStreaks) {
+      if (streak.currentMonthlyStreak > 0) {
+        await this.userStreakRepository.update(
+          { id: streak.id },
+          {
+            bettingStreakLostValue: streak.currentMonthlyStreak,
+            bettingStreakLostAt: now,
+            bettingStreakLossSeenAt: null,
+          },
+        );
+
+        this.eventEmitter.emit('streak.betting_lost', {
+          userId: streak.userId,
+          lostValue: streak.currentMonthlyStreak,
+          lostAt: now,
+        });
+      }
+    }
+
     this.logger.log(
-      `Monthly streaks reset completed: ${result.affected || 0} users affected (${usersWithStreaks.length} had active streaks)`,
+      `Monthly streaks reset completed: ${result.affected || 0} users affected (${activeStreaks.length} had active streaks)`,
     );
 
     return result.affected || 0;
@@ -388,5 +396,47 @@ export class StreakTrackerService {
       take: limit,
       relations: ['user'],
     });
+  }
+
+  /**
+   * Break streaks for users who had active streaks but didn't bet in the finalized week.
+   * Called after week finalization to ensure streaks don't persist indefinitely.
+   *
+   * @param bettedUserIds - User IDs who placed bets this week
+   * @returns Number of streaks broken
+   */
+  async breakMissedStreaks(bettedUserIds: string[]): Promise<number> {
+    const activeStreaks = await this.userStreakRepository.find({
+      where: [
+        { currentMonthlyStreak: MoreThan(0) },
+        { currentLifetimeStreak: MoreThan(0) },
+      ],
+    });
+
+    let broken = 0;
+    for (const streak of activeStreaks) {
+      if (bettedUserIds.includes(streak.userId)) continue;
+
+      if (streak.currentMonthlyStreak > 0) {
+        streak.bettingStreakLostValue = streak.currentMonthlyStreak;
+        streak.bettingStreakLostAt = new Date();
+        streak.bettingStreakLossSeenAt = null;
+
+        this.eventEmitter.emit('streak.betting_lost', {
+          userId: streak.userId,
+          lostValue: streak.currentMonthlyStreak,
+          lostAt: new Date(),
+        });
+      }
+
+      streak.currentMonthlyStreak = 0;
+      streak.currentLifetimeStreak = 0;
+      streak.monthlyStreakStartedAt = null;
+      await this.userStreakRepository.save(streak);
+      broken++;
+    }
+
+    this.logger.log(`Broke ${broken} missed streaks`);
+    return broken;
   }
 }

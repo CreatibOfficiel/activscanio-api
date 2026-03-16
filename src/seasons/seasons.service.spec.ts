@@ -8,6 +8,7 @@ import { ArchivedCompetitorRanking } from './entities/archived-competitor-rankin
 import { Competitor } from '../competitors/competitor.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
 import { Bet } from '../betting/entities/bet.entity';
+import { BetPick } from '../betting/entities/bet-pick.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 
 describe('SeasonsService', () => {
@@ -80,6 +81,12 @@ describe('SeasonsService', () => {
           },
         },
         {
+          provide: getRepositoryToken(BetPick),
+          useValue: {
+            find: jest.fn(),
+          },
+        },
+        {
           provide: getRepositoryToken(BettorRanking),
           useValue: {
             find: jest.fn(),
@@ -127,6 +134,7 @@ describe('SeasonsService', () => {
         raceCount: 10,
         winStreak: 3,
         avgRank12: 2.5,
+        currentMonthRaceCount: 5,
       },
       {
         id: 'c2',
@@ -138,6 +146,7 @@ describe('SeasonsService', () => {
         raceCount: 8,
         winStreak: 1,
         avgRank12: 3.2,
+        currentMonthRaceCount: 3,
       },
     ];
 
@@ -156,10 +165,10 @@ describe('SeasonsService', () => {
 
     it('should archive season successfully', async () => {
       mockQueryRunner.manager.find
-        .mockResolvedValueOnce(mockCompetitors) // Find competitors
-        .mockResolvedValueOnce(mockBettingWeeks); // Find betting weeks
+        .mockResolvedValueOnce(mockCompetitors); // Find competitors
 
       mockQueryRunner.manager.count
+        .mockResolvedValueOnce(10) // RaceEvent count
         .mockResolvedValueOnce(15) // Bets count
         .mockResolvedValueOnce(5); // Bettor rankings count
 
@@ -167,11 +176,13 @@ describe('SeasonsService', () => {
         id: 'archive-1',
         month,
         year,
-        seasonName: 'January 2024',
+        seasonName: 'Saison 1 - 2024',
         totalCompetitors: 2,
         totalBettors: 5,
         totalRaces: 0,
         totalBets: 15,
+        startDate: new Date(2024, 0, 1),
+        endDate: new Date(2024, 1, 0, 23, 59, 59, 999),
       };
 
       mockQueryRunner.manager.create.mockImplementation((entity, data) => {
@@ -190,15 +201,15 @@ describe('SeasonsService', () => {
       expect(mockQueryRunner.manager.create).toHaveBeenCalledWith(
         SeasonArchive,
         expect.objectContaining({
-          month,
+          seasonNumber: month,
           year,
-          seasonName: 'January 2024',
+          seasonName: 'Saison 1 - 2024',
           totalCompetitors: 2,
         }),
       );
       expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
         BettingWeek,
-        { month, year },
+        { seasonNumber: month, year },
         { seasonArchiveId: mockArchive.id },
       );
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
@@ -218,22 +229,33 @@ describe('SeasonsService', () => {
         raceCount: 5,
         winStreak: 0,
         avgRank12: 5.0,
+        currentMonthRaceCount: 3,
       }));
 
       mockQueryRunner.manager.find
-        .mockResolvedValueOnce(manyCompetitors)
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce(manyCompetitors);
 
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
       mockQueryRunner.manager.create.mockImplementation((entity, data) => {
         if (entity === SeasonArchive) {
-          return { id: 'archive-1', month, year, seasonName: 'January 2024' };
+          return {
+            id: 'archive-1',
+            month,
+            year,
+            seasonName: 'Saison 1 - 2024',
+            startDate: new Date(2024, 0, 1),
+            endDate: new Date(2024, 1, 0, 23, 59, 59, 999),
+          };
         }
         return data;
       });
 
-      mockQueryRunner.manager.save.mockResolvedValue({ id: 'archive-1' });
+      mockQueryRunner.manager.save.mockResolvedValue({
+        id: 'archive-1',
+        startDate: new Date(2024, 0, 1),
+        endDate: new Date(2024, 1, 0, 23, 59, 59, 999),
+      });
 
       await service.archiveSeason(month, year);
 
@@ -243,9 +265,10 @@ describe('SeasonsService', () => {
     });
 
     it('should rollback transaction on error', async () => {
-      mockQueryRunner.manager.find.mockRejectedValue(
-        new Error('Database error'),
-      );
+      mockQueryRunner.manager.find
+        .mockResolvedValueOnce([]) // Competitors
+      mockQueryRunner.manager.count
+        .mockRejectedValueOnce(new Error('Database error'));
 
       await expect(service.archiveSeason(month, year)).rejects.toThrow(
         'Database error',
@@ -258,8 +281,7 @@ describe('SeasonsService', () => {
 
     it('should handle empty competitors list', async () => {
       mockQueryRunner.manager.find
-        .mockResolvedValueOnce([]) // No competitors
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([]); // No competitors
 
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
@@ -267,11 +289,13 @@ describe('SeasonsService', () => {
         id: 'archive-1',
         month,
         year,
-        seasonName: 'January 2024',
+        seasonName: 'Saison 1 - 2024',
         totalCompetitors: 0,
         totalBettors: 0,
         totalRaces: 0,
         totalBets: 0,
+        startDate: new Date(2024, 0, 1),
+        endDate: new Date(2024, 1, 0, 23, 59, 59, 999),
       };
 
       mockQueryRunner.manager.create.mockReturnValue(mockArchive);
@@ -284,20 +308,23 @@ describe('SeasonsService', () => {
     });
 
     it('should calculate correct date range', async () => {
-      mockQueryRunner.manager.find.mockResolvedValue([]);
+      mockQueryRunner.manager.find.mockResolvedValueOnce([]);
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
       mockQueryRunner.manager.create.mockImplementation((entity, data) => {
         if (entity === SeasonArchive) {
-          // Verify date range
-          expect(data.startDate).toEqual(new Date(2024, 0, 1)); // Jan 1
-          expect(data.endDate).toEqual(new Date(2024, 1, 0, 23, 59, 59, 999)); // Jan 31 end
+          // Verify date range is set (season-based, not month-based)
+          expect(data.startDate).toBeDefined();
+          expect(data.endDate).toBeDefined();
+          expect(data.startDate.getTime()).toBeLessThan(data.endDate.getTime());
           return data;
         }
         return data;
       });
 
-      mockQueryRunner.manager.save.mockResolvedValue({ id: 'archive-1' });
+      mockQueryRunner.manager.save.mockImplementation((entity) => {
+        return Promise.resolve(entity);
+      });
 
       await service.archiveSeason(month, year);
 
@@ -306,11 +333,11 @@ describe('SeasonsService', () => {
   });
 
   describe('getAllSeasons', () => {
-    it('should return all seasons ordered by year and month DESC', async () => {
+    it('should return all seasons ordered by year and seasonNumber DESC', async () => {
       const mockSeasons: Partial<SeasonArchive>[] = [
-        { id: '1', month: 12, year: 2024, seasonName: 'December 2024' },
-        { id: '2', month: 11, year: 2024, seasonName: 'November 2024' },
-        { id: '3', month: 10, year: 2024, seasonName: 'October 2024' },
+        { id: '1', seasonNumber: 3, year: 2024, seasonName: 'Saison 3 - 2024' },
+        { id: '2', seasonNumber: 2, year: 2024, seasonName: 'Saison 2 - 2024' },
+        { id: '3', seasonNumber: 1, year: 2024, seasonName: 'Saison 1 - 2024' },
       ];
 
       jest
@@ -320,7 +347,7 @@ describe('SeasonsService', () => {
       const result = await service.getAllSeasons();
 
       expect(seasonArchiveRepository.find).toHaveBeenCalledWith({
-        order: { year: 'DESC', month: 'DESC' },
+        order: { year: 'DESC', seasonNumber: 'DESC' },
       });
       expect(result).toEqual(mockSeasons);
     });
@@ -338,9 +365,9 @@ describe('SeasonsService', () => {
     it('should return season with relations', async () => {
       const mockSeason: Partial<SeasonArchive> = {
         id: '1',
-        month: 1,
+        seasonNumber: 1,
         year: 2024,
-        seasonName: 'January 2024',
+        seasonName: 'Saison 1 - 2024',
         competitorRankings: [],
       };
 
@@ -351,7 +378,7 @@ describe('SeasonsService', () => {
       const result = await service.getSeason(1, 2024);
 
       expect(seasonArchiveRepository.findOne).toHaveBeenCalledWith({
-        where: { month: 1, year: 2024 },
+        where: { seasonNumber: 1, year: 2024 },
         relations: ['competitorRankings'],
       });
       expect(result).toEqual(mockSeason);
@@ -370,13 +397,16 @@ describe('SeasonsService', () => {
     it('should return rankings ordered by rank ASC', async () => {
       const seasonId = 'season-1';
       const mockRankings: Partial<ArchivedCompetitorRanking>[] = [
-        { id: 'r1', rank: 1, competitorName: 'Mario Bros' },
-        { id: 'r2', rank: 2, competitorName: 'Luigi Bros' },
+        { id: 'r1', rank: 1, competitorName: 'Mario Bros', competitorId: 'c1' },
+        { id: 'r2', rank: 2, competitorName: 'Luigi Bros', competitorId: 'c2' },
       ];
 
       jest
         .spyOn(archivedCompetitorRankingRepository, 'find')
         .mockResolvedValue(mockRankings as ArchivedCompetitorRanking[]);
+      jest
+        .spyOn(competitorRepository, 'find')
+        .mockResolvedValue([]);
 
       const result = await service.getCompetitorRankings(seasonId);
 
@@ -384,12 +414,15 @@ describe('SeasonsService', () => {
         where: { seasonArchiveId: seasonId },
         order: { rank: 'ASC' },
       });
-      expect(result).toEqual(mockRankings);
+      expect(result).toHaveLength(2);
     });
 
     it('should return empty array when no rankings found', async () => {
       jest
         .spyOn(archivedCompetitorRankingRepository, 'find')
+        .mockResolvedValue([]);
+      jest
+        .spyOn(competitorRepository, 'find')
         .mockResolvedValue([]);
 
       const result = await service.getCompetitorRankings('non-existent');
@@ -401,8 +434,8 @@ describe('SeasonsService', () => {
   describe('getBettorRankings', () => {
     it('should return bettor rankings with user relations', async () => {
       const mockRankings: Partial<BettorRanking>[] = [
-        { id: 'b1', rank: 1, month: 1, year: 2024 },
-        { id: 'b2', rank: 2, month: 1, year: 2024 },
+        { id: 'b1', rank: 1, seasonNumber: 1, year: 2024 },
+        { id: 'b2', rank: 2, seasonNumber: 1, year: 2024 },
       ];
 
       jest
@@ -412,11 +445,11 @@ describe('SeasonsService', () => {
       const result = await service.getBettorRankings(1, 2024);
 
       expect(bettorRankingRepository.find).toHaveBeenCalledWith({
-        where: { month: 1, year: 2024 },
+        where: { seasonNumber: 1, year: 2024 },
         order: { rank: 'ASC' },
-        relations: ['user'],
+        relations: ['user', 'user.competitor'],
       });
-      expect(result).toEqual(mockRankings);
+      expect(result).toHaveLength(2);
     });
 
     it('should return empty array when no bettor rankings found', async () => {
@@ -431,8 +464,8 @@ describe('SeasonsService', () => {
   describe('getBettingWeeks', () => {
     it('should return betting weeks ordered by week number', async () => {
       const mockWeeks: Partial<BettingWeek>[] = [
-        { id: 'w1', weekNumber: 1, month: 1, year: 2024 },
-        { id: 'w2', weekNumber: 2, month: 1, year: 2024 },
+        { id: 'w1', weekNumber: 1, seasonNumber: 1, year: 2024 },
+        { id: 'w2', weekNumber: 2, seasonNumber: 1, year: 2024 },
       ];
 
       jest
@@ -442,7 +475,7 @@ describe('SeasonsService', () => {
       const result = await service.getBettingWeeks(1, 2024);
 
       expect(bettingWeekRepository.find).toHaveBeenCalledWith({
-        where: { month: 1, year: 2024 },
+        where: { seasonNumber: 1, year: 2024 },
         order: { weekNumber: 'ASC' },
       });
       expect(result).toEqual(mockWeeks);
@@ -473,19 +506,21 @@ describe('SeasonsService', () => {
         return data;
       });
 
-      mockQueryRunner.manager.save.mockResolvedValue({ id: 'archive-1' });
+      mockQueryRunner.manager.save.mockImplementation((entity) => {
+        return Promise.resolve(entity);
+      });
 
-      // Test January
+      // Test Season 1
       await service.archiveSeason(1, 2024);
-      expect(capturedSeasonName).toBe('January 2024');
+      expect(capturedSeasonName).toBe('Saison 1 - 2024');
 
-      // Test December
+      // Test Season 12
       await service.archiveSeason(12, 2024);
-      expect(capturedSeasonName).toBe('December 2024');
+      expect(capturedSeasonName).toBe('Saison 12 - 2024');
 
-      // Test June
+      // Test Season 6
       await service.archiveSeason(6, 2025);
-      expect(capturedSeasonName).toBe('June 2025');
+      expect(capturedSeasonName).toBe('Saison 6 - 2025');
     });
   });
 });

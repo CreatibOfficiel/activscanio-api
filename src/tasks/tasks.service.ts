@@ -384,6 +384,21 @@ export class TasksService {
         currentWeek.id,
       );
 
+      // 5. Break streaks for users who didn't bet this week
+      try {
+        const bettedUserIds = result.calculations.map((c) => c.userId);
+        const broken =
+          await this.streakTrackerService.breakMissedStreaks(bettedUserIds);
+        if (broken > 0) {
+          this.logger.log(`Broke ${broken} streaks for users who didn't bet`);
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to break missed streaks: ${error.message}`,
+          error.stack,
+        );
+      }
+
       this.logger.log(
         `✅ Week finalized: ${result.processedBets} bets processed, ${result.totalPointsDistributed.toFixed(2)} points distributed`,
       );

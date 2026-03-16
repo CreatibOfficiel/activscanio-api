@@ -6,19 +6,37 @@ import { Repository } from 'typeorm';
 import {
   Achievement,
   AchievementCategory,
+  AchievementConditionOperator,
+  AchievementConditionType,
+  AchievementDomain,
   AchievementRarity,
 } from '../../entities/achievement.entity';
 import { UserAchievement } from '../../entities/user-achievement.entity';
+import { UserStreak } from '../../entities/user-streak.entity';
 import { Bet } from '../../../betting/entities/bet.entity';
+import { BettorRanking } from '../../../betting/entities/bettor-ranking.entity';
+import { User } from '../../../users/user.entity';
+import { Competitor } from '../../../competitors/competitor.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { XPLevelService } from '../xp-level.service';
 
 describe('AchievementCalculatorService', () => {
+  let module: TestingModule;
   let service: AchievementCalculatorService;
   let achievementRepository: Repository<Achievement>;
   let userAchievementRepository: Repository<UserAchievement>;
   let betRepository: Repository<Bet>;
+  let xpLevelService: XPLevelService;
+  let userRepository: Repository<User>;
   let eventEmitter: EventEmitter2;
+
+  const mockCondition = {
+    type: AchievementConditionType.COUNT,
+    metric: 'betsPlaced',
+    operator: AchievementConditionOperator.GTE,
+    value: 1,
+  };
 
   const mockAchievements: Partial<Achievement>[] = [
     {
@@ -34,6 +52,8 @@ describe('AchievementCalculatorService', () => {
       chainName: null,
       isTemporary: false,
       canBeLost: false,
+      domain: AchievementDomain.BETTING,
+      condition: { ...mockCondition, value: 1 },
     },
     {
       id: '2',
@@ -48,6 +68,8 @@ describe('AchievementCalculatorService', () => {
       chainName: 'participation_chain',
       isTemporary: false,
       canBeLost: false,
+      domain: AchievementDomain.BETTING,
+      condition: { ...mockCondition, value: 5 },
     },
     {
       id: '3',
@@ -62,30 +84,67 @@ describe('AchievementCalculatorService', () => {
       chainName: 'participation_chain',
       isTemporary: false,
       canBeLost: false,
+      domain: AchievementDomain.BETTING,
+      condition: { ...mockCondition, value: 20 },
     },
   ];
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         AchievementCalculatorService,
         {
           provide: getRepositoryToken(Achievement) as string,
           useValue: {
-            find: jest.fn(),
+            find: jest.fn().mockResolvedValue([]),
           },
         },
         {
           provide: getRepositoryToken(UserAchievement) as string,
           useValue: {
-            find: jest.fn(),
+            find: jest.fn().mockResolvedValue([]),
             save: jest.fn(),
+            create: jest.fn().mockImplementation((data) => data),
+          },
+        },
+        {
+          provide: getRepositoryToken(UserStreak),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+            increment: jest.fn(),
+            update: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(BettorRanking),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+            find: jest.fn().mockResolvedValue([]),
           },
         },
         {
           provide: getRepositoryToken(Bet),
           useValue: {
-            count: jest.fn(),
+            count: jest.fn().mockResolvedValue(0),
+            find: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: getRepositoryToken(Competitor),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: XPLevelService,
+          useValue: {
+            awardXP: jest.fn(),
           },
         },
         {
@@ -107,6 +166,8 @@ describe('AchievementCalculatorService', () => {
       getRepositoryToken(UserAchievement),
     );
     betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
+    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    xpLevelService = module.get<XPLevelService>(XPLevelService);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
   });
 
@@ -201,39 +262,86 @@ describe('AchievementCalculatorService', () => {
   });
 
   describe('achievement unlocking', () => {
-    it('should emit achievement.unlocked event when new achievement is unlocked', async () => {
-      const mockUserAchievement = {
-        userId: 'user-123',
-        achievementId: '1',
-        achievement: mockAchievements[0],
-        unlockedAt: new Date(),
-      } as UserAchievement;
-
+    it('should save UserAchievement and award XP when condition is met', async () => {
+      // Only expose the first_bet achievement (betsPlaced >= 1)
       jest
-        .spyOn(userAchievementRepository, 'save')
-        .mockResolvedValue(mockUserAchievement);
+        .spyOn(achievementRepository, 'find')
+        .mockResolvedValue([mockAchievements[0]] as Achievement[]);
 
-      // Unlock achievement manually (simulating the unlock process)
+      // No achievements unlocked yet
+      jest
+        .spyOn(userAchievementRepository, 'find')
+        .mockResolvedValue([]);
 
-      await (
-        service as unknown as {
-          unlockAchievement: (
-            userId: string,
-            achievement: Achievement,
-          ) => Promise<void>;
-        }
-      ).unlockAchievement('user-123', mockAchievements[0] as Achievement);
+      // User has 1 bet → satisfies betsPlaced >= 1
+      const mockBet = {
+        id: 'bet-1',
+        userId: 'user-123',
+        isFinalized: true,
+        pointsEarned: 10,
+        createdAt: new Date(),
+        picks: [
+          { isCorrect: true, hasBoost: false, oddAtBet: 2 },
+        ],
+      };
+      jest.spyOn(betRepository, 'find').mockResolvedValue([mockBet] as any);
 
-      // Verify event was emitted
-      expect(eventEmitter.emit).toHaveBeenCalledWith(
-        'achievement.unlocked',
+      const result = await service.checkAchievements('user-123');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].achievementKey).toBe('first_bet');
+      expect(result[0].achievementName).toBe('First Bet');
+
+      // Should have saved the UserAchievement
+      expect(userAchievementRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-123',
-          achievement: expect.objectContaining({
-            key: 'first_bet',
-          }),
+          achievementId: '1',
         }),
       );
+
+      // Should have awarded XP
+      expect(xpLevelService.awardXP).toHaveBeenCalledWith(
+        'user-123',
+        `ACHIEVEMENT_${AchievementRarity.COMMON}`,
+      );
+    });
+
+    it('should not unlock already-unlocked achievements', async () => {
+      jest
+        .spyOn(achievementRepository, 'find')
+        .mockResolvedValue([mockAchievements[0]] as Achievement[]);
+
+      // first_bet is already unlocked
+      jest.spyOn(userAchievementRepository, 'find').mockImplementation(
+        (options: any) => {
+          if (options?.select) {
+            // The "get achievement IDs" call
+            return Promise.resolve([{ achievementId: '1' }] as any);
+          }
+          // The "get with relations" call
+          return Promise.resolve([{
+            userId: 'user-123',
+            achievementId: '1',
+            achievement: mockAchievements[0],
+          }] as any);
+        },
+      );
+
+      const mockBet = {
+        id: 'bet-1',
+        userId: 'user-123',
+        isFinalized: true,
+        pointsEarned: 10,
+        createdAt: new Date(),
+        picks: [{ isCorrect: true, hasBoost: false, oddAtBet: 2 }],
+      };
+      jest.spyOn(betRepository, 'find').mockResolvedValue([mockBet] as any);
+
+      const result = await service.checkAchievements('user-123');
+
+      expect(result).toHaveLength(0);
+      expect(userAchievementRepository.save).not.toHaveBeenCalled();
     });
   });
 

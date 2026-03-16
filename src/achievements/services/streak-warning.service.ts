@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
 import { Bet } from '../../betting/entities/bet.entity';
 import {
@@ -215,6 +215,32 @@ export class StreakWarningService {
         });
 
         if (currentWeek) {
+          // Verify streak is still valid: user must have bet in the previous week
+          const previousWeek = await this.bettingWeekRepository.findOne({
+            where: {
+              status: In([
+                BettingWeekStatus.FINALIZED,
+                BettingWeekStatus.CLOSED,
+              ]),
+              seasonNumber: currentWeek.seasonNumber,
+            },
+            order: { weekNumber: 'DESC' },
+          });
+
+          if (previousWeek) {
+            const previousBet = await this.betRepository.findOne({
+              where: { userId, bettingWeekId: previousWeek.id },
+            });
+
+            // If user didn't bet last week, streak is broken — reset it
+            if (!previousBet) {
+              streak.currentMonthlyStreak = 0;
+              streak.currentLifetimeStreak = 0;
+              await this.userStreakRepository.save(streak);
+              return result; // No warning needed
+            }
+          }
+
           const existingBet = await this.betRepository.findOne({
             where: { userId, bettingWeekId: currentWeek.id },
           });

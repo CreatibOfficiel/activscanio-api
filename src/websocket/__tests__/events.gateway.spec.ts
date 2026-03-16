@@ -162,14 +162,14 @@ describe('EventsGateway', () => {
     });
 
     it('should return correct count after registrations', () => {
-      gateway.handleRegister('user-1', { id: 'socket-1' } as Socket);
-      gateway.handleRegister('user-2', { id: 'socket-2' } as Socket);
+      gateway.handleRegister('user-1', { id: 'socket-1', emit: jest.fn() } as unknown as Socket);
+      gateway.handleRegister('user-2', { id: 'socket-2', emit: jest.fn() } as unknown as Socket);
 
       expect(gateway.getConnectedClientsCount()).toBe(2);
     });
 
     it('should update count after disconnection', () => {
-      const socket1 = { id: 'socket-1' } as Socket;
+      const socket1 = { id: 'socket-1', emit: jest.fn() } as unknown as Socket;
       gateway.handleRegister('user-1', socket1);
       expect(gateway.getConnectedClientsCount()).toBe(1);
 
