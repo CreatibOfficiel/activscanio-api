@@ -179,15 +179,15 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     }
 
     if (competitorId) {
-      qb.andWhere((subQb) => {
-        const sub = subQb
-          .subQuery()
-          .select('rr."raceEventId"')
-          .from('race_results', 'rr')
-          .where('rr."competitorId" = :competitorId')
-          .getQuery();
-        return `r.id IN ${sub}`;
-      }).setParameter('competitorId', competitorId);
+      // Use EXISTS rather than a subquery via the closure form: TypeORM's
+      // closure subqueries do not reliably propagate parameters set on the
+      // parent QB, which causes a runtime "bind 0 parameters" SQL error.
+      // EXISTS is also a hash semi-join in Postgres, so performance is
+      // equal or better than IN (SELECT ...).
+      qb.andWhere(
+        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceEventId" = r.id AND rr."competitorId" = :competitorId)',
+        { competitorId },
+      );
     }
 
     // Fetch one extra to know if there's a next page
@@ -205,15 +205,10 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     if (dateFrom) countQb.andWhere('r.date >= :dateFrom', { dateFrom });
     if (dateTo) countQb.andWhere('r.date <= :dateTo', { dateTo });
     if (competitorId) {
-      countQb.andWhere((subQb) => {
-        const sub = subQb
-          .subQuery()
-          .select('rr."raceEventId"')
-          .from('race_results', 'rr')
-          .where('rr."competitorId" = :competitorId')
-          .getQuery();
-        return `r.id IN ${sub}`;
-      }).setParameter('competitorId', competitorId);
+      countQb.andWhere(
+        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceEventId" = r.id AND rr."competitorId" = :competitorId)',
+        { competitorId },
+      );
     }
     const total = await countQb.getCount();
 

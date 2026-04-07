@@ -154,41 +154,72 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
   }
 
   /**
-   * Reset season stats for all competitors using soft reset (75/25)
-   * Called at season transition (first week of each 4-week season)
+   * Reset season stats at the end of a 4-week season.
    *
-   * Soft reset formula:
-   * - rating = 0.75 × oldRating + 0.25 × 1500
-   * - rd = min(oldRd + 50, 350) — increased uncertainty for new season
-   * - vol resets to default (0.06)
-   * - currentMonthRaceCount, winStreak reset to 0
+   * Two distinct paths, matching Glicko-2 canonical behavior:
    *
-   * NOT reset (intentional):
+   * 1. ACTIVE competitors (currentMonthRaceCount > 0) — full soft reset:
+   *    - rating = 0.75 × oldRating + 0.25 × 1500  (squish toward 1500)
+   *    - rd     = min(sqrt(rd² + vol² × 173.7178²), 350)  (Glickman Step 6)
+   *    - vol    = 0.06 (default)
+   *    - currentMonthRaceCount = 0
+   *    - winStreak = 0
+   *
+   * 2. INACTIVE competitors (currentMonthRaceCount = 0) — Glickman Step 6 only:
+   *    - rating, vol UNCHANGED  (per Glicko-2 paper, §Step 6)
+   *    - rd     = min(sqrt(rd² + vol² × 173.7178²), 350)
+   *    - winStreak unchanged (no races = no streak interruption)
+   *    - currentMonthRaceCount stays 0 trivially
+   *
+   *   Rationale: applying the 75/25 squish to absent players is a "stealth
+   *   hard reset" — drift compounds to ~58% toward 1500 after 3 missed
+   *   seasons. Lichess, Apex S25+, Valorant, all open-source Glicko-2 libs
+   *   skip the rating reset for inactives. The RD bump alone already handles
+   *   "you've been away, your rating is now uncertain": when they return,
+   *   their inflated RD makes their first races swing big and re-anchor
+   *   them to the active field naturally.
+   *
+   * NOT reset (intentional, both paths):
    * - raceCount: lifetime total, used for confirmed/provisional classification.
    *   Resetting it would make all competitors "provisional" (raceCount < 5)
-   *   for ~5 weeks, preventing any podium formation. The RD increase already
-   *   handles rating uncertainty per Glicko-2 best practices.
+   *   for ~5 weeks, preventing any podium formation.
    * - avgRank12: running lifetime average, stays consistent with raceCount.
    * - totalLifetimeRaces: all-time counter
    * - recentPositions, formFactor: based on actual race history
+   *
+   * Must run AFTER archiveSeasonStats (which reads currentMonthRaceCount).
    */
   async resetMonthlyStats(): Promise<void> {
-    await this.repository
+    // Path 1 — active competitors: full soft reset
+    const activeResult = await this.repository
       .createQueryBuilder()
       .update(Competitor)
       .set({
         rating: () => '0.75 * "rating" + 0.25 * 1500',
         rd: () =>
           'LEAST(SQRT("rd" * "rd" + "vol" * "vol" * 173.7178 * 173.7178), 350)',
+        vol: 0.06,
         currentMonthRaceCount: 0,
         winStreak: 0,
-        // Note: raceCount is NOT reset — keeps competitors "confirmed" across seasons.
-        // Note: avgRank12 is NOT reset — stays consistent with lifetime raceCount.
-        // Note: totalLifetimeRaces is intentionally NOT reset
-        // Note: recentPositions is preserved (based on actual race history)
       })
+      .where('"currentMonthRaceCount" > 0')
       .execute();
-    this.logger.log('Soft reset (75/25) season stats for all competitors');
+
+    // Path 2 — inactive competitors: RD-only update (Glickman Step 6)
+    const inactiveResult = await this.repository
+      .createQueryBuilder()
+      .update(Competitor)
+      .set({
+        rd: () =>
+          'LEAST(SQRT("rd" * "rd" + "vol" * "vol" * 173.7178 * 173.7178), 350)',
+      })
+      .where('"currentMonthRaceCount" = 0')
+      .execute();
+
+    this.logger.log(
+      `Season reset: ${activeResult.affected ?? 0} active (75/25 squish), ` +
+        `${inactiveResult.affected ?? 0} inactive (RD-only update)`,
+    );
   }
 
   /**
