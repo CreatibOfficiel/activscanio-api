@@ -119,7 +119,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   emitStreakLost(
     userId: string,
-    data: { type: 'betting' | 'play'; lostValue: number; lostAt: Date; missedDays?: string[] },
+    data: {
+      type: 'betting' | 'play';
+      lostValue: number;
+      lostAt: Date;
+      missedDays?: string[];
+    },
   ) {
     const socketId = this.userSockets.get(userId);
     if (socketId) {
@@ -151,9 +156,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   broadcastCompetitorUpdate(competitor: any) {
     this.server.emit('competitor:updated', competitor);
-    this.logger.log(
-      `Broadcasted competitor update: ${competitor.id}`,
-    );
+    this.logger.log(`Broadcasted competitor update: ${competitor.id}`);
   }
 
   /**
@@ -200,7 +203,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Emit duel resolved event to both users + broadcast
    */
-  emitDuelResolved(challengerUserId: string, challengedUserId: string, data: any) {
+  emitDuelResolved(
+    challengerUserId: string,
+    challengedUserId: string,
+    data: any,
+  ) {
     const challengerSocket = this.userSockets.get(challengerUserId);
     if (challengerSocket) {
       this.server.to(challengerSocket).emit('duel:resolved', data);
@@ -216,7 +223,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /**
    * Emit duel cancelled event to both users
    */
-  emitDuelCancelled(challengerUserId: string, challengedUserId: string, data: any) {
+  emitDuelCancelled(
+    challengerUserId: string,
+    challengedUserId: string,
+    data: any,
+  ) {
     const challengerSocket = this.userSockets.get(challengerUserId);
     if (challengerSocket) {
       this.server.to(challengerSocket).emit('duel:cancelled', data);
@@ -226,6 +237,46 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(challengedSocket).emit('duel:cancelled', data);
     }
     this.logger.log(`Sent duel:cancelled to both users`);
+  }
+
+  /**
+   * Emit duel settled (proof uploaded) event to both users + feed
+   */
+  emitDuelSettled(
+    challengerUserId: string,
+    challengedUserId: string,
+    data: any,
+  ) {
+    const challengerSocket = this.userSockets.get(challengerUserId);
+    if (challengerSocket) {
+      this.server.to(challengerSocket).emit('duel:settled', data);
+    }
+    const challengedSocket = this.userSockets.get(challengedUserId);
+    if (challengedSocket) {
+      this.server.to(challengedSocket).emit('duel:settled', data);
+    }
+    this.server.emit('duel:feed', data);
+    this.logger.log(`Sent duel:settled to both users + broadcast`);
+  }
+
+  /**
+   * Emit duel unsettled (proof undone) event to both users + feed
+   */
+  emitDuelUnsettled(
+    challengerUserId: string,
+    challengedUserId: string,
+    data: any,
+  ) {
+    const challengerSocket = this.userSockets.get(challengerUserId);
+    if (challengerSocket) {
+      this.server.to(challengerSocket).emit('duel:unsettled', data);
+    }
+    const challengedSocket = this.userSockets.get(challengedUserId);
+    if (challengedSocket) {
+      this.server.to(challengedSocket).emit('duel:unsettled', data);
+    }
+    this.server.emit('duel:feed', data);
+    this.logger.log(`Sent duel:unsettled to both users + broadcast`);
   }
 
   /**

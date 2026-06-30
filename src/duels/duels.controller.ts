@@ -2,14 +2,19 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Delete,
   Body,
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -79,6 +84,14 @@ export class DuelsController {
     }));
   }
 
+  @Get('balances')
+  @ApiOperation({
+    summary: 'Get who-owes-whom balances (À payer / À recevoir)',
+  })
+  async getBalances(@CurrentUser('clerkId') clerkId: string) {
+    return this.duelsService.getBalances(clerkId);
+  }
+
   @Public()
   @Get('feed')
   @ApiOperation({ summary: 'Get public duel feed (resolved duels)' })
@@ -98,6 +111,42 @@ export class DuelsController {
         challengerUser: sanitizeUser(duel.challengerUser),
         challengedUser: sanitizeUser(duel.challengedUser),
       })),
+    };
+  }
+
+  @Patch(':id/proof')
+  @ApiOperation({
+    summary: 'Upload payment proof and settle the duel (loser only)',
+  })
+  @UseInterceptors(FileInterceptor('photo'))
+  async uploadProof(
+    @Param('id') id: string,
+    @CurrentUser('clerkId') clerkId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Photo is required');
+    }
+    const duel = await this.duelsService.uploadProof(id, clerkId, file);
+    return {
+      ...duel,
+      challengerUser: sanitizeUser(duel.challengerUser),
+      challengedUser: sanitizeUser(duel.challengedUser),
+    };
+  }
+
+  @Delete(':id/proof')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Undo a settlement (loser only)' })
+  async undoProof(
+    @Param('id') id: string,
+    @CurrentUser('clerkId') clerkId: string,
+  ) {
+    const duel = await this.duelsService.undoProof(id, clerkId);
+    return {
+      ...duel,
+      challengerUser: sanitizeUser(duel.challengerUser),
+      challengedUser: sanitizeUser(duel.challengedUser),
     };
   }
 

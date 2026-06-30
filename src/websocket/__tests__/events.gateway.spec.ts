@@ -162,8 +162,14 @@ describe('EventsGateway', () => {
     });
 
     it('should return correct count after registrations', () => {
-      gateway.handleRegister('user-1', { id: 'socket-1', emit: jest.fn() } as unknown as Socket);
-      gateway.handleRegister('user-2', { id: 'socket-2', emit: jest.fn() } as unknown as Socket);
+      gateway.handleRegister('user-1', {
+        id: 'socket-1',
+        emit: jest.fn(),
+      } as unknown as Socket);
+      gateway.handleRegister('user-2', {
+        id: 'socket-2',
+        emit: jest.fn(),
+      } as unknown as Socket);
 
       expect(gateway.getConnectedClientsCount()).toBe(2);
     });
@@ -188,6 +194,60 @@ describe('EventsGateway', () => {
       gateway.handleRegister(userId, mockSocket as Socket);
 
       expect(gateway.isUserConnected(userId)).toBe(true);
+    });
+  });
+
+  describe('emitDuelSettled', () => {
+    beforeEach(() => {
+      gateway.server = {
+        to: jest.fn().mockReturnThis(),
+        emit: jest.fn(),
+      } as any;
+    });
+
+    it('should emit to both registered users and broadcast to the feed', () => {
+      const challengerSocket = { id: 'sock-challenger', emit: jest.fn() } as unknown as Socket;
+      const challengedSocket = { id: 'sock-challenged', emit: jest.fn() } as unknown as Socket;
+      gateway.handleRegister('challenger-1', challengerSocket);
+      gateway.handleRegister('challenged-1', challengedSocket);
+
+      const data = { duelId: 'd1', stakeEmoji: '🍺' };
+      gateway.emitDuelSettled('challenger-1', 'challenged-1', data);
+
+      expect(gateway.server.to).toHaveBeenCalledWith('sock-challenger');
+      expect(gateway.server.to).toHaveBeenCalledWith('sock-challenged');
+      // duel:feed is broadcast to everyone via server.emit
+      expect(gateway.server.emit).toHaveBeenCalledWith('duel:feed', data);
+    });
+
+    it('should still broadcast to the feed when a user is offline', () => {
+      const data = { duelId: 'd2' };
+      gateway.emitDuelSettled('offline-a', 'offline-b', data);
+
+      expect(gateway.server.emit).toHaveBeenCalledWith('duel:feed', data);
+    });
+  });
+
+  describe('emitDuelUnsettled', () => {
+    beforeEach(() => {
+      gateway.server = {
+        to: jest.fn().mockReturnThis(),
+        emit: jest.fn(),
+      } as any;
+    });
+
+    it('should emit to both registered users and broadcast to the feed', () => {
+      const challengerSocket = { id: 'sock-c', emit: jest.fn() } as unknown as Socket;
+      const challengedSocket = { id: 'sock-d', emit: jest.fn() } as unknown as Socket;
+      gateway.handleRegister('chal-2', challengerSocket);
+      gateway.handleRegister('cged-2', challengedSocket);
+
+      const data = { duelId: 'd3' };
+      gateway.emitDuelUnsettled('chal-2', 'cged-2', data);
+
+      expect(gateway.server.to).toHaveBeenCalledWith('sock-c');
+      expect(gateway.server.to).toHaveBeenCalledWith('sock-d');
+      expect(gateway.server.emit).toHaveBeenCalledWith('duel:feed', data);
     });
   });
 });

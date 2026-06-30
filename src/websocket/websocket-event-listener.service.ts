@@ -196,9 +196,7 @@ export class WebSocketEventListener {
    */
   @OnEvent('liveBet.detected')
   handleLiveBetDetected(payload: { userId: string; liveBet: any }) {
-    this.logger.log(
-      `Relaying liveBet:detected to user ${payload.userId}`,
-    );
+    this.logger.log(`Relaying liveBet:detected to user ${payload.userId}`);
     this.eventsGateway.emitLiveBetDetected(payload.userId, {
       liveBetId: payload.liveBet.id,
       status: payload.liveBet.status,
@@ -212,9 +210,7 @@ export class WebSocketEventListener {
    */
   @OnEvent('liveBet.resolved')
   handleLiveBetResolved(payload: { userId: string; liveBet: any }) {
-    this.logger.log(
-      `Relaying liveBet:resolved to user ${payload.userId}`,
-    );
+    this.logger.log(`Relaying liveBet:resolved to user ${payload.userId}`);
     this.eventsGateway.emitLiveBetResolved(payload.userId, {
       liveBetId: payload.liveBet.id,
       status: payload.liveBet.status,
@@ -234,8 +230,14 @@ export class WebSocketEventListener {
    * Listen to duel created events → notify challenged user
    */
   @OnEvent('duel.created')
-  handleDuelCreated(payload: { duel: any; challengerUser: any; challengedUser: any }) {
-    this.logger.log(`Relaying duel:received to user ${payload.duel.challengedUserId}`);
+  handleDuelCreated(payload: {
+    duel: any;
+    challengerUser: any;
+    challengedUser: any;
+  }) {
+    this.logger.log(
+      `Relaying duel:received to user ${payload.duel.challengedUserId}`,
+    );
     this.eventsGateway.emitDuelReceived(payload.duel.challengedUserId, {
       duelId: payload.duel.id,
       challenger: {
@@ -243,7 +245,11 @@ export class WebSocketEventListener {
         lastName: payload.challengerUser.lastName,
         profilePictureUrl: payload.challengerUser.profilePictureUrl,
       },
-      stake: payload.duel.stake,
+      stakeType: payload.duel.stakeType,
+      stakeEmoji: payload.duel.stakeEmoji,
+      stakeLabel: payload.duel.stakeLabel,
+      conditionType: payload.duel.conditionType,
+      conditionValue: payload.duel.conditionValue,
       expiresAt: payload.duel.expiresAt,
     });
   }
@@ -253,7 +259,9 @@ export class WebSocketEventListener {
    */
   @OnEvent('duel.accepted')
   handleDuelAccepted(payload: { duel: any }) {
-    this.logger.log(`Relaying duel:accepted to user ${payload.duel.challengerUserId}`);
+    this.logger.log(
+      `Relaying duel:accepted to user ${payload.duel.challengerUserId}`,
+    );
     this.eventsGateway.emitDuelAccepted(payload.duel.challengerUserId, {
       duelId: payload.duel.id,
     });
@@ -264,7 +272,9 @@ export class WebSocketEventListener {
    */
   @OnEvent('duel.declined')
   handleDuelDeclined(payload: { duel: any }) {
-    this.logger.log(`Relaying duel:declined to user ${payload.duel.challengerUserId}`);
+    this.logger.log(
+      `Relaying duel:declined to user ${payload.duel.challengerUserId}`,
+    );
     this.eventsGateway.emitDuelDeclined(payload.duel.challengerUserId, {
       duelId: payload.duel.id,
     });
@@ -283,7 +293,9 @@ export class WebSocketEventListener {
         duelId: payload.duel.id,
         winnerUserId: payload.duel.winnerUserId,
         loserUserId: payload.duel.loserUserId,
-        stake: payload.duel.stake,
+        stakeType: payload.duel.stakeType,
+        stakeEmoji: payload.duel.stakeEmoji,
+        stakeLabel: payload.duel.stakeLabel,
         raceEventId: payload.duel.raceEventId,
       },
     );
@@ -301,6 +313,44 @@ export class WebSocketEventListener {
       {
         duelId: payload.duel.id,
         reason: payload.reason,
+      },
+    );
+  }
+
+  /**
+   * Listen to duel settled events (proof uploaded) → notify both users + feed
+   */
+  @OnEvent('duel.settled')
+  handleDuelSettled(payload: { duel: any }) {
+    this.logger.log(`Relaying duel:settled for duel ${payload.duel.id}`);
+    this.eventsGateway.emitDuelSettled(
+      payload.duel.challengerUserId,
+      payload.duel.challengedUserId,
+      {
+        duelId: payload.duel.id,
+        winnerUserId: payload.duel.winnerUserId,
+        loserUserId: payload.duel.loserUserId,
+        stakeType: payload.duel.stakeType,
+        stakeEmoji: payload.duel.stakeEmoji,
+        stakeLabel: payload.duel.stakeLabel,
+        proofPhotoUrl: payload.duel.proofPhotoUrl,
+      },
+    );
+  }
+
+  /**
+   * Listen to duel unsettled events (proof undone) → notify both users + feed
+   */
+  @OnEvent('duel.unsettled')
+  handleDuelUnsettled(payload: { duel: any }) {
+    this.logger.log(`Relaying duel:unsettled for duel ${payload.duel.id}`);
+    this.eventsGateway.emitDuelUnsettled(
+      payload.duel.challengerUserId,
+      payload.duel.challengedUserId,
+      {
+        duelId: payload.duel.id,
+        winnerUserId: payload.duel.winnerUserId,
+        loserUserId: payload.duel.loserUserId,
       },
     );
   }

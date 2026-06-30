@@ -5,14 +5,15 @@ import { DuelsController } from './duels.controller';
 import { DuelsService } from './duels.service';
 import { DuelsListener } from './duels.listener';
 import { User } from '../users/user.entity';
-import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 import { RaceResult } from '../races/race-result.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BettingModule } from '../betting/betting.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Duel, User, BettorRanking, RaceResult]),
+    TypeOrmModule.forFeature([Duel, User, RaceResult]),
     NotificationsModule,
+    BettingModule,
   ],
   controllers: [DuelsController],
   providers: [DuelsService, DuelsListener],
