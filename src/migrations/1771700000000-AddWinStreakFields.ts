@@ -36,9 +36,7 @@ export class AddWinStreakFields1771700000000 implements MigrationInterface {
     );
 
     // A1: Remove win streak columns from user_streaks
-    await queryRunner.query(
-      `DROP INDEX "IDX_user_streaks_bestWinStreak"`,
-    );
+    await queryRunner.query(`DROP INDEX "IDX_user_streaks_bestWinStreak"`);
     await queryRunner.query(
       `ALTER TABLE "user_streaks" DROP COLUMN "lastWinYear"`,
     );

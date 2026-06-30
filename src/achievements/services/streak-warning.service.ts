@@ -163,9 +163,7 @@ export class StreakWarningService {
       // Dedup: already warned today?
       if (competitor.lastPlayStreakWarningDate === todayStr) continue;
 
-      const { title, body } = this.getPlayWarningMessage(
-        competitor.playStreak,
-      );
+      const { title, body } = this.getPlayWarningMessage(competitor.playStreak);
 
       await this.notificationsService.sendNotification({
         userIds: [user.id],
@@ -302,13 +300,13 @@ export class StreakWarningService {
     if (streak === 1) {
       return {
         title: 'Ta série est en jeu !',
-        body: 'Tu as parié 1 semaine d\'affilée. Place ton prono avant ce soir !',
+        body: "Tu as parié 1 semaine d'affilée. Place ton prono avant ce soir !",
       };
     }
     if (streak <= 4) {
       return {
         title: `${streak} semaines de suite !`,
-        body: 'Belle série ! N\'oublie pas de parier cette semaine.',
+        body: "Belle série ! N'oublie pas de parier cette semaine.",
       };
     }
     if (streak <= 9) {
@@ -321,13 +319,14 @@ export class StreakWarningService {
     // 10+
     return {
       title: `Série LEGENDAIRE : ${streak} sem.`,
-      body: 'Ne laisse pas cette série historique s\'arrêter !',
+      body: "Ne laisse pas cette série historique s'arrêter !",
     };
   }
 
-  private getPlayWarningMessage(
-    streak: number,
-  ): { title: string; body: string } {
+  private getPlayWarningMessage(streak: number): {
+    title: string;
+    body: string;
+  } {
     if (streak <= 3) {
       return {
         title: `Série de ${streak}j en danger !`,
@@ -337,7 +336,7 @@ export class StreakWarningService {
     if (streak <= 9) {
       return {
         title: `Série de ${streak} jours en danger !`,
-        body: 'Dernier jour avant la perte. Une course et c\'est sauvé !',
+        body: "Dernier jour avant la perte. Une course et c'est sauvé !",
       };
     }
     // 10+

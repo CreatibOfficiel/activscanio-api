@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixAchievementMinCount1772800000000
-  implements MigrationInterface
-{
+export class FixAchievementMinCount1772800000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ============================================================
     // Part 1: Update achievement conditions in DB with minCount

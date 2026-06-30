@@ -23,7 +23,10 @@ import { AchievementSeedService } from './services/achievement-seed.service';
 import { XPLevelService } from './services/xp-level.service';
 import { StreakTrackerService } from './services/streak-tracker.service';
 import { LevelRewardsService } from './services/level-rewards.service';
-import { StreakWarningService, StreakWarningStatus } from './services/streak-warning.service';
+import {
+  StreakWarningService,
+  StreakWarningStatus,
+} from './services/streak-warning.service';
 import { AdvancedStatsService } from '../betting/services/advanced-stats.service';
 import { ConfigService } from '@nestjs/config';
 import { ClerkGuard } from '../auth/clerk.guard';
@@ -296,7 +299,9 @@ export class AchievementsController {
     const totalAchievements = await this.achievementRepository.count();
     const unlockedAchievements = user.achievementCount;
     const achievementProgress =
-      totalAchievements > 0 ? (unlockedAchievements / totalAchievements) * 100 : 0;
+      totalAchievements > 0
+        ? (unlockedAchievements / totalAchievements) * 100
+        : 0;
 
     return {
       userId: user.id,
@@ -603,14 +608,13 @@ export class AchievementsController {
   @Public()
   @Post('admin/seed-and-backfill')
   @ApiOperation({
-    summary: 'Seed achievements and backfill racing achievements for competitors',
+    summary:
+      'Seed achievements and backfill racing achievements for competitors',
   })
   @ApiQuery({ name: 'secret', required: true, type: String })
   @ApiResponse({ status: 200, description: 'Seed and backfill completed' })
   @ApiResponse({ status: 403, description: 'Invalid admin secret' })
-  async seedAndBackfill(
-    @Query('secret') secret: string,
-  ): Promise<{
+  async seedAndBackfill(@Query('secret') secret: string): Promise<{
     seeded: number;
     backfillResults: { userId: string; unlocked: string[] }[];
   }> {
@@ -632,9 +636,8 @@ export class AchievementsController {
     const backfillResults: { userId: string; unlocked: string[] }[] = [];
 
     for (const user of competitorUsers) {
-      const unlocked = await this.achievementCalculatorService.checkAchievements(
-        user.id,
-      );
+      const unlocked =
+        await this.achievementCalculatorService.checkAchievements(user.id);
       if (unlocked.length > 0) {
         backfillResults.push({
           userId: user.id,

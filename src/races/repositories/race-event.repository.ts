@@ -122,14 +122,23 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     const now = new Date();
     const day = now.getUTCDay(); // 0=Sun, 1=Mon, ...
     const diff = day === 0 ? 6 : day - 1; // days since Monday
-    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diff));
+    const monday = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - diff,
+      ),
+    );
     return this.repository
       .createQueryBuilder('r')
       .where('r.date >= :monday', { monday })
       .getCount();
   }
 
-  async findMostActiveCompetitor(): Promise<{ competitorId: string; raceCount: number } | null> {
+  async findMostActiveCompetitor(): Promise<{
+    competitorId: string;
+    raceCount: number;
+  } | null> {
     const result = await this.repository.manager
       .createQueryBuilder()
       .select('rr."competitorId"', 'competitorId')

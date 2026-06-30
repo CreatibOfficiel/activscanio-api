@@ -151,8 +151,10 @@ export class TasksService {
       const currentYear = now.getFullYear();
 
       if (SeasonUtils.isFirstWeekOfSeason(currentWeekNumber, currentYear)) {
-        const currentSeasonNumber =
-          SeasonUtils.getSeasonNumber(currentWeekNumber, currentYear);
+        const currentSeasonNumber = SeasonUtils.getSeasonNumber(
+          currentWeekNumber,
+          currentYear,
+        );
         const prev = SeasonUtils.getPreviousSeason(
           currentSeasonNumber,
           currentYear,
@@ -577,13 +579,10 @@ export class TasksService {
       return;
     }
 
-    this.logger.log(
-      `🚀 Starting task: ${TASK_DESCRIPTIONS.playStreakWarning}`,
-    );
+    this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.playStreakWarning}`);
 
     try {
-      const warned =
-        await this.streakWarningService.checkPlayStreakWarnings();
+      const warned = await this.streakWarningService.checkPlayStreakWarnings();
       this.logger.log(`✅ Play streak warning: ${warned} users warned`);
     } catch (error) {
       this.logger.error(
@@ -665,7 +664,11 @@ export class TasksService {
 
     // Filter to confirmed competitors only (same criteria as leaderboard)
     const confirmedCompetitors = allCompetitors.filter((c) => {
-      const { confirmed } = classifyCompetitor(c.raceCount, c.rd, c.lastRaceDate);
+      const { confirmed } = classifyCompetitor(
+        c.raceCount,
+        c.rd,
+        c.lastRaceDate,
+      );
       return confirmed;
     });
 

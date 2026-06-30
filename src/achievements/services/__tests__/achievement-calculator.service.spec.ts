@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { AchievementCalculatorService } from '../achievement-calculator.service';
@@ -269,9 +268,7 @@ describe('AchievementCalculatorService', () => {
         .mockResolvedValue([mockAchievements[0]] as Achievement[]);
 
       // No achievements unlocked yet
-      jest
-        .spyOn(userAchievementRepository, 'find')
-        .mockResolvedValue([]);
+      jest.spyOn(userAchievementRepository, 'find').mockResolvedValue([]);
 
       // User has 1 bet → satisfies betsPlaced >= 1
       const mockBet = {
@@ -280,9 +277,7 @@ describe('AchievementCalculatorService', () => {
         isFinalized: true,
         pointsEarned: 10,
         createdAt: new Date(),
-        picks: [
-          { isCorrect: true, hasBoost: false, oddAtBet: 2 },
-        ],
+        picks: [{ isCorrect: true, hasBoost: false, oddAtBet: 2 }],
       };
       jest.spyOn(betRepository, 'find').mockResolvedValue([mockBet] as any);
 
@@ -313,20 +308,22 @@ describe('AchievementCalculatorService', () => {
         .mockResolvedValue([mockAchievements[0]] as Achievement[]);
 
       // first_bet is already unlocked
-      jest.spyOn(userAchievementRepository, 'find').mockImplementation(
-        (options: any) => {
+      jest
+        .spyOn(userAchievementRepository, 'find')
+        .mockImplementation((options: any) => {
           if (options?.select) {
             // The "get achievement IDs" call
             return Promise.resolve([{ achievementId: '1' }] as any);
           }
           // The "get with relations" call
-          return Promise.resolve([{
-            userId: 'user-123',
-            achievementId: '1',
-            achievement: mockAchievements[0],
-          }] as any);
-        },
-      );
+          return Promise.resolve([
+            {
+              userId: 'user-123',
+              achievementId: '1',
+              achievement: mockAchievements[0],
+            },
+          ] as any);
+        });
 
       const mockBet = {
         id: 'bet-1',

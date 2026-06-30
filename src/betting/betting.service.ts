@@ -60,8 +60,16 @@ export class BettingService {
 
     return await this.bettingWeekRepository.findOne({
       where: [
-        { status: BettingWeekStatus.OPEN, startDate: LessThanOrEqual(now), endDate: MoreThanOrEqual(now) },
-        { status: BettingWeekStatus.CLOSED, startDate: LessThanOrEqual(now), endDate: MoreThanOrEqual(now) },
+        {
+          status: BettingWeekStatus.OPEN,
+          startDate: LessThanOrEqual(now),
+          endDate: MoreThanOrEqual(now),
+        },
+        {
+          status: BettingWeekStatus.CLOSED,
+          startDate: LessThanOrEqual(now),
+          endDate: MoreThanOrEqual(now),
+        },
       ],
       relations: ['podiumFirst', 'podiumSecond', 'podiumThird'],
       order: { startDate: 'DESC' },
@@ -197,7 +205,10 @@ export class BettingService {
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentWeek = WeekUtils.getISOWeek(now);
-      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek, currentYear);
+      const currentSeason = SeasonUtils.getSeasonNumber(
+        currentWeek,
+        currentYear,
+      );
 
       if (
         user.lastBoostUsedSeason === currentSeason &&
@@ -283,7 +294,10 @@ export class BettingService {
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentWeek = WeekUtils.getISOWeek(now);
-      const currentSeason = SeasonUtils.getSeasonNumber(currentWeek, currentYear);
+      const currentSeason = SeasonUtils.getSeasonNumber(
+        currentWeek,
+        currentYear,
+      );
       const result = await this.userRepository
         .createQueryBuilder()
         .update()
@@ -386,7 +400,8 @@ export class BettingService {
 
       const achievementsUnlocked = allAchievements
         .filter(
-          (ua) => ua.unlockedAt >= finalizedAt && ua.unlockedAt <= timeWindowEnd,
+          (ua) =>
+            ua.unlockedAt >= finalizedAt && ua.unlockedAt <= timeWindowEnd,
         )
         .map((ua) => ({
           id: ua.achievement.id,
@@ -457,9 +472,7 @@ export class BettingService {
 
     // Calculate the Monday of the first week of the next season
     const nextSeason = { seasonNumber: currentSeason + 1, year: currentYear };
-    const nextSeasonWeeks = SeasonUtils.getSeasonWeeks(
-      nextSeason.seasonNumber,
-    );
+    const nextSeasonWeeks = SeasonUtils.getSeasonWeeks(nextSeason.seasonNumber);
     const resetsOn = WeekUtils.getMondayOfWeek(
       nextSeason.year,
       nextSeasonWeeks.start,
@@ -487,7 +500,13 @@ export class BettingService {
 
     const [bets, total] = await this.betRepository.findAndCount({
       where,
-      relations: ['user', 'user.competitor', 'picks', 'picks.competitor', 'bettingWeek'],
+      relations: [
+        'user',
+        'user.competitor',
+        'picks',
+        'picks.competitor',
+        'bettingWeek',
+      ],
       order: { placedAt: 'DESC' },
       take: limit,
       skip: offset,
@@ -526,7 +545,11 @@ export class BettingService {
    */
   async getUnseenStreakLosses(userId: string): Promise<{
     bettingStreakLoss: { lostValue: number; lostAt: Date } | null;
-    playStreakLoss: { lostValue: number; lostAt: Date; missedDays: string[] } | null;
+    playStreakLoss: {
+      lostValue: number;
+      lostAt: Date;
+      missedDays: string[];
+    } | null;
   }> {
     // Check betting streak loss
     const userStreak = await this.userStreakRepository.findOne({
@@ -547,7 +570,11 @@ export class BettingService {
 
     // Check play streak loss (via competitor linked to user)
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    let playStreakLoss: { lostValue: number; lostAt: Date; missedDays: string[] } | null = null;
+    let playStreakLoss: {
+      lostValue: number;
+      lostAt: Date;
+      missedDays: string[];
+    } | null = null;
 
     if (user?.competitorId) {
       const competitor = await this.competitorRepository.findOne({

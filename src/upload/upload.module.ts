@@ -28,7 +28,12 @@ import { UploadService } from './upload.service';
         if (allowedMimes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new Error(`File type ${file.mimetype} not allowed. Only JPEG, PNG, and WebP are accepted.`), false);
+          cb(
+            new Error(
+              `File type ${file.mimetype} not allowed. Only JPEG, PNG, and WebP are accepted.`,
+            ),
+            false,
+          );
         }
       },
       limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo

@@ -21,9 +21,7 @@ export class DropLegacyOddColumn1772300000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "competitor_odds" ADD COLUMN "odd" float`,
     );
-    await queryRunner.query(
-      `UPDATE "competitor_odds" SET "odd" = "oddFirst"`,
-    );
+    await queryRunner.query(`UPDATE "competitor_odds" SET "odd" = "oddFirst"`);
     await queryRunner.query(
       `ALTER TABLE "competitor_odds" ALTER COLUMN "odd" SET NOT NULL`,
     );

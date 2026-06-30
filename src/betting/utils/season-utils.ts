@@ -13,14 +13,20 @@ const WEEKS_PER_SEASON = 4;
 
 export class SeasonUtils {
   /** Map an ISO week number to a season number (1-based, from app start). */
-  static getSeasonNumber(weekNumber: number, year: number = APP_START_YEAR): number {
+  static getSeasonNumber(
+    weekNumber: number,
+    year: number = APP_START_YEAR,
+  ): number {
     const yearOffset = (year - APP_START_YEAR) * 52;
     const absoluteWeek = yearOffset + weekNumber - APP_START_WEEK;
     return Math.floor(absoluteWeek / WEEKS_PER_SEASON) + 1;
   }
 
   /** True when this week is the first of its season (calibration week). */
-  static isFirstWeekOfSeason(weekNumber: number, year: number = APP_START_YEAR): boolean {
+  static isFirstWeekOfSeason(
+    weekNumber: number,
+    year: number = APP_START_YEAR,
+  ): boolean {
     const yearOffset = (year - APP_START_YEAR) * 52;
     const absoluteWeek = yearOffset + weekNumber - APP_START_WEEK;
     return absoluteWeek % WEEKS_PER_SEASON === 0;

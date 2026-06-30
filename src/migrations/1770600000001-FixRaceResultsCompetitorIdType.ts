@@ -27,7 +27,7 @@ export class FixRaceResultsCompetitorIdType1770600000001
     if (orphans.length > 0) {
       throw new Error(
         `Cannot migrate: found ${orphans.length} race_results with invalid competitorId. ` +
-        `First: ${JSON.stringify(orphans[0])}. Fix data before retrying.`,
+          `First: ${JSON.stringify(orphans[0])}. Fix data before retrying.`,
       );
     }
 

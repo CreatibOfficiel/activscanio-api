@@ -184,10 +184,7 @@ export class UsersController {
    * Delete user (ownership-checked)
    */
   @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser() currentUser: any,
-  ) {
+  async remove(@Param('id') id: string, @CurrentUser() currentUser: any) {
     await this.assertOwnership(id, currentUser);
     await this.usersService.remove(id);
     return { message: 'User deleted successfully' };
@@ -197,7 +194,10 @@ export class UsersController {
    * Verify that the authenticated user owns the resource they're trying to access.
    * Compares Clerk ID from token against the user record in DB.
    */
-  private async assertOwnership(userId: string, currentUser: any): Promise<void> {
+  private async assertOwnership(
+    userId: string,
+    currentUser: any,
+  ): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const clerkId = currentUser?.clerkId as string;
     const dbUser = await this.usersService.findOne(userId);
@@ -205,5 +205,4 @@ export class UsersController {
       throw new ForbiddenException('You can only modify your own account');
     }
   }
-
 }

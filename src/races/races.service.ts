@@ -7,7 +7,10 @@ import { RaceEvent } from './race-event.entity';
 import { RaceResult } from './race-result.entity';
 import { CreateRaceDto } from './dtos/create-race.dto';
 import { RaceCreatedEvent } from './events';
-import { RaceEventRepository, PaginatedRacesResult } from './repositories/race-event.repository';
+import {
+  RaceEventRepository,
+  PaginatedRacesResult,
+} from './repositories/race-event.repository';
 import { SeasonUtils } from '../betting/utils/season-utils';
 import { WeekUtils } from '../betting/services/week-manager.service';
 import {
@@ -62,7 +65,6 @@ export class RacesService {
     }
 
     try {
-
       const race = new RaceEvent();
       race.date = raceDate;
 
@@ -175,7 +177,9 @@ export class RacesService {
       raceCount: number;
     } | null = null;
     if (mostActiveRaw) {
-      const competitor = await this.competitorsService.findOne(mostActiveRaw.competitorId);
+      const competitor = await this.competitorsService.findOne(
+        mostActiveRaw.competitorId,
+      );
       if (competitor) {
         mostActive = {
           competitorId: competitor.id,
@@ -202,7 +206,11 @@ export class RacesService {
     let dateTo: Date | undefined;
 
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
 
     switch (period) {
       case 'today':
@@ -328,9 +336,7 @@ export class RacesService {
     raceResults: RaceResult[],
     raceDate: Date,
   ): Promise<void> {
-    const competitorIds = [
-      ...new Set(raceResults.map((r) => r.competitorId)),
-    ];
+    const competitorIds = [...new Set(raceResults.map((r) => r.competitorId))];
 
     for (const competitorId of competitorIds) {
       await this.competitorsService.updatePlayStreak(competitorId, raceDate);

@@ -182,11 +182,32 @@ export class BettingController {
    */
   @Public()
   @Get('bets/community')
-  @ApiOperation({ summary: 'Get all community bets with pagination and filters' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of items (1-50)', example: 10 })
-  @ApiQuery({ name: 'offset', required: false, description: 'Items to skip', example: 0 })
-  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by bet status', enum: ['pending', 'won', 'lost', 'cancelled'] })
+  @ApiOperation({
+    summary: 'Get all community bets with pagination and filters',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items (1-50)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Items to skip',
+    example: 0,
+  })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by bet status',
+    enum: ['pending', 'won', 'lost', 'cancelled'],
+  })
   @ApiResponse({ status: 200, description: 'Paginated community bets' })
   async getCommunityBets(@Query() query: QueryCommunityBetsDto) {
     const result = await this.bettingService.getCommunityBets(
@@ -206,7 +227,9 @@ export class BettingController {
               id: bet.user.id,
               firstName: bet.user.firstName,
               lastName: bet.user.lastName,
-              profilePictureUrl: bet.user.competitor?.profilePictureUrl ?? bet.user.profilePictureUrl,
+              profilePictureUrl:
+                bet.user.competitor?.profilePictureUrl ??
+                bet.user.profilePictureUrl,
               level: bet.user.level,
               currentTitle: bet.user.currentTitle,
             }

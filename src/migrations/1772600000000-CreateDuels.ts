@@ -49,7 +49,9 @@ export class CreateDuels1772600000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "duels" DROP CONSTRAINT "FK_duels_challengerUserId"`,
     );
-    await queryRunner.query(`DROP INDEX "IDX_duels_challenger_challenged_status"`);
+    await queryRunner.query(
+      `DROP INDEX "IDX_duels_challenger_challenged_status"`,
+    );
     await queryRunner.query(`DROP TABLE "duels"`);
     await queryRunner.query(`DROP TYPE "public"."duel_status_enum"`);
   }

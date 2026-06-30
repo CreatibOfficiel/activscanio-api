@@ -92,9 +92,7 @@ export class AchievementCalculatorService {
     const race = event.race;
     if (!race.results || race.results.length === 0) return;
 
-    const competitorIds = [
-      ...new Set(race.results.map((r) => r.competitorId)),
-    ];
+    const competitorIds = [...new Set(race.results.map((r) => r.competitorId))];
 
     // Find users linked to these competitors
     const users = await this.userRepository.find({
@@ -382,7 +380,10 @@ export class AchievementCalculatorService {
   private async getUserStats(userId: string): Promise<UserStats> {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), currentYear);
+    const currentSeason = SeasonUtils.getSeasonNumber(
+      WeekUtils.getISOWeek(now),
+      currentYear,
+    );
 
     // Get all user bets
     const allBets = await this.betRepository.find({
@@ -453,7 +454,10 @@ export class AchievementCalculatorService {
       const hasBoost = bet.picks.some((pick) => pick.hasBoost);
       if (hasBoost) {
         const betDate = new Date(bet.createdAt);
-        const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate), betDate.getFullYear());
+        const betSeason = SeasonUtils.getSeasonNumber(
+          WeekUtils.getISOWeek(betDate),
+          betDate.getFullYear(),
+        );
         const seasonKey = `${betDate.getFullYear()}-${betSeason}`;
         boostsBySeason.set(seasonKey, true);
       }
@@ -505,10 +509,12 @@ export class AchievementCalculatorService {
     // Season stats (filter bets belonging to the current season)
     const monthlyBets = allBets.filter((bet) => {
       const betDate = new Date(bet.createdAt);
-      const betSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(betDate), betDate.getFullYear());
+      const betSeason = SeasonUtils.getSeasonNumber(
+        WeekUtils.getISOWeek(betDate),
+        betDate.getFullYear(),
+      );
       return (
-        betSeason === currentSeason &&
-        betDate.getFullYear() === currentYear
+        betSeason === currentSeason && betDate.getFullYear() === currentYear
       );
     });
 
@@ -589,7 +595,7 @@ export class AchievementCalculatorService {
       competitorBestWinStreak: competitor?.bestWinStreak ?? 0,
       competitorPlayStreak: competitor?.playStreak ?? 0,
       competitorBestPlayStreak: competitor?.bestPlayStreak ?? 0,
-      competitorRating: competitor ? (competitor.rating - 2 * competitor.rd) : 0,
+      competitorRating: competitor ? competitor.rating - 2 * competitor.rd : 0,
       competitorAvgRank12: competitor?.avgRank12 ?? 0,
     };
   }

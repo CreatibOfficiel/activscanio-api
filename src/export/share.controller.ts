@@ -134,7 +134,10 @@ export class ShareController {
       // Get current ranking (if available)
       const now = new Date();
       const currentYear = now.getFullYear();
-      const currentSeason = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), currentYear);
+      const currentSeason = SeasonUtils.getSeasonNumber(
+        WeekUtils.getISOWeek(now),
+        currentYear,
+      );
       const ranking = (await this.userRepository.manager.findOne(
         'bettor_rankings',
         {

@@ -17,14 +17,28 @@ import { BettingModule } from 'src/betting/betting.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Competitor, CompetitorEloSnapshot, RaceResult, User]),
+    TypeOrmModule.forFeature([
+      Competitor,
+      CompetitorEloSnapshot,
+      RaceResult,
+      User,
+    ]),
     forwardRef(() => RacesModule),
     BettingModule,
     RatingModule,
     UsersModule,
   ],
   controllers: [CompetitorsController],
-  providers: [CompetitorsService, CompetitorRepository, CompetitorEloSnapshotRepository, RaceResultRepository],
-  exports: [CompetitorsService, CompetitorRepository, CompetitorEloSnapshotRepository],
+  providers: [
+    CompetitorsService,
+    CompetitorRepository,
+    CompetitorEloSnapshotRepository,
+    RaceResultRepository,
+  ],
+  exports: [
+    CompetitorsService,
+    CompetitorRepository,
+    CompetitorEloSnapshotRepository,
+  ],
 })
 export class CompetitorsModule {}

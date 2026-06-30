@@ -164,8 +164,7 @@ describe('SeasonsService', () => {
     });
 
     it('should archive season successfully', async () => {
-      mockQueryRunner.manager.find
-        .mockResolvedValueOnce(mockCompetitors); // Find competitors
+      mockQueryRunner.manager.find.mockResolvedValueOnce(mockCompetitors); // Find competitors
 
       mockQueryRunner.manager.count
         .mockResolvedValueOnce(10) // RaceEvent count
@@ -232,8 +231,7 @@ describe('SeasonsService', () => {
         currentMonthRaceCount: 3,
       }));
 
-      mockQueryRunner.manager.find
-        .mockResolvedValueOnce(manyCompetitors);
+      mockQueryRunner.manager.find.mockResolvedValueOnce(manyCompetitors);
 
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
@@ -265,10 +263,10 @@ describe('SeasonsService', () => {
     });
 
     it('should rollback transaction on error', async () => {
-      mockQueryRunner.manager.find
-        .mockResolvedValueOnce([]) // Competitors
-      mockQueryRunner.manager.count
-        .mockRejectedValueOnce(new Error('Database error'));
+      mockQueryRunner.manager.find.mockResolvedValueOnce([]); // Competitors
+      mockQueryRunner.manager.count.mockRejectedValueOnce(
+        new Error('Database error'),
+      );
 
       await expect(service.archiveSeason(month, year)).rejects.toThrow(
         'Database error',
@@ -280,8 +278,7 @@ describe('SeasonsService', () => {
     });
 
     it('should handle empty competitors list', async () => {
-      mockQueryRunner.manager.find
-        .mockResolvedValueOnce([]); // No competitors
+      mockQueryRunner.manager.find.mockResolvedValueOnce([]); // No competitors
 
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
@@ -404,9 +401,7 @@ describe('SeasonsService', () => {
       jest
         .spyOn(archivedCompetitorRankingRepository, 'find')
         .mockResolvedValue(mockRankings as ArchivedCompetitorRanking[]);
-      jest
-        .spyOn(competitorRepository, 'find')
-        .mockResolvedValue([]);
+      jest.spyOn(competitorRepository, 'find').mockResolvedValue([]);
 
       const result = await service.getCompetitorRankings(seasonId);
 
@@ -421,9 +416,7 @@ describe('SeasonsService', () => {
       jest
         .spyOn(archivedCompetitorRankingRepository, 'find')
         .mockResolvedValue([]);
-      jest
-        .spyOn(competitorRepository, 'find')
-        .mockResolvedValue([]);
+      jest.spyOn(competitorRepository, 'find').mockResolvedValue([]);
 
       const result = await service.getCompetitorRankings('non-existent');
 

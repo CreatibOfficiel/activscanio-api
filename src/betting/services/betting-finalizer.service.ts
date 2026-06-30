@@ -193,11 +193,7 @@ export class BettingFinalizerService {
     const calculations = await this.processBets(bets, podium, finalOddsMap);
 
     // 6. Update bettor rankings
-    await this.updateBettorRankings(
-      week.seasonNumber,
-      week.year,
-      calculations,
-    );
+    await this.updateBettorRankings(week.seasonNumber, week.year, calculations);
 
     // 7. Calculate stats
     const totalPointsDistributed = calculations.reduce(
@@ -532,7 +528,7 @@ export class BettingFinalizerService {
 
       if (competitorFinalOdds) {
         // Get the final odd for the specific position
-        finalOdd = competitorFinalOdds[pick.position as BetPosition];
+        finalOdd = competitorFinalOdds[pick.position];
       }
 
       // Calculate points for this pick

@@ -25,7 +25,11 @@ import { CharacterVariantsModule } from '../character-variants/character-variant
     CharacterVariantsModule,
   ],
   controllers: [LiveBettingController],
-  providers: [LiveBettingService, CharacterDetectorService, LiveRaceCreatedListener],
+  providers: [
+    LiveBettingService,
+    CharacterDetectorService,
+    LiveRaceCreatedListener,
+  ],
   exports: [LiveBettingService],
 })
 export class LiveBettingModule {}

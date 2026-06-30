@@ -79,7 +79,13 @@ export class BackfillWinStreaks1771700000001 implements MigrationInterface {
              "lastWinWeekNumber" = $3,
              "lastWinYear" = $4
          WHERE "userId" = $5`,
-        [currentWinStreak, bestWinStreak, lastWinWeekNumber, lastWinYear, userId],
+        [
+          currentWinStreak,
+          bestWinStreak,
+          lastWinWeekNumber,
+          lastWinYear,
+          userId,
+        ],
       );
     }
 
@@ -101,10 +107,7 @@ export class BackfillWinStreaks1771700000001 implements MigrationInterface {
     `);
 
     // Group by competitor
-    const competitorRaces = new Map<
-      string,
-      Array<{ rank12: number }>
-    >();
+    const competitorRaces = new Map<string, Array<{ rank12: number }>>();
     for (const row of competitorRows) {
       if (!competitorRaces.has(row.competitorId)) {
         competitorRaces.set(row.competitorId, []);
@@ -165,11 +168,7 @@ export class BackfillWinStreaks1771700000001 implements MigrationInterface {
     if (lastYear === currentYear && currentWeek === lastWeek + 1) return true;
 
     // Year transition
-    if (
-      lastYear === currentYear - 1 &&
-      lastWeek >= 52 &&
-      currentWeek === 1
-    ) {
+    if (lastYear === currentYear - 1 && lastWeek >= 52 && currentWeek === 1) {
       return true;
     }
 

@@ -35,10 +35,7 @@ export class SeasonsController {
   })
   @ApiResponse({ status: 200, description: 'Season details with stats' })
   @ApiResponse({ status: 404, description: 'Season not found' })
-  async getSeason(
-    @Param('year') year: string,
-    @Param('month') month: string,
-  ) {
+  async getSeason(@Param('year') year: string, @Param('month') month: string) {
     return await this.seasonsService.getSeason(parseInt(month), parseInt(year));
   }
 

@@ -333,7 +333,6 @@ export class OddsCalculatorService {
       s.step.oddFirst = clamp(1 / s.step.pFirst);
       s.step.oddSecond = clamp(1 / s.step.pSecond);
       s.step.oddThird = clamp(1 / s.step.pThird);
-
     }
 
     return strengths.map((s) => s.step);

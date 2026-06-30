@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddResultNotifications1772500000000
-  implements MigrationInterface
-{
+export class AddResultNotifications1772500000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Bet: tracking "vu"
     await queryRunner.query(
@@ -51,8 +49,6 @@ export class AddResultNotifications1772500000000
     await queryRunner.query(
       `ALTER TABLE "user_streaks" DROP COLUMN "bettingStreakLostValue"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "bets" DROP COLUMN "resultSeenAt"`,
-    );
+    await queryRunner.query(`ALTER TABLE "bets" DROP COLUMN "resultSeenAt"`);
   }
 }

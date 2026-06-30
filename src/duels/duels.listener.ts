@@ -11,7 +11,9 @@ export class DuelsListener {
 
   @OnEvent('race.created')
   async handleRaceCreated(event: RaceCreatedEvent) {
-    this.logger.log(`Race created event received for duel resolution: ${event.race.id}`);
+    this.logger.log(
+      `Race created event received for duel resolution: ${event.race.id}`,
+    );
 
     try {
       await this.duelsService.resolveDuelsForRace(event.race);

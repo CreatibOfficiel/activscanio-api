@@ -13,7 +13,13 @@ import { AchievementsModule } from '../achievements/achievements.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Competitor, CompetitorMonthlyStats, RaceResult, User, BettingWeek]),
+    TypeOrmModule.forFeature([
+      Competitor,
+      CompetitorMonthlyStats,
+      RaceResult,
+      User,
+      BettingWeek,
+    ]),
     BettingModule,
     CompetitorsModule,
     SeasonsModule,

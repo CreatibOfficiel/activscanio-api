@@ -56,7 +56,7 @@ export class UsersService {
    * Creates user if doesn't exist, updates if exists
    */
   async syncFromClerk(syncDto: SyncClerkUserDto): Promise<User> {
-    let user = await this.userRepository.findByClerkId(syncDto.clerkId);
+    const user = await this.userRepository.findByClerkId(syncDto.clerkId);
 
     if (user) {
       // Update existing user

@@ -12,7 +12,10 @@ import { LiveBet, LiveBetStatus } from '../entities/live-bet.entity';
 import { User } from '../../users/user.entity';
 import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 import { CompetitorOdds } from '../../betting/entities/competitor-odds.entity';
-import { BettingWeek, BettingWeekStatus } from '../../betting/entities/betting-week.entity';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../../betting/entities/betting-week.entity';
 import { RaceEvent } from '../../races/race-event.entity';
 import { RaceResult } from '../../races/race-result.entity';
 import { CharacterDetectorService } from './character-detector.service';
@@ -102,10 +105,7 @@ export class LiveBettingService {
     return saved;
   }
 
-  private async runDetection(
-    liveBetId: string,
-    base64: string,
-  ): Promise<void> {
+  private async runDetection(liveBetId: string, base64: string): Promise<void> {
     const liveBet = await this.liveBetRepository.findOne({
       where: { id: liveBetId },
     });
@@ -117,8 +117,7 @@ export class LiveBettingService {
       const now = new Date();
       liveBet.detectedCharacters = result.characters;
       liveBet.detectionExpiresAt = new Date(
-        now.getTime() +
-          LIVE_BETTING_CONFIG.DETECTION_CONFIRM_SECONDS * 1000,
+        now.getTime() + LIVE_BETTING_CONFIG.DETECTION_CONFIRM_SECONDS * 1000,
       );
 
       // Auto-confirm if all detections are confident
@@ -243,7 +242,10 @@ export class LiveBettingService {
 
     const now = new Date();
     const year = now.getFullYear();
-    const seasonNumber = SeasonUtils.getSeasonNumber(WeekUtils.getISOWeek(now), year);
+    const seasonNumber = SeasonUtils.getSeasonNumber(
+      WeekUtils.getISOWeek(now),
+      year,
+    );
 
     for (const liveBet of activeBets) {
       if (liveBet.expiresAt < now) continue; // already expired, skip
@@ -395,10 +397,7 @@ export class LiveBettingService {
     });
   }
 
-  async getLiveBet(
-    liveBetId: string,
-    userClerkId: string,
-  ): Promise<LiveBet> {
+  async getLiveBet(liveBetId: string, userClerkId: string): Promise<LiveBet> {
     const user = await this.userRepository.findOne({
       where: { clerkId: userClerkId },
     });

@@ -208,20 +208,14 @@ export class CompetitorsService {
   /**
    * Update play streak for a competitor after a race
    */
-  async updatePlayStreak(
-    competitorId: string,
-    raceDate: Date,
-  ): Promise<void> {
+  async updatePlayStreak(competitorId: string, raceDate: Date): Promise<void> {
     await this.competitorRepository.updatePlayStreak(competitorId, raceDate);
   }
 
   /**
    * Update win streak for a competitor after a race
    */
-  async updateWinStreak(
-    competitorId: string,
-    rank12: number,
-  ): Promise<void> {
+  async updateWinStreak(competitorId: string, rank12: number): Promise<void> {
     await this.competitorRepository.updateWinStreak(competitorId, rank12);
   }
 

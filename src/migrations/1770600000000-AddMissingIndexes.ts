@@ -27,9 +27,7 @@ export class AddMissingIndexes1770600000000 implements MigrationInterface {
     await queryRunner.query(
       `DROP INDEX IF EXISTS "IDX_bettor_rankings_month_year_points"`,
     );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "IDX_betting_weeks_status"`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_betting_weeks_status"`);
     await queryRunner.query(
       `DROP INDEX IF EXISTS "IDX_race_results_competitorId"`,
     );

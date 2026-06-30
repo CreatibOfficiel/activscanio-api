@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RecalculatePlayStreaks1772400000000
-  implements MigrationInterface
-{
+export class RecalculatePlayStreaks1772400000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     const competitors: { id: string }[] = await queryRunner.query(
       `SELECT id FROM "competitors"`,

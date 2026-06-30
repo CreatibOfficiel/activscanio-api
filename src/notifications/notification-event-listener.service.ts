@@ -133,10 +133,7 @@ export class NotificationEventListener {
         requireInteraction: true,
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to send duel created notification`,
-        error,
-      );
+      this.logger.error(`Failed to send duel created notification`, error);
     }
   }
 
@@ -165,10 +162,7 @@ export class NotificationEventListener {
         url: '/betting/duels',
       });
     } catch (error) {
-      this.logger.error(
-        `Failed to send duel resolved notification`,
-        error,
-      );
+      this.logger.error(`Failed to send duel resolved notification`, error);
     }
   }
 }

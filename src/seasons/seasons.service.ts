@@ -29,7 +29,9 @@ export interface SeasonHighlights {
   longestParticipationStreak: { userName: string; streak: number } | null;
   longestWinStreak: { competitorName: string; streak: number } | null;
   mostRaces: { competitorName: string; count: number } | null;
-  bestRaceScorers: { competitorName: string; maxScore: number; perfectCount: number }[] | null;
+  bestRaceScorers:
+    | { competitorName: string; maxScore: number; perfectCount: number }[]
+    | null;
 }
 
 @Injectable()
@@ -311,10 +313,7 @@ export class SeasonsService {
   /**
    * Get bettor rankings for a season (enriched with user info)
    */
-  async getBettorRankings(
-    seasonNumber: number,
-    year: number,
-  ) {
+  async getBettorRankings(seasonNumber: number, year: number) {
     const rankings = await this.bettorRankingRepository.find({
       where: { seasonNumber, year },
       order: { rank: 'ASC' },
@@ -326,7 +325,10 @@ export class SeasonsService {
       userName: r.user
         ? `${r.user.firstName} ${r.user.lastName}`.trim()
         : 'Inconnu',
-      profilePictureUrl: r.user?.competitor?.profilePictureUrl ?? r.user?.profilePictureUrl ?? null,
+      profilePictureUrl:
+        r.user?.competitor?.profilePictureUrl ??
+        r.user?.profilePictureUrl ??
+        null,
       rank: r.rank,
       totalPoints: r.totalPoints,
       betsPlaced: r.betsPlaced,
@@ -359,7 +361,7 @@ export class SeasonsService {
       .innerJoin('bet.user', 'user')
       .innerJoin('bet.bettingWeek', 'week')
       .select([
-        "CONCAT(user.firstName, ' ', user.lastName) AS \"userName\"",
+        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
         'week.seasonWeekNumber AS week',
         'bet.pointsEarned AS points',
       ])
@@ -379,7 +381,7 @@ export class SeasonsService {
       .innerJoin('bet.bettingWeek', 'week')
       .innerJoin('bet.picks', 'pick')
       .select([
-        "CONCAT(user.firstName, ' ', user.lastName) AS \"userName\"",
+        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
         'week.seasonWeekNumber AS week',
         'bet.pointsEarned AS points',
       ])
@@ -406,7 +408,7 @@ export class SeasonsService {
       .innerJoin('bet.user', 'user')
       .innerJoin('bet.bettingWeek', 'week')
       .select([
-        "CONCAT(user.firstName, ' ', user.lastName) AS \"userName\"",
+        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
         'week.seasonWeekNumber AS week',
         'bet.pointsEarned AS points',
       ])
@@ -428,8 +430,8 @@ export class SeasonsService {
       .innerJoin('bet.bettingWeek', 'week')
       .innerJoin('pick.competitor', 'competitor')
       .select([
-        "CONCAT(user.firstName, ' ', user.lastName) AS \"userName\"",
-        "CONCAT(competitor.firstName, ' ', competitor.lastName) AS \"competitorName\"",
+        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
+        'CONCAT(competitor.firstName, \' \', competitor.lastName) AS "competitorName"',
         'pick.oddAtBet AS odd',
         'week.seasonWeekNumber AS week',
       ])
@@ -447,7 +449,7 @@ export class SeasonsService {
       .createQueryBuilder('ranking')
       .innerJoin('ranking.user', 'user')
       .select([
-        "CONCAT(user.firstName, ' ', user.lastName) AS \"userName\"",
+        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
         'ranking.weeklyParticipationStreak AS streak',
       ])
       .where(

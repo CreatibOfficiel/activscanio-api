@@ -76,8 +76,7 @@ export class RankingsService {
       .orderBy('ranking.rank', 'ASC', 'NULLS LAST')
       .addOrderBy('ranking.totalPoints', 'DESC');
 
-    const { entities: rankings, raw } =
-      await queryBuilder.getRawAndEntities();
+    const { entities: rankings, raw } = await queryBuilder.getRawAndEntities();
 
     // Build a map of raw streak data by userId
     const streakMap = new Map<
@@ -99,7 +98,10 @@ export class RankingsService {
         ? `${r.user.firstName || ''} ${r.user.lastName || ''}`.trim() ||
           r.user.email
         : 'Unknown',
-      profilePictureUrl: r.user?.competitor?.profilePictureUrl ?? r.user?.profilePictureUrl ?? null,
+      profilePictureUrl:
+        r.user?.competitor?.profilePictureUrl ??
+        r.user?.profilePictureUrl ??
+        null,
       firstName: r.user?.firstName ?? null,
       lastName: r.user?.lastName ?? null,
       totalPoints: r.totalPoints,

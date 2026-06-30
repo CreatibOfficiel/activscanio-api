@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
  * WeekManagerService
  *
@@ -345,7 +345,9 @@ export class WeekManagerService {
       .where('"bettingWeekId" = :weekId AND "isFinalized" = false', { weekId })
       .execute();
 
-    this.logger.log(`Week ${weekId} cancelled — all pending bets set to 0 points`);
+    this.logger.log(
+      `Week ${weekId} cancelled — all pending bets set to 0 points`,
+    );
   }
 
   /**

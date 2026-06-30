@@ -4,7 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RaceCreatedEvent } from '../../races/events';
 import { OddsCalculatorService } from '../services/odds-calculator.service';
-import { BettingWeek, BettingWeekStatus } from '../entities/betting-week.entity';
+import {
+  BettingWeek,
+  BettingWeekStatus,
+} from '../entities/betting-week.entity';
 
 /**
  * Listener for race creation events
@@ -69,11 +72,14 @@ export class RaceCreatedListener {
       // Retry once after 5s delay
       try {
         await new Promise((resolve) => setTimeout(resolve, 5000));
-        this.logger.log(`Retrying odds calculation for week ${event.bettingWeekId}...`);
+        this.logger.log(
+          `Retrying odds calculation for week ${event.bettingWeekId}...`,
+        );
         await this.oddsCalculator.calculateOddsForWeek(event.bettingWeekId);
         this.logger.log(`Retry succeeded for week ${event.bettingWeekId}`);
       } catch (retryError) {
-        const retryStack = retryError instanceof Error ? retryError.stack : undefined;
+        const retryStack =
+          retryError instanceof Error ? retryError.stack : undefined;
         this.logger.error(
           `Retry also failed for week ${event.bettingWeekId} — odds may be stale:`,
           retryStack,

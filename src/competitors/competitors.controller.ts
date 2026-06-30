@@ -125,10 +125,7 @@ export class CompetitorsController {
   /* ───────── ELO HISTORY ───────── */
 
   @Get(':id/elo-history')
-  getEloHistory(
-    @Param('id') id: string,
-    @Query('days') daysStr?: string,
-  ) {
+  getEloHistory(@Param('id') id: string, @Query('days') daysStr?: string) {
     const days = daysStr ? parseInt(daysStr, 10) || undefined : undefined;
     return this.competitorsService.getEloHistory(id, days);
   }

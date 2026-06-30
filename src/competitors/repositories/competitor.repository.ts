@@ -6,7 +6,10 @@ import { Competitor } from '../competitor.entity';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import { RaceResult } from '../../races/race-result.entity';
 import { User } from '../../users/user.entity';
-import { businessDaysBetween, missedBusinessDays } from '../utils/business-days';
+import {
+  businessDaysBetween,
+  missedBusinessDays,
+} from '../utils/business-days';
 
 /**
  * Competitor repository with domain-specific queries
@@ -324,10 +327,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
    * @param competitorId - Competitor UUID
    * @param raceDate - Date of the race
    */
-  async updatePlayStreak(
-    competitorId: string,
-    raceDate: Date,
-  ): Promise<void> {
+  async updatePlayStreak(competitorId: string, raceDate: Date): Promise<void> {
     const competitor = await this.repository.findOne({
       where: { id: competitorId },
     });
@@ -354,7 +354,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
         // 2+ missed weekdays — streak broken
         if (playStreak > 0) {
           // Track the lost streak for notification
-          const missed = missedBusinessDays(competitor.lastRaceDate!, raceDate);
+          const missed = missedBusinessDays(competitor.lastRaceDate, raceDate);
           competitor.playStreakLostValue = playStreak;
           competitor.playStreakLostAt = new Date();
           competitor.playStreakLossSeenAt = null;
@@ -402,10 +402,7 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
    * @param competitorId - Competitor UUID
    * @param rank12 - Race finishing position
    */
-  async updateWinStreak(
-    competitorId: string,
-    rank12: number,
-  ): Promise<void> {
+  async updateWinStreak(competitorId: string, rank12: number): Promise<void> {
     const competitor = await this.repository.findOne({
       where: { id: competitorId },
     });

@@ -40,9 +40,6 @@ export function classifyCompetitor(
  * Calculate conservative score (Glicko-2 lower bound).
  * Used for ranking: rating - 2 * rd
  */
-export function calculateConservativeScore(
-  rating: number,
-  rd: number,
-): number {
+export function calculateConservativeScore(rating: number, rd: number): number {
   return rating - 2 * rd;
 }

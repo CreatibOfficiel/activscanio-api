@@ -133,15 +133,18 @@ export const TASK_EXECUTION_CONFIG = {
  */
 export const TASK_DESCRIPTIONS = {
   resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:00)',
-  createWeek: 'Create new betting week + season transition if needed (Monday 00:05)',
+  createWeek:
+    'Create new betting week + season transition if needed (Monday 00:05)',
   closeWeek: 'Close betting week (Tuesday 00:00 = Monday midnight)',
   finalizeWeek: 'Finalize betting week and calculate points (Sunday 20:00)',
   recalculateRankings: 'Recalculate season rankings (Sunday 20:03)',
-  snapshotCompetitorRanks: 'Snapshot competitor ranks for trends (Mon-Fri 00:00)',
+  snapshotCompetitorRanks:
+    'Snapshot competitor ranks for trends (Mon-Fri 00:00)',
   snapshotBettorRanks: 'Snapshot bettor ranks for trends (Sunday 20:05)',
   bettingStreakWarningEarly: 'Betting streak warning (Monday 18:00)',
   playStreakWarning: 'Play streak warning (Mon-Fri 09:00)',
-  snapshotCompetitorElo: 'Snapshot competitor ELO for history chart (Daily 00:01)',
+  snapshotCompetitorElo:
+    'Snapshot competitor ELO for history chart (Daily 00:01)',
 };
 
 /**

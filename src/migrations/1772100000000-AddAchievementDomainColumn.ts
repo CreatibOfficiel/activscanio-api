@@ -16,8 +16,6 @@ export class AddAchievementDomainColumn1772100000000
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "IDX_achievements_domain"`);
-    await queryRunner.query(
-      `ALTER TABLE "achievements" DROP COLUMN "domain"`,
-    );
+    await queryRunner.query(`ALTER TABLE "achievements" DROP COLUMN "domain"`);
   }
 }

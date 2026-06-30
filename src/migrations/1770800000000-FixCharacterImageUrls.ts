@@ -14,9 +14,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * The mapping of which characters have subfolders vs single files is hardcoded
  * based on the actual public/characters/ directory structure.
  */
-export class FixCharacterImageUrls1770800000000
-  implements MigrationInterface
-{
+export class FixCharacterImageUrls1770800000000 implements MigrationInterface {
   name = 'FixCharacterImageUrls1770800000000';
 
   /**
