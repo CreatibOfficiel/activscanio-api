@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BettingWeek } from '../betting/entities/betting-week.entity';
+import { User } from '../users/user.entity';
 import { EventsGateway } from './events.gateway';
 import { WebSocketEventListener } from './websocket-event-listener.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BettingWeek])],
+  imports: [TypeOrmModule.forFeature([BettingWeek, User])],
   providers: [EventsGateway, WebSocketEventListener],
   exports: [EventsGateway],
 })

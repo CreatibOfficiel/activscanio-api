@@ -15,6 +15,7 @@ describe('DuelsService.evaluateDuel', () => {
     null as never,
     null as never,
     null as never,
+    null as never,
   );
 
   const evaluate = (

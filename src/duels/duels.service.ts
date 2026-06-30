@@ -10,6 +10,7 @@ import { Repository, In } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Duel, DuelStatus, StakeType, DuelConditionType } from './duel.entity';
 import { User, UserRole } from '../users/user.entity';
+import { Competitor } from '../competitors/competitor.entity';
 import { RaceEvent } from '../races/race-event.entity';
 import { RaceResult } from '../races/race-result.entity';
 import { WeekManagerService } from '../betting/services/week-manager.service';
@@ -58,6 +59,8 @@ export class DuelsService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(RaceResult)
     private readonly raceResultRepository: Repository<RaceResult>,
+    @InjectRepository(Competitor)
+    private readonly competitorRepository: Repository<Competitor>,
     private readonly weekManager: WeekManagerService,
     private readonly uploadService: UploadService,
     private readonly eventEmitter: EventEmitter2,
@@ -156,6 +159,16 @@ export class DuelsService {
     this.logger.log(
       `Duel ${saved.id} created: ${challenger.id} vs ${challenged.id}, stake=${dto.stakeType}`,
     );
+
+    // Use the challenger's competitor photo for the received-challenge modal
+    // (the User photo is the Clerk avatar and is often null).
+    const challengerCompetitor = await this.competitorRepository.findOne({
+      where: { id: challenger.competitorId },
+      select: ['profilePictureUrl'],
+    });
+    if (challengerCompetitor?.profilePictureUrl) {
+      challenger.profilePictureUrl = challengerCompetitor.profilePictureUrl;
+    }
 
     this.eventEmitter.emit('duel.created', {
       duel: saved,
@@ -308,7 +321,9 @@ export class DuelsService {
       qb.andWhere('duel.status = :status', { status });
     }
 
-    return qb.getMany();
+    const duels = await qb.getMany();
+    await this.attachCompetitorPhotos(duels);
+    return duels;
   }
 
   async getDuelFeed(
@@ -324,7 +339,44 @@ export class DuelsService {
       take: limit,
       skip: offset,
     });
+    await this.attachCompetitorPhotos(data);
     return { data, total };
+  }
+
+  /**
+   * The avatar shown everywhere in the app is the Competitor photo (always set),
+   * not the User photo (the Clerk avatar, often null). Duels join the User, so
+   * we overwrite each side's profilePictureUrl with the linked competitor's.
+   */
+  private async attachCompetitorPhotos(duels: Duel[]): Promise<void> {
+    if (duels.length === 0) return;
+
+    const competitorIds = new Set<string>();
+    for (const duel of duels) {
+      if (duel.challengerCompetitorId)
+        competitorIds.add(duel.challengerCompetitorId);
+      if (duel.challengedCompetitorId)
+        competitorIds.add(duel.challengedCompetitorId);
+    }
+
+    const competitors = await this.competitorRepository.find({
+      where: { id: In([...competitorIds]) },
+      select: ['id', 'profilePictureUrl'],
+    });
+    const photoById = new Map(
+      competitors.map((c) => [c.id, c.profilePictureUrl]),
+    );
+
+    for (const duel of duels) {
+      const challengerPhoto = photoById.get(duel.challengerCompetitorId);
+      if (duel.challengerUser && challengerPhoto) {
+        duel.challengerUser.profilePictureUrl = challengerPhoto;
+      }
+      const challengedPhoto = photoById.get(duel.challengedCompetitorId);
+      if (duel.challengedUser && challengedPhoto) {
+        duel.challengedUser.profilePictureUrl = challengedPhoto;
+      }
+    }
   }
 
   async resolveDuelsForRace(race: RaceEvent): Promise<void> {

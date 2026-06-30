@@ -10,6 +10,9 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../users/user.entity';
 
 @WebSocketGateway({
   cors: {
@@ -23,7 +26,15 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(EventsGateway.name);
-  private userSockets = new Map<string, string>(); // userId -> socketId
+  // Maps BOTH the internal user UUID and the Clerk id to the socket id, so
+  // emits keyed on either id reach the client (the frontend registers with the
+  // Clerk id, but backend events target the internal UUID).
+  private userSockets = new Map<string, string>();
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
@@ -32,26 +43,51 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
 
-    // Remove from userSockets map
+    // Remove every key pointing at this socket (a user may be mapped by both
+    // their internal id and their Clerk id).
     for (const [userId, socketId] of this.userSockets.entries()) {
       if (socketId === client.id) {
         this.userSockets.delete(userId);
         this.logger.log(`User ${userId} unregistered from WebSocket`);
-        break;
       }
     }
   }
 
   /**
-   * Client registers their userId to receive personalized events
+   * Client registers their userId to receive personalized events. The frontend
+   * sends the Clerk id; we resolve it to the internal user id and register the
+   * socket under both so emits targeting either id are delivered.
    */
   @SubscribeMessage('register')
-  handleRegister(
+  async handleRegister(
     @MessageBody() userId: string,
     @ConnectedSocket() client: Socket,
   ) {
     this.userSockets.set(userId, client.id);
-    this.logger.log(`User ${userId} registered with socket ${client.id}`);
+
+    // Resolve Clerk id -> internal user id and also map that, since backend
+    // personal events (duels, bets, achievements...) target the internal id.
+    try {
+      const user = await this.userRepository.findOne({
+        where: { clerkId: userId },
+        select: ['id'],
+      });
+      if (user && user.id !== userId) {
+        this.userSockets.set(user.id, client.id);
+        this.logger.log(
+          `User ${userId} (internal ${user.id}) registered with socket ${client.id}`,
+        );
+      } else {
+        this.logger.log(`User ${userId} registered with socket ${client.id}`);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Could not resolve internal id for ${userId}: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+      );
+    }
+
     client.emit('registered', { success: true, userId });
   }
 

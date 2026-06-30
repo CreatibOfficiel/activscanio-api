@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventsGateway } from '../events.gateway';
+import { User } from '../../users/user.entity';
 import { Socket } from 'socket.io';
 
 describe('EventsGateway', () => {
@@ -9,7 +11,13 @@ describe('EventsGateway', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [EventsGateway],
+      providers: [
+        EventsGateway,
+        {
+          provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+        },
+      ],
     }).compile();
 
     gateway = module.get<EventsGateway>(EventsGateway);
@@ -38,36 +46,32 @@ describe('EventsGateway', () => {
   });
 
   describe('handleRegister', () => {
-    it('should register user with socket ID', () => {
+    it('should register user with socket ID', async () => {
       const userId = 'user-123';
-      const logSpy = jest.spyOn(gateway['logger'], 'log');
 
-      gateway.handleRegister(userId, mockSocket as Socket);
+      await gateway.handleRegister(userId, mockSocket as Socket);
 
-      expect(logSpy).toHaveBeenCalledWith(
-        `User ${userId} registered with socket ${mockSocket.id}`,
-      );
       expect(mockSocket.emit).toHaveBeenCalledWith('registered', {
         success: true,
         userId,
       });
     });
 
-    it('should map userId to socketId', () => {
+    it('should map userId to socketId', async () => {
       const userId = 'user-123';
 
-      gateway.handleRegister(userId, mockSocket as Socket);
+      await gateway.handleRegister(userId, mockSocket as Socket);
 
       expect(gateway.isUserConnected(userId)).toBe(true);
     });
   });
 
   describe('handleDisconnect', () => {
-    it('should remove user from registry on disconnect', () => {
+    it('should remove user from registry on disconnect', async () => {
       const userId = 'user-123';
 
       // First register
-      gateway.handleRegister(userId, mockSocket as Socket);
+      await gateway.handleRegister(userId, mockSocket as Socket);
       expect(gateway.isUserConnected(userId)).toBe(true);
 
       // Then disconnect
