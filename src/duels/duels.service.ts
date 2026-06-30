@@ -595,6 +595,9 @@ export class DuelsService {
       relations: ['challengerUser', 'challengedUser'],
     });
 
+    // Replace the User (Clerk) photos with the competitor photos shown elsewhere
+    await this.attachCompetitorPhotos(duels);
+
     const byCounterpart = new Map<string, DuelBalance>();
 
     for (const duel of duels) {
