@@ -28,11 +28,12 @@ describe('AchievementCalculatorService', () => {
   let betRepository: Repository<Bet>;
   let xpLevelService: XPLevelService;
   let userRepository: Repository<User>;
+  let competitorRepository: Repository<Competitor>;
   let eventEmitter: EventEmitter2;
 
   const mockCondition = {
     type: AchievementConditionType.COUNT,
-    metric: 'betsPlaced',
+    metric: 'competitorRaceCount',
     operator: AchievementConditionOperator.GTE,
     value: 1,
   };
@@ -166,6 +167,9 @@ describe('AchievementCalculatorService', () => {
     );
     betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    competitorRepository = module.get<Repository<Competitor>>(
+      getRepositoryToken(Competitor),
+    );
     xpLevelService = module.get<XPLevelService>(XPLevelService);
     eventEmitter = module.get<EventEmitter2>(EventEmitter2);
   });
@@ -262,7 +266,7 @@ describe('AchievementCalculatorService', () => {
 
   describe('achievement unlocking', () => {
     it('should save UserAchievement and award XP when condition is met', async () => {
-      // Only expose the first_bet achievement (betsPlaced >= 1)
+      // Only expose the first achievement (competitorRaceCount >= 1)
       jest
         .spyOn(achievementRepository, 'find')
         .mockResolvedValue([mockAchievements[0]] as Achievement[]);
@@ -270,16 +274,22 @@ describe('AchievementCalculatorService', () => {
       // No achievements unlocked yet
       jest.spyOn(userAchievementRepository, 'find').mockResolvedValue([]);
 
-      // User has 1 bet → satisfies betsPlaced >= 1
-      const mockBet = {
-        id: 'bet-1',
-        userId: 'user-123',
-        isFinalized: true,
-        pointsEarned: 10,
-        createdAt: new Date(),
-        picks: [{ isCorrect: true, hasBoost: false, oddAtBet: 2 }],
-      };
-      jest.spyOn(betRepository, 'find').mockResolvedValue([mockBet] as any);
+      // The user races, so competitorRaceCount >= 1 is satisfied.
+      jest
+        .spyOn(userRepository, 'findOne')
+        .mockResolvedValue({ id: 'user-123', competitorId: 'comp-1' } as any);
+      jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
+        id: 'comp-1',
+        rating: 1500,
+        rd: 50,
+        raceCount: 3,
+        totalWins: 0,
+        winStreak: 0,
+        bestWinStreak: 0,
+        playStreak: 0,
+        bestPlayStreak: 0,
+        avgRank12: 0,
+      } as any);
 
       const result = await service.checkAchievements('user-123');
 

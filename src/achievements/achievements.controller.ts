@@ -344,30 +344,22 @@ export class AchievementsController {
       lastAchievementUnlockedAt: user.lastAchievementUnlockedAt,
 
       // From userStats
-      totalBetsPlaced: userStats.totalBetsPlaced,
-      totalBetsWon: userStats.totalBetsWon,
-      totalPerfectBets: userStats.totalPerfectBets,
-      totalPoints: userStats.totalPoints,
-      winRate: userStats.winRate,
-
       currentMonthlyStreak: userStats.currentMonthlyStreak,
       longestLifetimeStreak: userStats.longestLifetimeStreak,
       currentLifetimeStreak: userStats.currentLifetimeStreak,
       currentWinStreak: userStats.currentWinStreak,
       bestWinStreak: userStats.bestWinStreak,
 
-      monthlyBetsPlaced: userStats.monthlyBetsPlaced,
-      monthlyBetsWon: userStats.monthlyBetsWon,
-      monthlyPerfectBets: userStats.monthlyPerfectBets,
-      monthlyPoints: userStats.monthlyPoints,
-      monthlyRank: userStats.monthlyRank,
-
-      bestMonthlyRank: userStats.bestMonthlyRank,
-      consecutiveMonthlyWins: userStats.consecutiveMonthlyWins,
-
-      totalBoostsUsed: userStats.totalBoostsUsed,
-      highOddsWins: userStats.highOddsWins,
-      boostedHighOddsWins: userStats.boostedHighOddsWins,
+      // Racing stats
+      isCompetitor: userStats.isCompetitor,
+      competitorTotalWins: userStats.competitorTotalWins,
+      competitorRaceCount: userStats.competitorRaceCount,
+      competitorWinStreak: userStats.competitorWinStreak,
+      competitorBestWinStreak: userStats.competitorBestWinStreak,
+      competitorPlayStreak: userStats.competitorPlayStreak,
+      competitorBestPlayStreak: userStats.competitorBestPlayStreak,
+      competitorRating: userStats.competitorRating,
+      competitorAvgRank12: userStats.competitorAvgRank12,
     };
   }
 

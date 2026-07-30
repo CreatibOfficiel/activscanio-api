@@ -75,13 +75,6 @@ export class UserStatsResponseDto {
   achievementProgress: number; // Percentage
   lastAchievementUnlockedAt: Date | null;
 
-  // Betting stats (lifetime)
-  totalBetsPlaced: number;
-  totalBetsWon: number;
-  totalPerfectBets: number;
-  totalPoints: number;
-  winRate: number;
-
   // Streaks
   currentMonthlyStreak: number;
   longestLifetimeStreak: number;
@@ -91,19 +84,14 @@ export class UserStatsResponseDto {
   currentWinStreak: number;
   bestWinStreak: number;
 
-  // Monthly stats
-  monthlyBetsPlaced: number;
-  monthlyBetsWon: number;
-  monthlyPerfectBets: number;
-  monthlyPoints: number;
-  monthlyRank: number | null;
-
-  // Ranking
-  bestMonthlyRank: number | null;
-  consecutiveMonthlyWins: number;
-
-  // Special
-  totalBoostsUsed: number;
-  highOddsWins: number;
-  boostedHighOddsWins: number;
+  // Racing stats
+  isCompetitor: boolean;
+  competitorTotalWins: number;
+  competitorRaceCount: number;
+  competitorWinStreak: number;
+  competitorBestWinStreak: number;
+  competitorPlayStreak: number;
+  competitorBestPlayStreak: number;
+  competitorRating: number;
+  competitorAvgRank12: number;
 }
