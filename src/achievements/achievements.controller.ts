@@ -27,7 +27,6 @@ import {
   StreakWarningService,
   StreakWarningStatus,
 } from './services/streak-warning.service';
-import { AdvancedStatsService } from '../betting/services/advanced-stats.service';
 import { ConfigService } from '@nestjs/config';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { Public } from '../auth/decorators/public.decorator';
@@ -69,7 +68,6 @@ export class AchievementsController {
     private readonly configService: ConfigService,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly levelRewardsService: LevelRewardsService,
-    private readonly advancedStatsService: AdvancedStatsService,
     private readonly streakWarningService: StreakWarningService,
     private readonly usersService: UsersService,
   ) {}
@@ -446,102 +444,6 @@ export class AchievementsController {
     };
   }
 
-  /**
-   * Get stats history for graphs
-   */
-  @Get('stats/:userId/history')
-  @ApiOperation({ summary: 'Get user stats history for graphs' })
-  @ApiParam({
-    name: 'userId',
-    description: 'User UUID or "me" for current user',
-  })
-  @ApiQuery({
-    name: 'period',
-    required: false,
-    enum: ['7d', '30d', '3m', '1y'],
-  })
-  @ApiResponse({ status: 200, description: 'Daily stats history' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async getStatsHistory(
-    @Param('userId') userIdParam: string,
-    @Query('period') period: '7d' | '30d' | '3m' | '1y' = '30d',
-    @CurrentUser('clerkId') clerkId?: string,
-  ) {
-    let userId = userIdParam;
-    if (userIdParam === 'me') {
-      if (!clerkId) {
-        throw new BadRequestException('Authentication required for "me"');
-      }
-      userId = await this.getUserIdFromClerkId(clerkId);
-    }
-
-    return await this.advancedStatsService.getStatsHistory(userId, period);
-  }
-
-  /**
-   * Get comparison stats (user vs average)
-   */
-  @Get('stats/:userId/comparison')
-  @ApiOperation({ summary: 'Compare user stats with average' })
-  @ApiParam({
-    name: 'userId',
-    description: 'User UUID or "me" for current user',
-  })
-  @ApiResponse({ status: 200, description: 'Comparison data' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async getStatsComparison(
-    @Param('userId') userIdParam: string,
-    @CurrentUser('clerkId') clerkId?: string,
-  ) {
-    let userId = userIdParam;
-    if (userIdParam === 'me') {
-      if (!clerkId) {
-        throw new BadRequestException('Authentication required for "me"');
-      }
-      userId = await this.getUserIdFromClerkId(clerkId);
-    }
-
-    return await this.advancedStatsService.getComparisonStats(userId);
-  }
-
-  /**
-   * Get advanced stats (best day, patterns, etc.)
-   */
-  @Get('stats/:userId/advanced')
-  @ApiOperation({ summary: 'Get advanced user stats' })
-  @ApiParam({
-    name: 'userId',
-    description: 'User UUID or "me" for current user',
-  })
-  @ApiResponse({ status: 200, description: 'Advanced stats data' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async getAdvancedStats(
-    @Param('userId') userIdParam: string,
-    @CurrentUser('clerkId') clerkId?: string,
-  ) {
-    let userId = userIdParam;
-    if (userIdParam === 'me') {
-      if (!clerkId) {
-        throw new BadRequestException('Authentication required for "me"');
-      }
-      userId = await this.getUserIdFromClerkId(clerkId);
-    }
-
-    const [bestDay, favoriteCompetitors, patterns, winRateTrend] =
-      await Promise.all([
-        this.advancedStatsService.getBestDayOfWeek(userId),
-        this.advancedStatsService.getFavoriteCompetitors(userId, 5),
-        this.advancedStatsService.getBettingPatterns(userId),
-        this.advancedStatsService.getWinRateTrend(userId, 30),
-      ]);
-
-    return {
-      bestDay,
-      favoriteCompetitors,
-      patterns,
-      winRateTrend,
-    };
-  }
 
   /**
    * Get XP history

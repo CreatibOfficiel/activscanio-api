@@ -44,7 +44,6 @@ import {
   XPLevelService,
   XPSource,
 } from '../../achievements/services/xp-level.service';
-import { DailyBonusService } from '../../achievements/services/daily-bonus.service';
 import { CanvasImageService } from '../../image-generation/services/canvas-image.service';
 import { ImageStorageService } from '../../image-generation/services/image-storage.service';
 import { TvDisplayService } from '../../image-generation/services/tv-display.service';
@@ -128,7 +127,6 @@ export class BettingFinalizerService {
     private readonly eventEmitter: EventEmitter2,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly xpLevelService: XPLevelService,
-    private readonly dailyBonusService: DailyBonusService,
     private readonly canvasImageService: CanvasImageService,
     private readonly imageStorageService: ImageStorageService,
     private readonly tvDisplayService: TvDisplayService,
@@ -446,13 +444,8 @@ export class BettingFinalizerService {
           totalXP += 25; // COMEBACK_BONUS
         }
 
-        await this.dailyBonusService.trackDailyActivity(
-          bet.userId,
-          true, // bet was placed
-          betWon,
-          calculation.finalPoints,
-          totalXP,
-        );
+        // Daily activity tracking went away with DailyUserStats.
+        void totalXP;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';

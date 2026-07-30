@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
-import { BettingWeek } from '../../betting/entities/betting-week.entity';
 import { User } from '../../users/user.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
@@ -24,8 +23,6 @@ export class StreakTrackerService {
   constructor(
     @InjectRepository(UserStreak)
     private readonly userStreakRepository: Repository<UserStreak>,
-    @InjectRepository(BettingWeek)
-    private readonly bettingWeekRepository: Repository<BettingWeek>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(Competitor)
