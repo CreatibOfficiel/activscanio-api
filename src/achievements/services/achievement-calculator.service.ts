@@ -17,8 +17,8 @@ import { Bet } from '../../betting/entities/bet.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { RaceCreatedEvent } from '../../races/events/race-created.event';
 import { XPLevelService, XPSource } from './xp-level.service';
-import { SeasonUtils } from '../../betting/utils/season-utils';
-import { WeekUtils } from '../../betting/services/week-manager.service';
+import { SeasonUtils } from '../../common/utils/season-utils';
+import { WeekUtils } from '../../common/utils/week-utils';
 import {
   BetFinalizedContext,
   UserStats,

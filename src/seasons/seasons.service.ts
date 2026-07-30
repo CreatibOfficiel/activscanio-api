@@ -9,8 +9,8 @@ import { Bet } from '../betting/entities/bet.entity';
 import { BetPick } from '../betting/entities/bet-pick.entity';
 import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 import { RaceEvent } from '../races/race-event.entity';
-import { SeasonUtils } from '../betting/utils/season-utils';
-import { WeekUtils } from '../betting/services/week-manager.service';
+import { SeasonUtils } from '../common/utils/season-utils';
+import { WeekUtils } from '../common/utils/week-utils';
 
 export interface SeasonHighlights {
   perfectScores: { userName: string; week: number; points: number }[];

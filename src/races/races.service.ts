@@ -11,8 +11,8 @@ import {
   RaceEventRepository,
   PaginatedRacesResult,
 } from './repositories/race-event.repository';
-import { SeasonUtils } from '../betting/utils/season-utils';
-import { WeekUtils } from '../betting/services/week-manager.service';
+import { SeasonUtils } from '../common/utils/season-utils';
+import { WeekUtils } from '../common/utils/week-utils';
 import {
   RaceEventNotFoundException,
   InvalidRaceDataException,

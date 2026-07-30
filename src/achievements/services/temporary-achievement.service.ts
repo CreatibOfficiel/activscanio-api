@@ -7,8 +7,8 @@ import { UserAchievement } from '../entities/user-achievement.entity';
 import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 import { Bet } from '../../betting/entities/bet.entity';
 import { UserStreak } from '../entities/user-streak.entity';
-import { SeasonUtils } from '../../betting/utils/season-utils';
-import { WeekUtils } from '../../betting/services/week-manager.service';
+import { SeasonUtils } from '../../common/utils/season-utils';
+import { WeekUtils } from '../../common/utils/week-utils';
 
 /**
  * TemporaryAchievementService
