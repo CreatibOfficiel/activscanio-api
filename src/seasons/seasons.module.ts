@@ -5,10 +5,6 @@ import { SeasonsController } from './seasons.controller';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';
 import { Competitor } from '../competitors/competitor.entity';
-import { BettingWeek } from '../betting/entities/betting-week.entity';
-import { Bet } from '../betting/entities/bet.entity';
-import { BetPick } from '../betting/entities/bet-pick.entity';
-import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 
 @Module({
   imports: [
@@ -16,10 +12,6 @@ import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
       SeasonArchive,
       ArchivedCompetitorRanking,
       Competitor,
-      BettingWeek,
-      Bet,
-      BetPick,
-      BettorRanking,
     ]),
   ],
   controllers: [SeasonsController],

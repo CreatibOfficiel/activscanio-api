@@ -206,11 +206,8 @@ describe('SeasonsService', () => {
           totalCompetitors: 2,
         }),
       );
-      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
-        BettingWeek,
-        { seasonNumber: month, year },
-        { seasonArchiveId: mockArchive.id },
-      );
+      // Betting weeks are no longer linked to the archive.
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
       expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
       expect(result).toEqual(mockArchive);
@@ -264,6 +261,10 @@ describe('SeasonsService', () => {
 
     it('should rollback transaction on error', async () => {
       mockQueryRunner.manager.find.mockResolvedValueOnce([]); // Competitors
+      // clearAllMocks resets calls but not implementations, so a persistent
+      // mockResolvedValue from an earlier test would swallow the rejection.
+      mockQueryRunner.manager.count.mockReset();
+      // The race count is now the only count() in archiveSeason.
       mockQueryRunner.manager.count.mockRejectedValueOnce(
         new Error('Database error'),
       );
@@ -419,65 +420,6 @@ describe('SeasonsService', () => {
       jest.spyOn(competitorRepository, 'find').mockResolvedValue([]);
 
       const result = await service.getCompetitorRankings('non-existent');
-
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('getBettorRankings', () => {
-    it('should return bettor rankings with user relations', async () => {
-      const mockRankings: Partial<BettorRanking>[] = [
-        { id: 'b1', rank: 1, seasonNumber: 1, year: 2024 },
-        { id: 'b2', rank: 2, seasonNumber: 1, year: 2024 },
-      ];
-
-      jest
-        .spyOn(bettorRankingRepository, 'find')
-        .mockResolvedValue(mockRankings as BettorRanking[]);
-
-      const result = await service.getBettorRankings(1, 2024);
-
-      expect(bettorRankingRepository.find).toHaveBeenCalledWith({
-        where: { seasonNumber: 1, year: 2024 },
-        order: { rank: 'ASC' },
-        relations: ['user', 'user.competitor'],
-      });
-      expect(result).toHaveLength(2);
-    });
-
-    it('should return empty array when no bettor rankings found', async () => {
-      jest.spyOn(bettorRankingRepository, 'find').mockResolvedValue([]);
-
-      const result = await service.getBettorRankings(13, 2024);
-
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('getBettingWeeks', () => {
-    it('should return betting weeks ordered by week number', async () => {
-      const mockWeeks: Partial<BettingWeek>[] = [
-        { id: 'w1', weekNumber: 1, seasonNumber: 1, year: 2024 },
-        { id: 'w2', weekNumber: 2, seasonNumber: 1, year: 2024 },
-      ];
-
-      jest
-        .spyOn(bettingWeekRepository, 'find')
-        .mockResolvedValue(mockWeeks as BettingWeek[]);
-
-      const result = await service.getBettingWeeks(1, 2024);
-
-      expect(bettingWeekRepository.find).toHaveBeenCalledWith({
-        where: { seasonNumber: 1, year: 2024 },
-        order: { weekNumber: 'ASC' },
-      });
-      expect(result).toEqual(mockWeeks);
-    });
-
-    it('should return empty array when no weeks found', async () => {
-      jest.spyOn(bettingWeekRepository, 'find').mockResolvedValue([]);
-
-      const result = await service.getBettingWeeks(13, 2024);
 
       expect(result).toEqual([]);
     });
