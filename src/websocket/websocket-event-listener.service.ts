@@ -74,7 +74,7 @@ export class WebSocketEventListener {
   /**
    * Listen to betting streak lost events
    */
-  @OnEvent('streak.betting_lost')
+  @OnEvent('streak.participation_lost')
   handleBettingStreakLost(payload: {
     userId: string;
     lostValue: number;

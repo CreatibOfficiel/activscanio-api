@@ -87,8 +87,8 @@ export class StreakWarningService {
       // 4. Check dedup: already warned this week?
       if (
         urgency === 'early' &&
-        streak.lastBettingWarningWeek === currentWeek.weekNumber &&
-        streak.lastBettingWarningYear === currentWeek.year
+        streak.lastParticipationWarningWeek === currentWeek.weekNumber &&
+        streak.lastParticipationWarningYear === currentWeek.year
       ) {
         continue;
       }
@@ -114,8 +114,8 @@ export class StreakWarningService {
 
       // 6. Update dedup tracking
       await this.userStreakRepository.update(streak.id, {
-        lastBettingWarningWeek: currentWeek.weekNumber,
-        lastBettingWarningYear: currentWeek.year,
+        lastParticipationWarningWeek: currentWeek.weekNumber,
+        lastParticipationWarningYear: currentWeek.year,
       });
 
       warnedCount++;

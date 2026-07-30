@@ -63,9 +63,9 @@ describe('StreakTrackerService — streak losses', () => {
       const lostAt = new Date('2026-07-01T10:00:00Z');
       jest.spyOn(userStreakRepository, 'findOne').mockResolvedValue({
         userId: USER_ID,
-        bettingStreakLostValue: 5,
-        bettingStreakLostAt: lostAt,
-        bettingStreakLossSeenAt: null,
+        participationStreakLostValue: 5,
+        participationStreakLostAt: lostAt,
+        participationStreakLossSeenAt: null,
       } as unknown as UserStreak);
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
 
@@ -78,9 +78,9 @@ describe('StreakTrackerService — streak losses', () => {
     it('hides a participation streak loss already seen', async () => {
       jest.spyOn(userStreakRepository, 'findOne').mockResolvedValue({
         userId: USER_ID,
-        bettingStreakLostValue: 5,
-        bettingStreakLostAt: new Date(),
-        bettingStreakLossSeenAt: new Date(),
+        participationStreakLostValue: 5,
+        participationStreakLostAt: new Date(),
+        participationStreakLossSeenAt: new Date(),
       } as unknown as UserStreak);
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
 
@@ -166,7 +166,7 @@ describe('StreakTrackerService — streak losses', () => {
       expect(userStreakRepository.update).toHaveBeenCalledWith(
         { userId: USER_ID },
         expect.objectContaining({
-          bettingStreakLossSeenAt: expect.any(Date),
+          participationStreakLossSeenAt: expect.any(Date),
         }),
       );
       expect(competitorRepository.update).toHaveBeenCalledWith(

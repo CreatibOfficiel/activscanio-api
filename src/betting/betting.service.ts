@@ -558,13 +558,13 @@ export class BettingService {
 
     let bettingStreakLoss: { lostValue: number; lostAt: Date } | null = null;
     if (
-      userStreak?.bettingStreakLostValue &&
-      userStreak.bettingStreakLostAt &&
-      !userStreak.bettingStreakLossSeenAt
+      userStreak?.participationStreakLostValue &&
+      userStreak.participationStreakLostAt &&
+      !userStreak.participationStreakLossSeenAt
     ) {
       bettingStreakLoss = {
-        lostValue: userStreak.bettingStreakLostValue,
-        lostAt: userStreak.bettingStreakLostAt,
+        lostValue: userStreak.participationStreakLostValue,
+        lostAt: userStreak.participationStreakLostAt,
       };
     }
 
@@ -608,7 +608,7 @@ export class BettingService {
     // Mark betting streak loss as seen
     await this.userStreakRepository.update(
       { userId },
-      { bettingStreakLossSeenAt: now },
+      { participationStreakLossSeenAt: now },
     );
 
     // Mark play streak loss as seen (via competitor linked to user)

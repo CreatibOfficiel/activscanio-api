@@ -23,6 +23,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -313,9 +314,11 @@ export class BettingFinalizerService {
 
       // Update participation streak for this user
       try {
+        const placedAt = new Date(bet.placedAt);
         await this.streakTrackerService.updateStreak(
           bet.userId,
-          bet.bettingWeekId,
+          getISOWeek(placedAt),
+          getISOWeekYear(placedAt),
         );
       } catch (error) {
         const errorMessage =
@@ -328,9 +331,11 @@ export class BettingFinalizerService {
       // Update win streak for this user
       try {
         const betWonForStreak = calculation.finalPoints > 0;
+        const placedAt = new Date(bet.placedAt);
         await this.streakTrackerService.updateWinStreak(
           bet.userId,
-          bet.bettingWeekId,
+          getISOWeek(placedAt),
+          getISOWeekYear(placedAt),
           betWonForStreak,
         );
       } catch (error) {
