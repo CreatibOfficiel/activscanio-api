@@ -553,7 +553,7 @@ export class TasksService {
 
     try {
       const warned =
-        await this.streakWarningService.checkBettingStreakWarnings('urgent');
+        await this.streakWarningService.checkParticipationStreakWarnings('urgent');
       this.logger.log(`✅ Betting streak warning: ${warned} users warned`);
     } catch (error) {
       this.logger.error(

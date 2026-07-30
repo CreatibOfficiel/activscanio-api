@@ -1,12 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { WeekUtils } from '../../common/utils/week-utils';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
-import { Bet } from '../../betting/entities/bet.entity';
-import {
-  BettingWeek,
-  BettingWeekStatus,
-} from '../../betting/entities/betting-week.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { User } from '../../users/user.entity';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -33,10 +29,6 @@ export class StreakWarningService {
   constructor(
     @InjectRepository(UserStreak)
     private readonly userStreakRepository: Repository<UserStreak>,
-    @InjectRepository(Bet)
-    private readonly betRepository: Repository<Bet>,
-    @InjectRepository(BettingWeek)
-    private readonly bettingWeekRepository: Repository<BettingWeek>,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
     @InjectRepository(User)
@@ -49,21 +41,15 @@ export class StreakWarningService {
    * @param urgency - 'early' or 'urgent' (Monday 18:00 UTC)
    * @returns number of users warned
    */
-  async checkBettingStreakWarnings(
+  async checkParticipationStreakWarnings(
     urgency: 'early' | 'urgent',
   ): Promise<number> {
-    // 1. Find the current OPEN betting week
-    const currentWeek = await this.bettingWeekRepository.findOne({
-      where: { status: BettingWeekStatus.OPEN },
-      order: { createdAt: 'DESC' },
-    });
+    // The current ISO week, derived from the calendar rather than from an
+    // open betting week row.
+    const now = new Date();
+    const currentWeekNumber = WeekUtils.getISOWeek(now);
+    const currentYear = now.getFullYear();
 
-    if (!currentWeek) {
-      this.logger.log('No open betting week found — skipping streak warnings');
-      return 0;
-    }
-
-    // 2. Find all users with an active streak
     const streaksAtRisk = await this.userStreakRepository
       .createQueryBuilder('streak')
       .where(
@@ -74,26 +60,23 @@ export class StreakWarningService {
     let warnedCount = 0;
 
     for (const streak of streaksAtRisk) {
-      // 3. Check if user already bet this week
-      const existingBet = await this.betRepository.findOne({
-        where: {
-          userId: streak.userId,
-          bettingWeekId: currentWeek.id,
-        },
-      });
-
-      if (existingBet) continue; // Already bet, no warning needed
-
-      // 4. Check dedup: already warned this week?
+      // Already took part this week — nothing to warn about.
       if (
-        urgency === 'early' &&
-        streak.lastParticipationWarningWeek === currentWeek.weekNumber &&
-        streak.lastParticipationWarningYear === currentWeek.year
+        streak.lastParticipationWeekNumber === currentWeekNumber &&
+        streak.lastParticipationYear === currentYear
       ) {
         continue;
       }
 
-      // 5. Build and send notification
+      // Dedup: an early warning goes out once a week. Urgent ones always do.
+      if (
+        urgency === 'early' &&
+        streak.lastParticipationWarningWeek === currentWeekNumber &&
+        streak.lastParticipationWarningYear === currentYear
+      ) {
+        continue;
+      }
+
       const currentStreak = Math.max(
         streak.currentMonthlyStreak,
         streak.currentLifetimeStreak,
@@ -108,21 +91,20 @@ export class StreakWarningService {
         title,
         body,
         category: NotificationCategory.BETTING,
-        tag: `streak-bet-W${currentWeek.weekNumber}-${currentWeek.year}-${urgency}`,
-        url: '/betting',
+        tag: `streak-participation-W${currentWeekNumber}-${currentYear}-${urgency}`,
+        url: '/',
       });
 
-      // 6. Update dedup tracking
       await this.userStreakRepository.update(streak.id, {
-        lastParticipationWarningWeek: currentWeek.weekNumber,
-        lastParticipationWarningYear: currentWeek.year,
+        lastParticipationWarningWeek: currentWeekNumber,
+        lastParticipationWarningYear: currentYear,
       });
 
       warnedCount++;
     }
 
     this.logger.log(
-      `Betting streak warnings (${urgency}): ${warnedCount} users warned`,
+      `Participation streak warnings (${urgency}): ${warnedCount} users warned`,
     );
     return warnedCount;
   }
@@ -194,7 +176,7 @@ export class StreakWarningService {
       playStreak: { atRisk: false, currentStreak: 0, missedBusinessDays: 0 },
     };
 
-    // --- Betting streak ---
+    // --- Participation streak ---
     const streak = await this.userStreakRepository.findOne({
       where: { userId },
     });
@@ -206,52 +188,23 @@ export class StreakWarningService {
       );
 
       if (currentStreak > 0) {
-        // Check if there's an OPEN week and user hasn't bet yet
-        const currentWeek = await this.bettingWeekRepository.findOne({
-          where: { status: BettingWeekStatus.OPEN },
-          order: { createdAt: 'DESC' },
-        });
+        const now = new Date();
+        const currentWeekNumber = WeekUtils.getISOWeek(now);
+        const currentYear = now.getFullYear();
 
-        if (currentWeek) {
-          // Verify streak is still valid: user must have bet in the previous week
-          const previousWeek = await this.bettingWeekRepository.findOne({
-            where: {
-              status: In([
-                BettingWeekStatus.FINALIZED,
-                BettingWeekStatus.CLOSED,
-              ]),
-              seasonNumber: currentWeek.seasonNumber,
-            },
-            order: { weekNumber: 'DESC' },
-          });
+        const participatedThisWeek =
+          streak.lastParticipationWeekNumber === currentWeekNumber &&
+          streak.lastParticipationYear === currentYear;
 
-          if (previousWeek) {
-            const previousBet = await this.betRepository.findOne({
-              where: { userId, bettingWeekId: previousWeek.id },
-            });
-
-            // If user didn't bet last week, streak is broken — reset it
-            if (!previousBet) {
-              streak.currentMonthlyStreak = 0;
-              streak.currentLifetimeStreak = 0;
-              await this.userStreakRepository.save(streak);
-              return result; // No warning needed
-            }
-          }
-
-          const existingBet = await this.betRepository.findOne({
-            where: { userId, bettingWeekId: currentWeek.id },
-          });
-
-          if (!existingBet) {
-            result.bettingStreak = {
-              atRisk: true,
-              currentStreak,
-              weekClosesAt: currentWeek.endDate
-                ? currentWeek.endDate.toISOString()
-                : null,
-            };
-          }
+        if (!participatedThisWeek) {
+          result.bettingStreak = {
+            atRisk: true,
+            currentStreak,
+            weekClosesAt: WeekUtils.getSundayOfWeek(
+              currentYear,
+              currentWeekNumber,
+            ).toISOString(),
+          };
         }
       }
     }
