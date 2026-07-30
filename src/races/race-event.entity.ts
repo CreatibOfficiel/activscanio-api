@@ -4,11 +4,8 @@ import {
   CreateDateColumn,
   OneToMany,
   Column,
-  ManyToOne,
-  JoinColumn,
 } from 'typeorm';
 import { RaceResult } from './race-result.entity';
-import { BettingWeek } from '../betting/entities/betting-week.entity';
 
 @Entity('races')
 export class RaceEvent {
@@ -24,12 +21,13 @@ export class RaceEvent {
   @Column({ type: 'int', nullable: true })
   year: number;
 
+  /**
+   * Legacy column from the betting system. Never written by application code
+   * (only the dev seeder set it), so it is NULL in production. Kept until the
+   * removal migration drops it.
+   */
   @Column({ nullable: true })
   bettingWeekId: string;
-
-  @ManyToOne(() => BettingWeek, { nullable: true })
-  @JoinColumn({ name: 'bettingWeekId' })
-  bettingWeek: BettingWeek;
 
   @OneToMany(() => RaceResult, (res) => res.race, { cascade: true })
   results: RaceResult[];

@@ -19,7 +19,7 @@ export class BettorRanking {
   @Column()
   userId: string;
 
-  @ManyToOne(() => User, (user) => user.rankings)
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
   user: User;
 
