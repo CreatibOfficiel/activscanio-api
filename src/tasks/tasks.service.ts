@@ -39,7 +39,7 @@ import { CompetitorsService } from '../competitors/competitors.service';
 import { CompetitorRepository } from '../competitors/repositories/competitor.repository';
 import { CompetitorEloSnapshotRepository } from '../competitors/repositories/competitor-elo-snapshot.repository';
 import { Competitor } from '../competitors/competitor.entity';
-import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
+import { CompetitorMonthlyStats } from '../competitors/entities/competitor-monthly-stats.entity';
 import {
   BettingWeek,
   BettingWeekStatus,
