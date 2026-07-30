@@ -7,10 +7,6 @@ import { SeasonArchive } from '../entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from '../entities/archived-competitor-ranking.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { RaceEvent } from '../../races/race-event.entity';
-import { BettingWeek } from '../../betting/entities/betting-week.entity';
-import { Bet } from '../../betting/entities/bet.entity';
-import { BetPick } from '../../betting/entities/bet-pick.entity';
-import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 
 /**
  * Season highlights that must survive the betting removal.
@@ -90,22 +86,6 @@ describe('SeasonsService — surviving highlights', () => {
         { provide: getRepositoryToken(RaceEvent), useValue: { count: jest.fn() } },
         // Betting repositories still injected by SeasonsService. They go away
         // when the betting highlights are cut; these stubs go with them.
-        {
-          provide: getRepositoryToken(BettingWeek),
-          useValue: { find: jest.fn() },
-        },
-        {
-          provide: getRepositoryToken(Bet),
-          useValue: { createQueryBuilder: jest.fn(() => emptyQb()) },
-        },
-        {
-          provide: getRepositoryToken(BetPick),
-          useValue: { createQueryBuilder: jest.fn(() => emptyQb()) },
-        },
-        {
-          provide: getRepositoryToken(BettorRanking),
-          useValue: { createQueryBuilder: jest.fn(() => emptyQb()) },
-        },
       ],
     }).compile();
 

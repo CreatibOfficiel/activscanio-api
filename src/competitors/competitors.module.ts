@@ -13,7 +13,6 @@ import { User } from '../users/user.entity';
 import { RacesModule } from 'src/races/races.module';
 import { RatingModule } from 'src/rating/rating.module';
 import { UsersModule } from 'src/users/users.module';
-import { BettingModule } from 'src/betting/betting.module';
 
 @Module({
   imports: [
@@ -24,7 +23,6 @@ import { BettingModule } from 'src/betting/betting.module';
       User,
     ]),
     forwardRef(() => RacesModule),
-    BettingModule,
     RatingModule,
     UsersModule,
   ],

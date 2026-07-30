@@ -5,8 +5,6 @@ import { Competitor } from '../competitors/competitor.entity';
 import { CompetitorMonthlyStats } from '../competitors/entities/competitor-monthly-stats.entity';
 import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
-import { BettingWeek } from '../betting/entities/betting-week.entity';
-import { BettingModule } from '../betting/betting.module';
 import { CompetitorsModule } from '../competitors/competitors.module';
 import { SeasonsModule } from '../seasons/seasons.module';
 import { AchievementsModule } from '../achievements/achievements.module';
@@ -18,9 +16,7 @@ import { AchievementsModule } from '../achievements/achievements.module';
       CompetitorMonthlyStats,
       RaceResult,
       User,
-      BettingWeek,
     ]),
-    BettingModule,
     CompetitorsModule,
     SeasonsModule,
     AchievementsModule,

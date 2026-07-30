@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
-import {
-  BettingWeek,
-  BettingWeekStatus,
-} from '../betting/entities/betting-week.entity';
+import { Repository } from 'typeorm';
 import { EventsGateway } from './events.gateway';
 
 @Injectable()
@@ -14,8 +10,6 @@ export class WebSocketEventListener {
 
   constructor(
     private readonly eventsGateway: EventsGateway,
-    @InjectRepository(BettingWeek)
-    private readonly bettingWeekRepository: Repository<BettingWeek>,
   ) {}
 
   /**
@@ -60,16 +54,6 @@ export class WebSocketEventListener {
     );
   }
 
-  /**
-   * Listen to bet finalized events
-   */
-  @OnEvent('bet.finalized')
-  handleBetFinalized(payload: { userId: string; [key: string]: any }) {
-    this.logger.log(
-      `Relaying bet finalized via WebSocket for user ${payload.userId}`,
-    );
-    this.eventsGateway.emitBetFinalized(payload.userId, payload);
-  }
 
   /**
    * Listen to betting streak lost events
@@ -111,55 +95,14 @@ export class WebSocketEventListener {
     });
   }
 
-  /**
-   * Listen to perfect score events
-   */
-  @OnEvent('perfect.score')
-  handlePerfectScore(payload: {
-    userId: string;
-    userName: string;
-    betId: string;
-    imageUrl: string;
-    celebratedAt: Date;
-  }) {
-    this.logger.log(
-      `Relaying perfect score celebration via WebSocket for user ${payload.userId}`,
-    );
-    this.eventsGateway.emitPerfectScore(payload.userId, {
-      userName: payload.userName,
-      betId: payload.betId,
-      imageUrl: payload.imageUrl,
-      celebratedAt: payload.celebratedAt,
-      message: '🎉 SCORE PARFAIT ! Vous avez marqué 60 points !',
-    });
-  }
 
   /**
    * Listen to race created events (broadcast to all)
    */
   @OnEvent('race.created')
-  async handleRaceCreated(payload: { race: any }) {
+  handleRaceCreated(payload: { race: any }) {
     this.logger.log('Broadcasting race created event to all clients');
-
-    let bettingOpen = false;
-    try {
-      const now = new Date();
-      const openWeek = await this.bettingWeekRepository.findOne({
-        where: {
-          status: BettingWeekStatus.OPEN,
-          startDate: LessThanOrEqual(now),
-          endDate: MoreThanOrEqual(now),
-        },
-      });
-      bettingOpen = !!openWeek;
-    } catch (error) {
-      this.logger.error('Failed to check betting week status', error);
-    }
-
-    this.eventsGateway.broadcastRaceAnnouncement({
-      ...payload.race,
-      bettingOpen,
-    });
+    this.eventsGateway.broadcastRaceAnnouncement({ ...payload.race });
   }
 
   /**
@@ -171,14 +114,6 @@ export class WebSocketEventListener {
     this.eventsGateway.broadcastRaceResults(payload.results);
   }
 
-  /**
-   * Listen to weekly rankings updated events (broadcast to all)
-   */
-  @OnEvent('rankings.updated')
-  handleRankingsUpdated(payload: { rankings: any }) {
-    this.logger.log('Broadcasting weekly rankings update');
-    this.eventsGateway.broadcastWeeklyRankings(payload.rankings);
-  }
 
   /**
    * Listen to competitor created events (broadcast to all)
@@ -191,167 +126,12 @@ export class WebSocketEventListener {
     this.eventsGateway.broadcastCompetitorUpdate(payload.competitor);
   }
 
-  /**
-   * Listen to live bet detection events → notify bettor
-   */
-  @OnEvent('liveBet.detected')
-  handleLiveBetDetected(payload: { userId: string; liveBet: any }) {
-    this.logger.log(`Relaying liveBet:detected to user ${payload.userId}`);
-    this.eventsGateway.emitLiveBetDetected(payload.userId, {
-      liveBetId: payload.liveBet.id,
-      status: payload.liveBet.status,
-      detectedCharacters: payload.liveBet.detectedCharacters,
-      detectionExpiresAt: payload.liveBet.detectionExpiresAt,
-    });
-  }
 
-  /**
-   * Listen to live bet resolved events → notify bettor + broadcast
-   */
-  @OnEvent('liveBet.resolved')
-  handleLiveBetResolved(payload: { userId: string; liveBet: any }) {
-    this.logger.log(`Relaying liveBet:resolved to user ${payload.userId}`);
-    this.eventsGateway.emitLiveBetResolved(payload.userId, {
-      liveBetId: payload.liveBet.id,
-      status: payload.liveBet.status,
-      pointsEarned: payload.liveBet.pointsEarned,
-      competitorId: payload.liveBet.competitorId,
-      oddAtBet: payload.liveBet.oddAtBet,
-    });
-    this.eventsGateway.broadcastLiveBetResult({
-      liveBetId: payload.liveBet.id,
-      userId: payload.userId,
-      status: payload.liveBet.status,
-      pointsEarned: payload.liveBet.pointsEarned,
-    });
-  }
 
-  /**
-   * Listen to duel created events → notify challenged user
-   */
-  @OnEvent('duel.created')
-  handleDuelCreated(payload: {
-    duel: any;
-    challengerUser: any;
-    challengedUser: any;
-  }) {
-    this.logger.log(
-      `Relaying duel:received to user ${payload.duel.challengedUserId}`,
-    );
-    this.eventsGateway.emitDuelReceived(payload.duel.challengedUserId, {
-      duelId: payload.duel.id,
-      challenger: {
-        firstName: payload.challengerUser.firstName,
-        lastName: payload.challengerUser.lastName,
-        profilePictureUrl: payload.challengerUser.profilePictureUrl,
-      },
-      stakeType: payload.duel.stakeType,
-      stakeEmoji: payload.duel.stakeEmoji,
-      stakeLabel: payload.duel.stakeLabel,
-      conditionType: payload.duel.conditionType,
-      conditionValue: payload.duel.conditionValue,
-      expiresAt: payload.duel.expiresAt,
-    });
-  }
 
-  /**
-   * Listen to duel accepted events → notify challenger
-   */
-  @OnEvent('duel.accepted')
-  handleDuelAccepted(payload: { duel: any }) {
-    this.logger.log(
-      `Relaying duel:accepted to user ${payload.duel.challengerUserId}`,
-    );
-    this.eventsGateway.emitDuelAccepted(payload.duel.challengerUserId, {
-      duelId: payload.duel.id,
-    });
-  }
 
-  /**
-   * Listen to duel declined events → notify challenger
-   */
-  @OnEvent('duel.declined')
-  handleDuelDeclined(payload: { duel: any }) {
-    this.logger.log(
-      `Relaying duel:declined to user ${payload.duel.challengerUserId}`,
-    );
-    this.eventsGateway.emitDuelDeclined(payload.duel.challengerUserId, {
-      duelId: payload.duel.id,
-    });
-  }
 
-  /**
-   * Listen to duel resolved events → notify both users + feed
-   */
-  @OnEvent('duel.resolved')
-  handleDuelResolved(payload: { duel: any }) {
-    this.logger.log(`Relaying duel:resolved for duel ${payload.duel.id}`);
-    this.eventsGateway.emitDuelResolved(
-      payload.duel.challengerUserId,
-      payload.duel.challengedUserId,
-      {
-        duelId: payload.duel.id,
-        winnerUserId: payload.duel.winnerUserId,
-        loserUserId: payload.duel.loserUserId,
-        stakeType: payload.duel.stakeType,
-        stakeEmoji: payload.duel.stakeEmoji,
-        stakeLabel: payload.duel.stakeLabel,
-        raceEventId: payload.duel.raceEventId,
-      },
-    );
-  }
 
-  /**
-   * Listen to duel cancelled events → notify both users
-   */
-  @OnEvent('duel.cancelled')
-  handleDuelCancelled(payload: { duel: any; reason: string }) {
-    this.logger.log(`Relaying duel:cancelled for duel ${payload.duel.id}`);
-    this.eventsGateway.emitDuelCancelled(
-      payload.duel.challengerUserId,
-      payload.duel.challengedUserId,
-      {
-        duelId: payload.duel.id,
-        reason: payload.reason,
-      },
-    );
-  }
 
-  /**
-   * Listen to duel settled events (proof uploaded) → notify both users + feed
-   */
-  @OnEvent('duel.settled')
-  handleDuelSettled(payload: { duel: any }) {
-    this.logger.log(`Relaying duel:settled for duel ${payload.duel.id}`);
-    this.eventsGateway.emitDuelSettled(
-      payload.duel.challengerUserId,
-      payload.duel.challengedUserId,
-      {
-        duelId: payload.duel.id,
-        winnerUserId: payload.duel.winnerUserId,
-        loserUserId: payload.duel.loserUserId,
-        stakeType: payload.duel.stakeType,
-        stakeEmoji: payload.duel.stakeEmoji,
-        stakeLabel: payload.duel.stakeLabel,
-        proofPhotoUrl: payload.duel.proofPhotoUrl,
-      },
-    );
-  }
 
-  /**
-   * Listen to duel unsettled events (proof undone) → notify both users + feed
-   */
-  @OnEvent('duel.unsettled')
-  handleDuelUnsettled(payload: { duel: any }) {
-    this.logger.log(`Relaying duel:unsettled for duel ${payload.duel.id}`);
-    this.eventsGateway.emitDuelUnsettled(
-      payload.duel.challengerUserId,
-      payload.duel.challengedUserId,
-      {
-        duelId: payload.duel.id,
-        winnerUserId: payload.duel.winnerUserId,
-        loserUserId: payload.duel.loserUserId,
-      },
-    );
-  }
 }

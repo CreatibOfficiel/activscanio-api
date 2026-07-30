@@ -4,8 +4,6 @@ import { Repository } from 'typeorm';
 import { Parser } from 'json2csv';
 import { UserAchievement } from '../achievements/entities/user-achievement.entity';
 import { User } from '../users/user.entity';
-import { Bet } from '../betting/entities/bet.entity';
-import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 import { AchievementRarity } from '../achievements/entities/achievement.entity';
 
 @Injectable()
@@ -15,10 +13,6 @@ export class ExportService {
     private readonly userAchievementRepository: Repository<UserAchievement>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Bet)
-    private readonly betRepository: Repository<Bet>,
-    @InjectRepository(BettorRanking)
-    private readonly rankingRepository: Repository<BettorRanking>,
   ) {}
 
   /**
@@ -59,30 +53,6 @@ export class ExportService {
     return parser.parse(data);
   }
 
-  /**
-   * Export user's betting history to CSV
-   */
-  async exportBettingHistoryToCSV(userId: string): Promise<string> {
-    const bets = await this.betRepository.find({
-      where: { userId },
-      relations: ['bettingWeek'],
-      order: { createdAt: 'DESC' },
-      take: 500, // Last 500 bets
-    });
-
-    const data = bets.map((bet) => ({
-      'Betting Week': `Week ${bet.bettingWeek?.weekNumber || '-'}`,
-      Year: bet.bettingWeek?.year || '-',
-      'Points Earned': bet.pointsEarned || 0,
-      'Created At': bet.createdAt.toISOString(),
-      Status: bet.isFinalized ? 'Finalized' : 'Pending',
-    }));
-
-    const parser = new Parser({
-      fields: ['Betting Week', 'Year', 'Points Earned', 'Created At', 'Status'],
-    });
-    return parser.parse(data);
-  }
 
   /**
    * Export complete user stats to JSON
@@ -103,33 +73,6 @@ export class ExportService {
       relations: ['achievement'],
     });
 
-    // Get betting history (last 100)
-    const bets = await this.betRepository.find({
-      where: { userId },
-      relations: ['bettingWeek'],
-      order: { createdAt: 'DESC' },
-      take: 100,
-    });
-
-    // Get rankings history (last 13 seasons)
-    const rankings = await this.rankingRepository.find({
-      where: { userId },
-      order: { seasonNumber: 'DESC', year: 'DESC' },
-      take: 13,
-    });
-
-    // Calculate stats from bets
-    const totalBetsPlaced = bets.length;
-    const finalizedBets = bets.filter((b) => b.isFinalized);
-    const betsWon = finalizedBets.filter(
-      (b) => b.pointsEarned && b.pointsEarned > 0,
-    ).length;
-    const totalPoints = finalizedBets.reduce(
-      (sum, b) => sum + (b.pointsEarned || 0),
-      0,
-    );
-    const winRate =
-      finalizedBets.length > 0 ? (betsWon / finalizedBets.length) * 100 : 0;
 
     return {
       user: {
@@ -140,12 +83,6 @@ export class ExportService {
         achievementCount: user.achievementCount,
       },
       stats: {
-        lifetime: {
-          totalBetsPlaced,
-          totalBetsWon: betsWon,
-          winRate: parseFloat(winRate.toFixed(2)),
-          totalPoints,
-        },
         achievements: {
           total: achievements.length,
           byRarity: {
@@ -172,19 +109,6 @@ export class ExportService {
           ),
         },
       },
-      recentBets: bets.map((bet) => ({
-        weekNumber: bet.bettingWeek?.weekNumber,
-        year: bet.bettingWeek?.year,
-        pointsEarned: bet.pointsEarned,
-        createdAt: bet.createdAt,
-        isFinalized: bet.isFinalized,
-      })),
-      rankingsHistory: rankings.map((ranking) => ({
-        month: ranking.month,
-        year: ranking.year,
-        rank: ranking.rank,
-        totalPoints: ranking.totalPoints,
-      })),
       achievements: achievements.map((ua) => ({
         key: ua.achievement.key,
         name: ua.achievement.name,
@@ -203,42 +127,4 @@ export class ExportService {
     };
   }
 
-  /**
-   * Export rankings leaderboard to CSV (for admin/public use)
-   */
-  async exportLeaderboardToCSV(
-    month: number,
-    year: number,
-    limit: number = 100,
-  ): Promise<string> {
-    const rankings = await this.rankingRepository.find({
-      where: { seasonNumber: month, year },
-      order: { rank: 'ASC' },
-      take: limit,
-    });
-
-    const data = rankings.map((ranking) => ({
-      Rank: ranking.rank,
-      'User ID': ranking.userId,
-      Points: ranking.totalPoints,
-      'Bets Placed': ranking.betsPlaced || 0,
-      'Win Rate':
-        ranking.betsPlaced > 0
-          ? `${((ranking.betsWon / ranking.betsPlaced) * 100).toFixed(2)}%`
-          : '-',
-      'Perfect Bets': ranking.perfectBets || 0,
-    }));
-
-    const parser = new Parser({
-      fields: [
-        'Rank',
-        'User ID',
-        'Points',
-        'Bets Placed',
-        'Win Rate',
-        'Perfect Bets',
-      ],
-    });
-    return parser.parse(data);
-  }
 }

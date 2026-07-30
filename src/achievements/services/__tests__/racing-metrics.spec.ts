@@ -8,8 +8,6 @@ import { XPLevelService } from '../xp-level.service';
 import { Achievement } from '../../entities/achievement.entity';
 import { UserAchievement } from '../../entities/user-achievement.entity';
 import { UserStreak } from '../../entities/user-streak.entity';
-import { Bet } from '../../../betting/entities/bet.entity';
-import { BettorRanking } from '../../../betting/entities/bettor-ranking.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
 
@@ -99,21 +97,6 @@ describe('AchievementCalculatorService — racing metrics', () => {
         {
           provide: getRepositoryToken(UserStreak),
           useValue: { findOne: jest.fn().mockResolvedValue(null) },
-        },
-        {
-          provide: getRepositoryToken(Bet),
-          useValue: {
-            find: jest.fn().mockResolvedValue([]),
-            createQueryBuilder: jest.fn(() => emptyQueryBuilder()),
-          },
-        },
-        {
-          provide: getRepositoryToken(BettorRanking),
-          useValue: {
-            find: jest.fn().mockResolvedValue([]),
-            findOne: jest.fn().mockResolvedValue(null),
-            createQueryBuilder: jest.fn(() => emptyQueryBuilder()),
-          },
         },
         {
           provide: getRepositoryToken(User),

@@ -36,7 +36,6 @@ async function bootstrap() {
     .setDescription('Fantasy Racing Mario Kart - API Documentation')
     .setVersion('1.0')
     .addTag('onboarding', 'User onboarding and competitor linking')
-    .addTag('betting', 'Betting system and weekly predictions')
     .addTag('seasons', 'Season archives and historical data')
     .addTag('competitors', 'Competitor management and rankings')
     .addTag('races', 'Race results and analysis')

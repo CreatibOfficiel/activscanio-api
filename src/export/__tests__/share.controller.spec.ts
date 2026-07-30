@@ -7,7 +7,6 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserAchievement } from '../../achievements/entities/user-achievement.entity';
 import { User } from '../../users/user.entity';
-import { Bet } from '../../betting/entities/bet.entity';
 import { HttpException, HttpStatus, StreamableFile } from '@nestjs/common';
 
 // Mock uuid to avoid ESM issues
@@ -20,7 +19,6 @@ describe('ShareController', () => {
   let shareImageService: ShareImageService;
   let userAchievementRepository: Repository<UserAchievement>;
   let userRepository: Repository<User>;
-  let betRepository: Repository<Bet>;
 
   const mockUser = {
     id: 'user-123',
@@ -101,13 +99,6 @@ describe('ShareController', () => {
             },
           },
         },
-        {
-          provide: getRepositoryToken(Bet),
-          useValue: {
-            find: jest.fn(),
-            findOne: jest.fn(),
-          },
-        },
       ],
     }).compile();
 
@@ -117,7 +108,6 @@ describe('ShareController', () => {
       getRepositoryToken(UserAchievement),
     );
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
   });
 
   it('should be defined', () => {
@@ -188,167 +178,5 @@ describe('ShareController', () => {
     });
   });
 
-  describe('shareStats', () => {
-    beforeEach(() => {
-      // Mock count for achievements
-      jest.spyOn(userAchievementRepository, 'count').mockResolvedValue(15);
 
-      // Mock total achievements count
-      const mockAchievementRepo = {
-        count: jest.fn().mockResolvedValue(50),
-      };
-      jest
-        .spyOn(userAchievementRepository.manager, 'getRepository')
-        .mockReturnValue(mockAchievementRepo as any);
-
-      // Mock ranking
-      jest
-        .spyOn(userRepository.manager, 'findOne')
-        .mockResolvedValue({ rank: 5 } as any);
-    });
-
-    it('should generate and return stats share image', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue([mockBet] as any);
-      jest
-        .spyOn(shareImageService, 'generateStatsShareImage')
-        .mockResolvedValue(mockImageBuffer);
-
-      const result = await controller.shareStats('user-123');
-
-      expect(result).toBeInstanceOf(StreamableFile);
-      expect(shareImageService.generateStatsShareImage).toHaveBeenCalledWith(
-        'John Doe',
-        expect.objectContaining({
-          level: 10,
-          totalAchievements: 50,
-          unlockedAchievements: 15,
-          rank: 5,
-        }),
-      );
-    });
-
-    it('should calculate win rate correctly', async () => {
-      const bets = [
-        { ...mockBet, pointsEarned: 60, isFinalized: true },
-        { ...mockBet, pointsEarned: 45, isFinalized: true },
-        { ...mockBet, pointsEarned: null, isFinalized: false },
-      ];
-
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(bets as any);
-      jest
-        .spyOn(shareImageService, 'generateStatsShareImage')
-        .mockResolvedValue(mockImageBuffer);
-
-      await controller.shareStats('user-123');
-
-      expect(shareImageService.generateStatsShareImage).toHaveBeenCalledWith(
-        'John Doe',
-        expect.objectContaining({
-          winRate: 100, // 2 finalized, both won
-          totalPoints: 105, // 60 + 45
-        }),
-      );
-    });
-
-    it('should handle zero bets', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue([]);
-      jest
-        .spyOn(shareImageService, 'generateStatsShareImage')
-        .mockResolvedValue(mockImageBuffer);
-
-      await controller.shareStats('user-123');
-
-      expect(shareImageService.generateStatsShareImage).toHaveBeenCalledWith(
-        'John Doe',
-        expect.objectContaining({
-          winRate: 0,
-          totalPoints: 0,
-        }),
-      );
-    });
-
-    it('should throw 404 if user not found', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-
-      await expect(controller.shareStats('user-999')).rejects.toThrow(
-        new HttpException('User not found', HttpStatus.NOT_FOUND),
-      );
-    });
-  });
-
-  describe('sharePerfectScore', () => {
-    it('should generate and return perfect score share image', async () => {
-      jest.spyOn(betRepository, 'findOne').mockResolvedValue(mockBet as any);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(shareImageService, 'generatePerfectScoreShareImage')
-        .mockResolvedValue(mockImageBuffer);
-
-      const result = await controller.sharePerfectScore('bet-123', 'user-123');
-
-      expect(result).toBeInstanceOf(StreamableFile);
-      expect(
-        shareImageService.generatePerfectScoreShareImage,
-      ).toHaveBeenCalledWith('John Doe', 60, 'Week 5 - 2024');
-    });
-
-    it('should throw 404 if bet not found', async () => {
-      jest.spyOn(betRepository, 'findOne').mockResolvedValue(null);
-
-      await expect(
-        controller.sharePerfectScore('bet-999', 'user-123'),
-      ).rejects.toThrow(
-        new HttpException('Bet not found', HttpStatus.NOT_FOUND),
-      );
-    });
-
-    it('should throw 400 if bet is not a perfect score', async () => {
-      const notPerfectBet = { ...mockBet, pointsEarned: 45 };
-      jest
-        .spyOn(betRepository, 'findOne')
-        .mockResolvedValue(notPerfectBet as any);
-
-      await expect(
-        controller.sharePerfectScore('bet-123', 'user-123'),
-      ).rejects.toThrow(
-        new HttpException(
-          'This bet is not a perfect score',
-          HttpStatus.BAD_REQUEST,
-        ),
-      );
-    });
-
-    it('should only return bets belonging to the user', async () => {
-      jest.spyOn(betRepository, 'findOne').mockResolvedValue(mockBet as any);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(shareImageService, 'generatePerfectScoreShareImage')
-        .mockResolvedValue(mockImageBuffer);
-
-      await controller.sharePerfectScore('bet-123', 'user-123');
-
-      expect(betRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'bet-123', userId: 'user-123' },
-        relations: ['bettingWeek'],
-      });
-    });
-
-    it('should handle missing betting week data', async () => {
-      const betNoWeek = { ...mockBet, bettingWeek: null };
-      jest.spyOn(betRepository, 'findOne').mockResolvedValue(betNoWeek as any);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(shareImageService, 'generatePerfectScoreShareImage')
-        .mockResolvedValue(mockImageBuffer);
-
-      await controller.sharePerfectScore('bet-123', 'user-123');
-
-      expect(
-        shareImageService.generatePerfectScoreShareImage,
-      ).toHaveBeenCalledWith('John Doe', 60, 'Week ? - ?');
-    });
-  });
 });

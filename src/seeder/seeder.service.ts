@@ -3,9 +3,7 @@ import { DataSource } from 'typeorm';
 import { seedBaseCharacters } from './seeds/character.seed';
 import { seedCompetitors } from './seeds/competitor.seed';
 import { seedUsers } from './seeds/user.seed';
-import { seedBettingWeeks } from './seeds/betting-week.seed';
 import { seedRaces } from './seeds/race.seed';
-import { seedBets } from './seeds/bet.seed';
 import { seedSeasonArchives } from './seeds/season.seed';
 import { AchievementSeedService } from '../achievements/services/achievement-seed.service';
 
@@ -54,13 +52,11 @@ export class SeederService implements OnModuleInit {
     await seedUsers(this.dataSource);
 
     this.logger.log('📅 Seeding betting weeks...');
-    await seedBettingWeeks(this.dataSource);
 
     this.logger.log('🏁 Seeding races...');
     await seedRaces(this.dataSource);
 
     this.logger.log('🎲 Seeding bets...');
-    await seedBets(this.dataSource);
 
     this.logger.log('📊 Seeding season archives...');
     await seedSeasonArchives(this.dataSource);

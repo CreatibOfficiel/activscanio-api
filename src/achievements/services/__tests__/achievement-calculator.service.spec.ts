@@ -12,8 +12,6 @@ import {
 } from '../../entities/achievement.entity';
 import { UserAchievement } from '../../entities/user-achievement.entity';
 import { UserStreak } from '../../entities/user-streak.entity';
-import { Bet } from '../../../betting/entities/bet.entity';
-import { BettorRanking } from '../../../betting/entities/bettor-ranking.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -25,7 +23,6 @@ describe('AchievementCalculatorService', () => {
   let service: AchievementCalculatorService;
   let achievementRepository: Repository<Achievement>;
   let userAchievementRepository: Repository<UserAchievement>;
-  let betRepository: Repository<Bet>;
   let xpLevelService: XPLevelService;
   let userRepository: Repository<User>;
   let competitorRepository: Repository<Competitor>;
@@ -122,20 +119,6 @@ describe('AchievementCalculatorService', () => {
           },
         },
         {
-          provide: getRepositoryToken(BettorRanking),
-          useValue: {
-            findOne: jest.fn().mockResolvedValue(null),
-            find: jest.fn().mockResolvedValue([]),
-          },
-        },
-        {
-          provide: getRepositoryToken(Bet),
-          useValue: {
-            count: jest.fn().mockResolvedValue(0),
-            find: jest.fn().mockResolvedValue([]),
-          },
-        },
-        {
           provide: getRepositoryToken(Competitor),
           useValue: {
             findOne: jest.fn().mockResolvedValue(null),
@@ -165,7 +148,6 @@ describe('AchievementCalculatorService', () => {
     userAchievementRepository = module.get<Repository<UserAchievement>>(
       getRepositoryToken(UserAchievement),
     );
-    betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
     competitorRepository = module.get<Repository<Competitor>>(
       getRepositoryToken(Competitor),
@@ -189,7 +171,6 @@ describe('AchievementCalculatorService', () => {
         .mockResolvedValue(mockAchievements as Achievement[]);
 
       // Mock: user stats show they qualify for tier 2
-      jest.spyOn(betRepository, 'count').mockResolvedValue(10);
 
       // Try to check achievements
       const result = await service.checkAchievements('user-123');
@@ -221,7 +202,6 @@ describe('AchievementCalculatorService', () => {
         .mockResolvedValue(mockAchievements as Achievement[]);
 
       // Mock: user stats show they qualify for tier 2
-      jest.spyOn(betRepository, 'count').mockResolvedValue(10);
 
       // Try to check achievements
       const result = await service.checkAchievements('user-123');
@@ -251,7 +231,6 @@ describe('AchievementCalculatorService', () => {
         .mockResolvedValue(mockAchievements as Achievement[]);
 
       // Mock: user stats show they would qualify for tier 3
-      jest.spyOn(betRepository, 'count').mockResolvedValue(50);
 
       // Try to check achievements
       const result = await service.checkAchievements('user-123');
@@ -343,7 +322,6 @@ describe('AchievementCalculatorService', () => {
         createdAt: new Date(),
         picks: [{ isCorrect: true, hasBoost: false, oddAtBet: 2 }],
       };
-      jest.spyOn(betRepository, 'find').mockResolvedValue([mockBet] as any);
 
       const result = await service.checkAchievements('user-123');
 

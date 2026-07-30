@@ -4,7 +4,6 @@ import { SeasonArchive } from 'src/seasons/entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from 'src/seasons/entities/archived-competitor-ranking.entity';
 import { Competitor } from 'src/competitors/competitor.entity';
 import { User, UserRole } from 'src/users/user.entity';
-import { Bet } from 'src/betting/entities/bet.entity';
 import { seededRandom, subtractMonths } from '../utils/seed-helpers';
 
 const logger = new Logger('SeasonSeed');
@@ -20,7 +19,6 @@ export async function seedSeasonArchives(
   );
   const competitorRepository = dataSource.getRepository(Competitor);
   const userRepository = dataSource.getRepository(User);
-  const betRepository = dataSource.getRepository(Bet);
 
   // Check if we already have archives
   const existingCount = await seasonArchiveRepository.count();
@@ -35,7 +33,6 @@ export async function seedSeasonArchives(
   const users = await userRepository.find({
     where: [{ role: UserRole.BETTOR }, { role: UserRole.PLAYER }],
   });
-  await betRepository.count(); // Ensure bets exist
 
   if (competitors.length === 0) {
     logger.warn('⚠️ No competitors found. Please seed competitors first.');

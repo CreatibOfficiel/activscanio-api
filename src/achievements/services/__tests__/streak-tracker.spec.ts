@@ -7,7 +7,6 @@ import { StreakTrackerService } from '../streak-tracker.service';
 import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
-import { BettingWeek } from '../../../betting/entities/betting-week.entity';
 
 /**
  * Weekly participation streak.
@@ -48,11 +47,6 @@ describe('StreakTrackerService — weekly participation streak', () => {
         {
           provide: getRepositoryToken(Competitor),
           useValue: { findOne: jest.fn(), update: jest.fn() },
-        },
-        {
-          // Still injected today; goes away with the betting module.
-          provide: getRepositoryToken(BettingWeek),
-          useValue: { findOne: jest.fn() },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],

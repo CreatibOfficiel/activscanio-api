@@ -7,7 +7,6 @@ import { StreakTrackerService } from '../streak-tracker.service';
 import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
-import { BettingWeek } from '../../../betting/entities/betting-week.entity';
 
 /**
  * Streak-loss reads and writes moved out of BettingService.
@@ -36,12 +35,6 @@ describe('StreakTrackerService — streak losses', () => {
         },
         {
           provide: getRepositoryToken(User),
-          useValue: { findOne: jest.fn() },
-        },
-        {
-          // Still injected by StreakTrackerService; goes away with the
-          // betting module.
-          provide: getRepositoryToken(BettingWeek),
           useValue: { findOne: jest.fn() },
         },
         {

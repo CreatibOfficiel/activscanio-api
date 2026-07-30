@@ -6,19 +6,12 @@ import { SeasonsService } from './seasons.service';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';
 import { Competitor } from '../competitors/competitor.entity';
-import { BettingWeek } from '../betting/entities/betting-week.entity';
-import { Bet } from '../betting/entities/bet.entity';
-import { BetPick } from '../betting/entities/bet-pick.entity';
-import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 
 describe('SeasonsService', () => {
   let service: SeasonsService;
   let seasonArchiveRepository: Repository<SeasonArchive>;
   let archivedCompetitorRankingRepository: Repository<ArchivedCompetitorRanking>;
   let competitorRepository: Repository<Competitor>;
-  let bettingWeekRepository: Repository<BettingWeek>;
-  let betRepository: Repository<Bet>;
-  let bettorRankingRepository: Repository<BettorRanking>;
   let queryRunner: QueryRunner;
 
   const mockQueryRunner = {
@@ -68,30 +61,6 @@ describe('SeasonsService', () => {
             find: jest.fn(),
           },
         },
-        {
-          provide: getRepositoryToken(BettingWeek),
-          useValue: {
-            find: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(Bet),
-          useValue: {
-            count: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(BetPick),
-          useValue: {
-            find: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(BettorRanking),
-          useValue: {
-            find: jest.fn(),
-          },
-        },
       ],
     }).compile();
 
@@ -104,13 +73,6 @@ describe('SeasonsService', () => {
     >(getRepositoryToken(ArchivedCompetitorRanking));
     competitorRepository = module.get<Repository<Competitor>>(
       getRepositoryToken(Competitor),
-    );
-    bettingWeekRepository = module.get<Repository<BettingWeek>>(
-      getRepositoryToken(BettingWeek),
-    );
-    betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
-    bettorRankingRepository = module.get<Repository<BettorRanking>>(
-      getRepositoryToken(BettorRanking),
     );
     queryRunner = mockQueryRunner as unknown as QueryRunner;
   });
@@ -148,11 +110,6 @@ describe('SeasonsService', () => {
         avgRank12: 3.2,
         currentMonthRaceCount: 3,
       },
-    ];
-
-    const mockBettingWeeks: Partial<BettingWeek>[] = [
-      { id: 'w1', month, year, weekNumber: 1 },
-      { id: 'w2', month, year, weekNumber: 2 },
     ];
 
     beforeEach(() => {
