@@ -246,6 +246,30 @@ export class AchievementsController {
   }
 
   /**
+   * Unseen streak losses: weekly participation, and the Mario Kart play
+   * streak carried by the linked competitor.
+   */
+  @Get('streaks/unseen-losses')
+  @ApiOperation({ summary: 'Get unseen streak losses (participation + play)' })
+  @ApiResponse({ status: 200, description: 'Unseen streak losses' })
+  async getUnseenStreakLosses(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    return this.streakTrackerService.getUnseenStreakLosses(userId);
+  }
+
+  /**
+   * Mark all streak losses as seen, so their modal stops reappearing.
+   */
+  @Post('streaks/mark-losses-seen')
+  @ApiOperation({ summary: 'Mark all streak losses as seen' })
+  @ApiResponse({ status: 200, description: 'Streak losses marked as seen' })
+  async markStreakLossesSeen(@CurrentUser('clerkId') clerkId: string) {
+    const userId = await this.getUserIdFromClerkId(clerkId);
+    await this.streakTrackerService.markStreakLossesSeen(userId);
+    return { success: true };
+  }
+
+  /**
    * Get user stats (can view others' stats or own)
    */
   @Get('stats/:userId')

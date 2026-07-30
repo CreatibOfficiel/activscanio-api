@@ -7,7 +7,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { Competitor } from '../../competitors/competitor.entity';
+import { Competitor } from '../competitor.entity';
 
 @Entity('competitor_monthly_stats')
 @Index(['competitorId', 'seasonNumber', 'year'], { unique: true })

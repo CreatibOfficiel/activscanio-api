@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TasksService } from './tasks.service';
 import { Competitor } from '../competitors/competitor.entity';
-import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
+import { CompetitorMonthlyStats } from '../competitors/entities/competitor-monthly-stats.entity';
 import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { BettingWeek } from '../betting/entities/betting-week.entity';

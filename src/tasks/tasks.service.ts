@@ -29,19 +29,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  WeekManagerService,
-  WeekUtils,
-} from '../betting/services/week-manager.service';
+import { WeekManagerService } from '../betting/services/week-manager.service';
+import { WeekUtils } from '../common/utils/week-utils';
 import { BettingFinalizerService } from '../betting/services/betting-finalizer.service';
-import { SeasonUtils } from '../betting/utils/season-utils';
+import { SeasonUtils } from '../common/utils/season-utils';
 import { RankingsService } from '../betting/services/rankings.service';
 import { OddsCalculatorService } from '../betting/services/odds-calculator.service';
 import { CompetitorsService } from '../competitors/competitors.service';
 import { CompetitorRepository } from '../competitors/repositories/competitor.repository';
 import { CompetitorEloSnapshotRepository } from '../competitors/repositories/competitor-elo-snapshot.repository';
 import { Competitor } from '../competitors/competitor.entity';
-import { CompetitorMonthlyStats } from '../betting/entities/competitor-monthly-stats.entity';
+import { CompetitorMonthlyStats } from '../competitors/entities/competitor-monthly-stats.entity';
 import {
   BettingWeek,
   BettingWeekStatus,

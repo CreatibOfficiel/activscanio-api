@@ -3,8 +3,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
 import { BettingWeek } from '../../betting/entities/betting-week.entity';
+import { User } from '../../users/user.entity';
+import { Competitor } from '../../competitors/competitor.entity';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+
+export interface UnseenStreakLosses {
+  bettingStreakLoss: { lostValue: number; lostAt: Date } | null;
+  playStreakLoss: {
+    lostValue: number;
+    lostAt: Date;
+    missedDays: string[];
+  } | null;
+}
 
 @Injectable()
 export class StreakTrackerService {
@@ -15,8 +26,80 @@ export class StreakTrackerService {
     private readonly userStreakRepository: Repository<UserStreak>,
     @InjectRepository(BettingWeek)
     private readonly bettingWeekRepository: Repository<BettingWeek>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Competitor)
+    private readonly competitorRepository: Repository<Competitor>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  /**
+   * Unseen streak losses for a user.
+   *
+   * Covers two unrelated streaks: the weekly participation streak on
+   * UserStreak, and the Mario Kart play streak carried by the linked
+   * Competitor. The latter is why this lives here rather than in the betting
+   * module — it must outlive it.
+   */
+  async getUnseenStreakLosses(userId: string): Promise<UnseenStreakLosses> {
+    const userStreak = await this.userStreakRepository.findOne({
+      where: { userId },
+    });
+
+    let bettingStreakLoss: { lostValue: number; lostAt: Date } | null = null;
+    if (
+      userStreak?.bettingStreakLostValue &&
+      userStreak.bettingStreakLostAt &&
+      !userStreak.bettingStreakLossSeenAt
+    ) {
+      bettingStreakLoss = {
+        lostValue: userStreak.bettingStreakLostValue,
+        lostAt: userStreak.bettingStreakLostAt,
+      };
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    let playStreakLoss: UnseenStreakLosses['playStreakLoss'] = null;
+
+    if (user?.competitorId) {
+      const competitor = await this.competitorRepository.findOne({
+        where: { id: user.competitorId },
+      });
+
+      if (
+        competitor?.playStreakLostValue &&
+        competitor.playStreakLostAt &&
+        !competitor.playStreakLossSeenAt
+      ) {
+        playStreakLoss = {
+          lostValue: competitor.playStreakLostValue,
+          lostAt: competitor.playStreakLostAt,
+          missedDays: competitor.playStreakMissedDays
+            ? competitor.playStreakMissedDays.split(',')
+            : [],
+        };
+      }
+    }
+
+    return { bettingStreakLoss, playStreakLoss };
+  }
+
+  /** Mark both streak losses as seen, so their modal stops reappearing. */
+  async markStreakLossesSeen(userId: string): Promise<void> {
+    const now = new Date();
+
+    await this.userStreakRepository.update(
+      { userId },
+      { bettingStreakLossSeenAt: now },
+    );
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (user?.competitorId) {
+      await this.competitorRepository.update(user.competitorId, {
+        playStreakLossSeenAt: now,
+      });
+    }
+  }
 
   /**
    * Update user streak when they place a bet
