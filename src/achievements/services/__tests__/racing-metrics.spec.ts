@@ -10,6 +10,7 @@ import { UserAchievement } from '../../entities/user-achievement.entity';
 import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
+import { PingpongPlayer } from '../../../pingpong/entities/pingpong-player.entity';
 
 /**
  * Racing metrics that must survive the betting removal.
@@ -109,6 +110,10 @@ describe('AchievementCalculatorService — racing metrics', () => {
         {
           provide: getRepositoryToken(Competitor),
           useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(PingpongPlayer),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
         },
         {
           provide: XPLevelService,

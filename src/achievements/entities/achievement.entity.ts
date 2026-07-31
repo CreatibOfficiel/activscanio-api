@@ -41,8 +41,10 @@ export enum AchievementScope {
 }
 
 export enum AchievementDomain {
-  BETTING = 'BETTING',
+  /** Mario Kart racing. */
   RACING = 'RACING',
+  /** Ping-pong. Separate ratings, separate achievements. */
+  PINGPONG = 'PINGPONG',
 }
 
 export interface AchievementCondition {
@@ -102,7 +104,7 @@ export class Achievement {
   @Column({ type: 'boolean', default: false })
   canBeLost: boolean;
 
-  @Column({ type: 'varchar', default: AchievementDomain.BETTING })
+  @Column({ type: 'varchar', default: AchievementDomain.RACING })
   @Index()
   domain: AchievementDomain;
 

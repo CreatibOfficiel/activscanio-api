@@ -13,6 +13,7 @@ import { UserAchievement } from '../entities/user-achievement.entity';
 import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
 import { Competitor } from '../../competitors/competitor.entity';
+import { PingpongPlayer } from '../../pingpong/entities/pingpong-player.entity';
 import { RaceCreatedEvent } from '../../races/events/race-created.event';
 import { XPLevelService, XPSource } from './xp-level.service';
 import { SeasonUtils } from '../../common/utils/season-utils';
@@ -38,6 +39,8 @@ export class AchievementCalculatorService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
+    @InjectRepository(PingpongPlayer)
+    private readonly pingpongPlayerRepository: Repository<PingpongPlayer>,
     private readonly xpLevelService: XPLevelService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -130,6 +133,14 @@ export class AchievementCalculatorService {
       if (
         achievement.domain === AchievementDomain.RACING &&
         !userStats.isCompetitor
+      ) {
+        continue;
+      }
+
+      // Skip PINGPONG achievements for people who do not play it
+      if (
+        achievement.domain === AchievementDomain.PINGPONG &&
+        !userStats.isPingpongPlayer
       ) {
         continue;
       }
@@ -269,6 +280,28 @@ export class AchievementCalculatorService {
       case 'competitorAvgRank12':
         return userStats.competitorAvgRank12;
 
+      // Ping-pong metrics
+      case 'pingpongMatchCount':
+        return userStats.pingpongMatchCount;
+      case 'pingpongWeightedMatchCount':
+        return userStats.pingpongWeightedMatchCount;
+      case 'pingpongWins':
+        return userStats.pingpongWins;
+      case 'pingpongLosses':
+        return userStats.pingpongLosses;
+      case 'pingpongSetsWon':
+        return userStats.pingpongSetsWon;
+      case 'pingpongCurrentStreak':
+        return userStats.pingpongCurrentStreak;
+      case 'pingpongBestStreak':
+        return userStats.pingpongBestStreak;
+      case 'pingpongRating':
+        return userStats.pingpongRating;
+      case 'pingpongDistinctOpponents':
+        return userStats.pingpongDistinctOpponents;
+      case 'pingpongDiversityScore':
+        return userStats.pingpongDiversityScore;
+
       default:
         this.logger.warn(`Unknown metric: ${metric}`);
         return 0;
@@ -298,6 +331,13 @@ export class AchievementCalculatorService {
       isCompetitor = !!competitor;
     }
 
+    let pingpongPlayer: PingpongPlayer | null = null;
+    if (user?.competitorId) {
+      pingpongPlayer = await this.pingpongPlayerRepository.findOne({
+        where: { competitorId: user.competitorId },
+      });
+    }
+
     return {
       userId,
       currentMonthlyStreak: userStreak?.currentMonthlyStreak || 0,
@@ -314,6 +354,21 @@ export class AchievementCalculatorService {
       competitorBestPlayStreak: competitor?.bestPlayStreak ?? 0,
       competitorRating: competitor ? competitor.rating - 2 * competitor.rd : 0,
       competitorAvgRank12: competitor?.avgRank12 ?? 0,
+      isPingpongPlayer: !!pingpongPlayer,
+      pingpongMatchCount: pingpongPlayer?.matchCount ?? 0,
+      pingpongWeightedMatchCount: pingpongPlayer?.weightedMatchCount ?? 0,
+      pingpongWins: pingpongPlayer?.wins ?? 0,
+      pingpongLosses: pingpongPlayer?.losses ?? 0,
+      pingpongSetsWon: pingpongPlayer?.setsWon ?? 0,
+      pingpongCurrentStreak: pingpongPlayer?.currentStreak ?? 0,
+      pingpongBestStreak: pingpongPlayer?.bestStreak ?? 0,
+      // Conservative score, same convention as competitorRating: a high rating
+      // with a wide deviation should not unlock a rating milestone.
+      pingpongRating: pingpongPlayer
+        ? pingpongPlayer.rating - 2 * pingpongPlayer.rd
+        : 0,
+      pingpongDistinctOpponents: pingpongPlayer?.distinctOpponents21d ?? 0,
+      pingpongDiversityScore: pingpongPlayer?.diversityScore21d ?? 0,
     };
   }
 

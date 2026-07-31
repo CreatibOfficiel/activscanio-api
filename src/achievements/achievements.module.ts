@@ -16,6 +16,7 @@ import { StreakWarningService } from './services/streak-warning.service';
 import { AchievementsController } from './achievements.controller';
 import { User } from '../users/user.entity';
 import { Competitor } from '../competitors/competitor.entity';
+import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -29,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       LevelReward,
       User,
       Competitor,
+      PingpongPlayer,
     ]),
     UsersModule,
     NotificationsModule,

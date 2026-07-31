@@ -39,6 +39,20 @@ export interface UserStats {
   competitorBestPlayStreak: number;
   competitorRating: number;
   competitorAvgRank12: number;
+
+  // Ping-pong stats. Prefixed because the metric namespace is flat and global:
+  // an unprefixed `wins` would answer for racing achievements too.
+  isPingpongPlayer: boolean;
+  pingpongMatchCount: number;
+  pingpongWeightedMatchCount: number;
+  pingpongWins: number;
+  pingpongLosses: number;
+  pingpongSetsWon: number;
+  pingpongCurrentStreak: number;
+  pingpongBestStreak: number;
+  pingpongRating: number;
+  pingpongDistinctOpponents: number;
+  pingpongDiversityScore: number;
 }
 
 /**

@@ -14,6 +14,7 @@ import { UserAchievement } from '../../entities/user-achievement.entity';
 import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
+import { PingpongPlayer } from '../../../pingpong/entities/pingpong-player.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { XPLevelService } from '../xp-level.service';
@@ -49,7 +50,7 @@ describe('AchievementCalculatorService', () => {
       chainName: null,
       isTemporary: false,
       canBeLost: false,
-      domain: AchievementDomain.BETTING,
+      domain: AchievementDomain.RACING,
       condition: { ...mockCondition, value: 1 },
     },
     {
@@ -65,7 +66,7 @@ describe('AchievementCalculatorService', () => {
       chainName: 'participation_chain',
       isTemporary: false,
       canBeLost: false,
-      domain: AchievementDomain.BETTING,
+      domain: AchievementDomain.RACING,
       condition: { ...mockCondition, value: 5 },
     },
     {
@@ -81,7 +82,7 @@ describe('AchievementCalculatorService', () => {
       chainName: 'participation_chain',
       isTemporary: false,
       canBeLost: false,
-      domain: AchievementDomain.BETTING,
+      domain: AchievementDomain.RACING,
       condition: { ...mockCondition, value: 20 },
     },
   ];
@@ -120,6 +121,12 @@ describe('AchievementCalculatorService', () => {
         },
         {
           provide: getRepositoryToken(Competitor),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: getRepositoryToken(PingpongPlayer),
           useValue: {
             findOne: jest.fn().mockResolvedValue(null),
           },
