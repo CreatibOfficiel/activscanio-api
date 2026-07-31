@@ -39,6 +39,10 @@ import { CompetitorMonthlyStats } from '../competitors/entities/competitor-month
 import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { SeasonsService } from '../seasons/seasons.service';
+import { PingpongDecayService } from '../pingpong/services/pingpong-decay.service';
+import { PingpongRankSnapshotService } from '../pingpong/services/pingpong-rank-snapshot.service';
+import { PingpongEligibilityService } from '../pingpong/services/pingpong-eligibility.service';
+import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
 import { StreakTrackerService } from '../achievements/services/streak-tracker.service';
 import { StreakWarningService } from '../achievements/services/streak-warning.service';
 import {
@@ -49,7 +53,7 @@ import {
   CRON_SCHEDULES,
   TASK_EXECUTION_CONFIG,
   TASK_DESCRIPTIONS,
-  } from './config/tasks.config';
+} from './config/tasks.config';
 
 @Injectable()
 export class TasksService {
@@ -77,6 +81,11 @@ export class TasksService {
     private readonly competitorRepo: CompetitorRepository,
     private readonly competitorEloSnapshotRepo: CompetitorEloSnapshotRepository,
     private readonly seasonsService: SeasonsService,
+    private readonly pingpongDecayService: PingpongDecayService,
+    private readonly pingpongRankSnapshotService: PingpongRankSnapshotService,
+    private readonly pingpongEligibilityService: PingpongEligibilityService,
+    @InjectRepository(PingpongPlayer)
+    private readonly pingpongPlayerRepository: Repository<PingpongPlayer>,
     private readonly streakTrackerService: StreakTrackerService,
     private readonly streakWarningService: StreakWarningService,
     @InjectRepository(Competitor)
@@ -116,7 +125,10 @@ export class TasksService {
       currentWeekNumber,
       currentYear,
     );
-    const prev = SeasonUtils.getPreviousSeason(currentSeasonNumber, currentYear);
+    const prev = SeasonUtils.getPreviousSeason(
+      currentSeasonNumber,
+      currentYear,
+    );
 
     this.logger.log(
       `🔄 Season transition: season ${prev.seasonNumber}/${prev.year} → season ${currentSeasonNumber}/${currentYear}`,
@@ -277,7 +289,9 @@ export class TasksService {
 
     try {
       const warned =
-        await this.streakWarningService.checkParticipationStreakWarnings('urgent');
+        await this.streakWarningService.checkParticipationStreakWarnings(
+          'urgent',
+        );
       this.logger.log(`✅ Betting streak warning: ${warned} users warned`);
     } catch (error) {
       this.logger.error(
@@ -427,6 +441,158 @@ export class TasksService {
     } catch (error) {
       this.logger.error(`Retry ${attempt} failed: ${error.message}`);
       await this.retryTask(task, attempt + 1);
+    }
+  }
+
+  /* ==================== PING-PONG TASKS ==================== */
+
+  /**
+   * Widen the deviation of ping-pong players who have not played in a week.
+   *
+   * The service does this in a single atomic UPDATE guarded by lastDecayAt,
+   * so a double run cannot double the decay. The task lock below is a second
+   * barrier, not the only one.
+   */
+  @Cron(CRON_SCHEDULES.PINGPONG_RD_DECAY, {
+    name: 'pingpong-rd-decay',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handlePingpongRdDecay(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongRdDecay) {
+      this.logger.warn('Task "pingpong-rd-decay" is disabled');
+      return;
+    }
+    if (!this.acquireTaskLock('pingpong-rd-decay')) return;
+
+    this.logger.log(`🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongRdDecay}`);
+
+    try {
+      const count = await this.pingpongDecayService.runDecay();
+      this.logger.log(`✅ Ping-pong decay applied to ${count} players`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Ping-pong decay failed: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.releaseTaskLock('pingpong-rd-decay');
+    }
+  }
+
+  /**
+   * Record where each ping-pong player stood at the start of the week.
+   *
+   * Feeds the leaderboard's movement indicator. Weekly on purpose: a daily
+   * delta in a pool this size is mostly noise, and an arrow presents it as
+   * signal.
+   */
+  @Cron(CRON_SCHEDULES.PINGPONG_WEEKLY_RANKS, {
+    name: 'pingpong-weekly-ranks',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handlePingpongWeeklyRanks(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongWeeklyRanks) {
+      this.logger.warn('Task "pingpong-weekly-ranks" is disabled');
+      return;
+    }
+    if (!this.acquireTaskLock('pingpong-weekly-ranks')) return;
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongWeeklyRanks}`,
+    );
+
+    try {
+      const count = await this.pingpongRankSnapshotService.captureWeeklyRanks();
+      this.logger.log(
+        `✅ Weekly ping-pong ranks captured for ${count} players`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Weekly ping-pong rank capture failed: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.releaseTaskLock('pingpong-weekly-ranks');
+    }
+  }
+
+  /**
+   * Snapshot ping-pong ratings for the history chart.
+   * Idempotent: the (player, date) unique key turns a repeat into an upsert.
+   */
+  @Cron(CRON_SCHEDULES.PINGPONG_SNAPSHOT_ELO, {
+    name: 'pingpong-snapshot-elo',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handlePingpongSnapshotElo(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongSnapshotElo) {
+      this.logger.warn('Task "pingpong-snapshot-elo" is disabled');
+      return;
+    }
+    if (!this.acquireTaskLock('pingpong-snapshot-elo')) return;
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongSnapshotElo}`,
+    );
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await this.pingpongPlayerRepository.query(
+        `
+        INSERT INTO "pingpong_elo_snapshots"
+          ("playerId", "date", "rating", "rd", "vol", "matchCount")
+        SELECT "id", $1, "rating", "rd", "vol", "matchCount"
+        FROM "pingpong_players"
+        ON CONFLICT ("playerId", "date") DO UPDATE
+        SET "rating" = EXCLUDED."rating",
+            "rd" = EXCLUDED."rd",
+            "vol" = EXCLUDED."vol",
+            "matchCount" = EXCLUDED."matchCount"
+        `,
+        [today],
+      );
+      this.logger.log('✅ Ping-pong ELO snapshot done');
+    } catch (error) {
+      this.logger.error(
+        `❌ Ping-pong snapshot failed: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.releaseTaskLock('pingpong-snapshot-elo');
+    }
+  }
+
+  /**
+   * Recompute ranking eligibility over the rolling 21-day window.
+   *
+   * Runs daily rather than after each match: a player can fall out of
+   * eligibility through the passage of time alone, with no match to trigger it.
+   */
+  @Cron(CRON_SCHEDULES.PINGPONG_REFRESH_ELIGIBILITY, {
+    name: 'pingpong-refresh-eligibility',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handlePingpongRefreshEligibility(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongRefreshEligibility) {
+      this.logger.warn('Task "pingpong-refresh-eligibility" is disabled');
+      return;
+    }
+    if (!this.acquireTaskLock('pingpong-refresh-eligibility')) return;
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongRefreshEligibility}`,
+    );
+
+    try {
+      const count = await this.pingpongEligibilityService.refreshEligibility();
+      this.logger.log(`✅ Eligibility refreshed for ${count} players`);
+    } catch (error) {
+      this.logger.error(
+        `❌ Eligibility refresh failed: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.releaseTaskLock('pingpong-refresh-eligibility');
     }
   }
 }

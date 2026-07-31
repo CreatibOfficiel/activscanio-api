@@ -51,7 +51,7 @@ export class AchievementSeedService {
               condition: definition.condition,
               domain:
                 (definition as { domain?: AchievementDomain }).domain ||
-                AchievementDomain.BETTING,
+                AchievementDomain.RACING,
             },
           );
           updatedCount++;

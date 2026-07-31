@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -10,6 +9,11 @@ import { UserAchievement } from '../../entities/user-achievement.entity';
 import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
+import { PingpongPlayer } from '../../../pingpong/entities/pingpong-player.entity';
+import {
+  PingpongHighlightStatsService,
+  EMPTY_HIGHLIGHT_STATS,
+} from '../../../pingpong/services/pingpong-highlight-stats.service';
 
 /**
  * Racing metrics that must survive the betting removal.
@@ -33,31 +37,6 @@ describe('AchievementCalculatorService — racing metrics', () => {
   const COMPETITOR_ID = 'competitor-1';
 
   /** Query builder stub returning nothing, for the betting aggregates. */
-  function emptyQueryBuilder() {
-    const qb: Record<string, jest.Mock> = {};
-    for (const method of [
-      'select',
-      'addSelect',
-      'from',
-      'innerJoin',
-      'leftJoin',
-      'leftJoinAndSelect',
-      'where',
-      'andWhere',
-      'groupBy',
-      'addGroupBy',
-      'having',
-      'orderBy',
-      'addOrderBy',
-      'limit',
-    ]) {
-      qb[method] = jest.fn(() => qb);
-    }
-    qb.getRawOne = jest.fn().mockResolvedValue(null);
-    qb.getRawMany = jest.fn().mockResolvedValue([]);
-    qb.getMany = jest.fn().mockResolvedValue([]);
-    return qb;
-  }
 
   /** An achievement gated on a single numeric metric. */
   function racingAchievement(key: string, metric: string, value: number) {
@@ -111,6 +90,16 @@ describe('AchievementCalculatorService — racing metrics', () => {
           useValue: { findOne: jest.fn() },
         },
         {
+          provide: getRepositoryToken(PingpongPlayer),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: PingpongHighlightStatsService,
+          useValue: {
+            computeFor: jest.fn().mockResolvedValue(EMPTY_HIGHLIGHT_STATS),
+          },
+        },
+        {
           provide: XPLevelService,
           useValue: { awardXP: jest.fn().mockResolvedValue(undefined) },
         },
@@ -154,7 +143,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
     results.map((r) => r.achievementKey);
 
   it('unlocks on competitorTotalWins', async () => {
-    await buildService([racingAchievement('five_wins', 'competitorTotalWins', 5)]);
+    await buildService([
+      racingAchievement('five_wins', 'competitorTotalWins', 5),
+    ]);
     withCompetitor({ totalWins: 5 });
 
     const unlocked = await service.checkAchievements(USER_ID);
@@ -163,7 +154,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
   });
 
   it('stays locked when competitorTotalWins is short', async () => {
-    await buildService([racingAchievement('five_wins', 'competitorTotalWins', 5)]);
+    await buildService([
+      racingAchievement('five_wins', 'competitorTotalWins', 5),
+    ]);
     withCompetitor({ totalWins: 4 });
 
     const unlocked = await service.checkAchievements(USER_ID);
@@ -172,7 +165,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
   });
 
   it('unlocks on competitorRaceCount', async () => {
-    await buildService([racingAchievement('ten_races', 'competitorRaceCount', 10)]);
+    await buildService([
+      racingAchievement('ten_races', 'competitorRaceCount', 10),
+    ]);
     withCompetitor({ raceCount: 12 });
 
     const unlocked = await service.checkAchievements(USER_ID);
@@ -181,7 +176,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
   });
 
   it('unlocks on competitorWinStreak', async () => {
-    await buildService([racingAchievement('streak_3', 'competitorWinStreak', 3)]);
+    await buildService([
+      racingAchievement('streak_3', 'competitorWinStreak', 3),
+    ]);
     withCompetitor({ winStreak: 3 });
 
     const unlocked = await service.checkAchievements(USER_ID);
@@ -212,7 +209,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
   });
 
   it('scores competitorRating on the conservative score, not the raw rating', async () => {
-    await buildService([racingAchievement('elo_1600', 'competitorRating', 1600)]);
+    await buildService([
+      racingAchievement('elo_1600', 'competitorRating', 1600),
+    ]);
     // rating 1700 with rd 60 gives 1700 - 2*60 = 1580, which is below 1600.
     withCompetitor({ rating: 1700, rd: 60 });
 
@@ -222,7 +221,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
   });
 
   it('unlocks competitorRating once the conservative score clears the bar', async () => {
-    await buildService([racingAchievement('elo_1600', 'competitorRating', 1600)]);
+    await buildService([
+      racingAchievement('elo_1600', 'competitorRating', 1600),
+    ]);
     // rating 1750 with rd 50 gives 1650.
     withCompetitor({ rating: 1750, rd: 50 });
 
@@ -232,7 +233,9 @@ describe('AchievementCalculatorService — racing metrics', () => {
   });
 
   it('skips racing achievements for a user with no competitor', async () => {
-    await buildService([racingAchievement('five_wins', 'competitorTotalWins', 5)]);
+    await buildService([
+      racingAchievement('five_wins', 'competitorTotalWins', 5),
+    ]);
     jest
       .spyOn(userRepository, 'findOne')
       .mockResolvedValue({ id: USER_ID, competitorId: null } as User);

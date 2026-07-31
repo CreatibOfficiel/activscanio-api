@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { typedQuery } from './utils/typed-query';
 
 export class AddPlayStreakFields1771200000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -38,13 +39,15 @@ export class AddPlayStreakFields1771200000000 implements MigrationInterface {
    */
   private async backfillStreaks(queryRunner: QueryRunner): Promise<void> {
     // Get all competitors
-    const competitors: { id: string }[] = await queryRunner.query(
+    const competitors = await typedQuery<{ id: string }>(
+      queryRunner,
       `SELECT id FROM "competitors"`,
     );
 
     for (const comp of competitors) {
       // Get distinct race dates for this competitor, ordered ASC
-      const raceDates: { date: string }[] = await queryRunner.query(
+      const raceDates = await typedQuery<{ date: string }>(
+        queryRunner,
         `SELECT DISTINCT r."date"::date as date
          FROM "race_results" rr
          JOIN "races" r ON r."id" = rr."raceId"

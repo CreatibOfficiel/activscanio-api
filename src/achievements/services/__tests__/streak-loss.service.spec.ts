@@ -16,6 +16,9 @@ import { Competitor } from '../../../competitors/competitor.entity';
  * streak. Deleting them with the betting module would break the play-streak
  * modal for every player, so they live here now.
  */
+/** `expect.any()` is typed as `any` upstream; narrow it once here. */
+const anyDate = (): Date => expect.any(Date) as Date;
+
 describe('StreakTrackerService — streak losses', () => {
   let service: StreakTrackerService;
   let userStreakRepository: Repository<UserStreak>;
@@ -64,7 +67,7 @@ describe('StreakTrackerService — streak losses', () => {
 
       const result = await service.getUnseenStreakLosses(USER_ID);
 
-      expect(result.bettingStreakLoss).toEqual({ lostValue: 5, lostAt });
+      expect(result.participationStreakLoss).toEqual({ lostValue: 5, lostAt });
       expect(result.playStreakLoss).toBeNull();
     });
 
@@ -79,15 +82,16 @@ describe('StreakTrackerService — streak losses', () => {
 
       const result = await service.getUnseenStreakLosses(USER_ID);
 
-      expect(result.bettingStreakLoss).toBeNull();
+      expect(result.participationStreakLoss).toBeNull();
     });
 
     it('reports an unseen play streak loss from the linked competitor', async () => {
       const lostAt = new Date('2026-07-02T10:00:00Z');
       jest.spyOn(userStreakRepository, 'findOne').mockResolvedValue(null);
-      jest
-        .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: USER_ID, competitorId: COMPETITOR_ID } as User);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: USER_ID,
+        competitorId: COMPETITOR_ID,
+      } as User);
       jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
         id: COMPETITOR_ID,
         playStreakLostValue: 3,
@@ -107,9 +111,10 @@ describe('StreakTrackerService — streak losses', () => {
 
     it('returns an empty missedDays list when none are recorded', async () => {
       jest.spyOn(userStreakRepository, 'findOne').mockResolvedValue(null);
-      jest
-        .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: USER_ID, competitorId: COMPETITOR_ID } as User);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: USER_ID,
+        competitorId: COMPETITOR_ID,
+      } as User);
       jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
         id: COMPETITOR_ID,
         playStreakLostValue: 2,
@@ -142,7 +147,7 @@ describe('StreakTrackerService — streak losses', () => {
       const result = await service.getUnseenStreakLosses(USER_ID);
 
       expect(result).toEqual({
-        bettingStreakLoss: null,
+        participationStreakLoss: null,
         playStreakLoss: null,
       });
     });
@@ -150,21 +155,22 @@ describe('StreakTrackerService — streak losses', () => {
 
   describe('markStreakLossesSeen', () => {
     it('stamps both the participation streak and the competitor play streak', async () => {
-      jest
-        .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: USER_ID, competitorId: COMPETITOR_ID } as User);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: USER_ID,
+        competitorId: COMPETITOR_ID,
+      } as User);
 
       await service.markStreakLossesSeen(USER_ID);
 
       expect(userStreakRepository.update).toHaveBeenCalledWith(
         { userId: USER_ID },
         expect.objectContaining({
-          participationStreakLossSeenAt: expect.any(Date),
+          participationStreakLossSeenAt: anyDate(),
         }),
       );
       expect(competitorRepository.update).toHaveBeenCalledWith(
         COMPETITOR_ID,
-        expect.objectContaining({ playStreakLossSeenAt: expect.any(Date) }),
+        expect.objectContaining({ playStreakLossSeenAt: anyDate() }),
       );
     });
 

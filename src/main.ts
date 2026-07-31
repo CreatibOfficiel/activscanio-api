@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter, AllExceptionsFilter } from './common/filters';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -10,6 +11,29 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+
+  /**
+   * Run the class-validator decorators on request bodies.
+   *
+   * Without this pipe none of them execute — every @IsEnum, @Min and
+   * @ArrayMaxSize in the codebase was decorative, and a client could post a
+   * match with forty sets or an invented sport preference.
+   *
+   * `whitelist` is deliberately OFF. It strips undeclared properties, and
+   * five existing input DTOs carry no decorators at all (the character and
+   * base-character ones, plus UpdateUserDto) — turning it on would empty
+   * their bodies and break those endpoints silently. Enabling it means
+   * annotating those DTOs first.
+   *
+   * `transform` is on so @Type(() => SetScoreDto) actually builds nested
+   * instances; without it, nested validation never runs.
+   */
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      forbidUnknownValues: false,
+    }),
+  );
 
   // Register global exception filters
   // Order matters: HttpExceptionFilter catches HttpException, AllExceptionsFilter catches everything else

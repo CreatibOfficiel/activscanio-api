@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { typedQuery } from './utils/typed-query';
 
 /**
  * Fix race_results.competitorId:
@@ -15,14 +16,17 @@ export class FixRaceResultsCompetitorIdType1770600000001
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Step 1: Verify all existing values are valid UUIDs that exist in competitors
-    const orphans = await queryRunner.query(`
+    const orphans = await typedQuery<{ id: string; competitorId: string }>(
+      queryRunner,
+      `
       SELECT rr.id, rr."competitorId"
       FROM race_results rr
       WHERE NOT EXISTS (
         SELECT 1 FROM competitors c WHERE c.id::text = rr."competitorId"
       )
       LIMIT 5
-    `);
+    `,
+    );
 
     if (orphans.length > 0) {
       throw new Error(

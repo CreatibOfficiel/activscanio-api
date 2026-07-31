@@ -3,7 +3,6 @@ import { Logger } from '@nestjs/common';
 import { SeasonArchive } from 'src/seasons/entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from 'src/seasons/entities/archived-competitor-ranking.entity';
 import { Competitor } from 'src/competitors/competitor.entity';
-import { User, UserRole } from 'src/users/user.entity';
 import { seededRandom, subtractMonths } from '../utils/seed-helpers';
 
 const logger = new Logger('SeasonSeed');
@@ -18,7 +17,6 @@ export async function seedSeasonArchives(
     ArchivedCompetitorRanking,
   );
   const competitorRepository = dataSource.getRepository(Competitor);
-  const userRepository = dataSource.getRepository(User);
 
   // Check if we already have archives
   const existingCount = await seasonArchiveRepository.count();
@@ -30,10 +28,6 @@ export async function seedSeasonArchives(
   }
 
   const competitors = await competitorRepository.find();
-  const users = await userRepository.find({
-    where: [{ role: UserRole.BETTOR }, { role: UserRole.PLAYER }],
-  });
-
   if (competitors.length === 0) {
     logger.warn('⚠️ No competitors found. Please seed competitors first.');
     return [];
@@ -77,12 +71,7 @@ export async function seedSeasonArchives(
       Math.floor(competitors.length * 0.7),
       competitors.length,
     );
-    archive.totalBettors = seededRandom.int(
-      Math.floor(users.length * 0.6),
-      users.length,
-    );
     archive.totalRaces = seededRandom.int(15, 30);
-    archive.totalBets = seededRandom.int(30, 80);
 
     archivesToCreate.push(archive);
   }

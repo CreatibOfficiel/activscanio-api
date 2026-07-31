@@ -35,7 +35,6 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
     return [];
   }
 
-
   const racesToCreate: RaceEvent[] = [];
   const resultsToCreate: RaceResult[] = [];
 

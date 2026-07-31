@@ -7,11 +7,14 @@ import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { CompetitorsModule } from '../competitors/competitors.module';
 import { SeasonsModule } from '../seasons/seasons.module';
+import { PingpongModule } from '../pingpong/pingpong.module';
+import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
 import { AchievementsModule } from '../achievements/achievements.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      PingpongPlayer,
       Competitor,
       CompetitorMonthlyStats,
       RaceResult,
@@ -19,6 +22,7 @@ import { AchievementsModule } from '../achievements/achievements.module';
     ]),
     CompetitorsModule,
     SeasonsModule,
+    PingpongModule,
     AchievementsModule,
   ],
   providers: [TasksService],

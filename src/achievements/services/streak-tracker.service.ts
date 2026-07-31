@@ -4,11 +4,23 @@ import { MoreThan, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
 import { Competitor } from '../../competitors/competitor.entity';
-import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+/**
+ * Streak losses the user has not been shown yet.
+ *
+ * These key names are a wire contract: the frontend reads them straight off
+ * the JSON and casts, so TypeScript never checks the two sides agree. This
+ * interface once carried the betting-era name while the client read
+ * `participationStreakLoss`, which meant the loss modal silently never
+ * appeared — no error anywhere, just a feature that quietly did nothing.
+ *
+ * Renaming either side alone reintroduces that. The column behind it was
+ * already renamed to participationStreakLossSeenAt by the betting-removal
+ * migration; only this output key had been left behind.
+ */
 export interface UnseenStreakLosses {
-  bettingStreakLoss: { lostValue: number; lostAt: Date } | null;
+  participationStreakLoss: { lostValue: number; lostAt: Date } | null;
   playStreakLoss: {
     lostValue: number;
     lostAt: Date;
@@ -43,13 +55,14 @@ export class StreakTrackerService {
       where: { userId },
     });
 
-    let bettingStreakLoss: { lostValue: number; lostAt: Date } | null = null;
+    let participationStreakLoss: { lostValue: number; lostAt: Date } | null =
+      null;
     if (
       userStreak?.participationStreakLostValue &&
       userStreak.participationStreakLostAt &&
       !userStreak.participationStreakLossSeenAt
     ) {
-      bettingStreakLoss = {
+      participationStreakLoss = {
         lostValue: userStreak.participationStreakLostValue,
         lostAt: userStreak.participationStreakLostAt,
       };
@@ -78,7 +91,7 @@ export class StreakTrackerService {
       }
     }
 
-    return { bettingStreakLoss, playStreakLoss };
+    return { participationStreakLoss, playStreakLoss };
   }
 
   /** Mark both streak losses as seen, so their modal stops reappearing. */
@@ -163,7 +176,8 @@ export class StreakTrackerService {
         );
 
         // Track the lost streak for notification
-        userStreak.participationStreakLostValue = userStreak.currentMonthlyStreak;
+        userStreak.participationStreakLostValue =
+          userStreak.currentMonthlyStreak;
         userStreak.participationStreakLostAt = new Date();
         userStreak.participationStreakLossSeenAt = null;
 

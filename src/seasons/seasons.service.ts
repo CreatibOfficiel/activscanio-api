@@ -3,10 +3,32 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, QueryRunner, Between } from 'typeorm';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';
+import { ArchivedPingpongRanking } from './entities/archived-pingpong-ranking.entity';
 import { Competitor } from '../competitors/competitor.entity';
+import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
+import { PingpongMatch } from '../pingpong/entities/pingpong-match.entity';
 import { RaceEvent } from '../races/race-event.entity';
 import { SeasonUtils } from '../common/utils/season-utils';
 import { WeekUtils } from '../common/utils/week-utils';
+
+/**
+ * A raw row holding a name and one numeric column.
+ *
+ * Postgres returns aggregates and bigints as STRINGS through the driver, so
+ * the numeric field is typed as `string | number` and every read goes through
+ * `Number()`. Comparing the raw value would work by coercion today and break
+ * silently the day a column changes type.
+ */
+type RawNamedCount<K extends string> = {
+  competitorName: string;
+} & Record<K, string | number>;
+
+/** One row of the perfect-race aggregate. */
+interface RawBestScorer {
+  competitorName: string;
+  maxScore: string | number;
+  perfectCount: string | number;
+}
 
 export interface SeasonHighlights {
   longestWinStreak: { competitorName: string; streak: number } | null;
@@ -25,6 +47,8 @@ export class SeasonsService {
     private readonly seasonArchiveRepository: Repository<SeasonArchive>,
     @InjectRepository(ArchivedCompetitorRanking)
     private readonly archivedCompetitorRankingRepository: Repository<ArchivedCompetitorRanking>,
+    @InjectRepository(ArchivedPingpongRanking)
+    private readonly archivedPingpongRankingRepository: Repository<ArchivedPingpongRanking>,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
   ) {}
@@ -64,6 +88,19 @@ export class SeasonsService {
         where: { date: Between(startDate, endDate) },
       });
 
+      // Ping-pong runs its own season on the same calendar, with its own
+      // rating scale. Gathered inside the same transaction so a season is
+      // never archived for one sport and not the other.
+      const pingpongPlayers = await queryRunner.manager.find(PingpongPlayer, {
+        // The archive stores a denormalised name, so the competitor has to be
+        // loaded here — it will not be reachable once the account is gone.
+        relations: ['competitor'],
+      });
+      const totalPingpongMatches = await queryRunner.manager.count(
+        PingpongMatch,
+        { where: { playedAt: Between(startDate, endDate) } },
+      );
+
       // Create season archive
       const archive = queryRunner.manager.create(SeasonArchive, {
         month: seasonNumber, // backward compat
@@ -73,9 +110,9 @@ export class SeasonsService {
         startDate,
         endDate,
         totalCompetitors: activeCompetitors.length,
-        totalBettors: 0,
         totalRaces,
-        totalBets: 0,
+        totalPingpongPlayers: pingpongPlayers.length,
+        totalPingpongMatches,
       });
 
       await queryRunner.manager.save(archive);
@@ -85,6 +122,12 @@ export class SeasonsService {
         queryRunner,
         archive,
         competitors,
+      );
+
+      await this.archivePingpongRankingsInTransaction(
+        queryRunner,
+        archive,
+        pingpongPlayers,
       );
 
       await queryRunner.commitTransaction();
@@ -104,6 +147,101 @@ export class SeasonsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Archive ping-pong standings for the season (within transaction).
+   *
+   * Mirrors the competitor archive: everyone is written down, but only
+   * players eligible for the ranking carry a rank. Dropping the others would
+   * make the archive misreport who was around that season, so they are stored
+   * with `rank: null` and `provisional: true` — the same convention already
+   * used for calibrating racers.
+   */
+  private async archivePingpongRankingsInTransaction(
+    queryRunner: QueryRunner,
+    archive: SeasonArchive,
+    players: PingpongPlayer[],
+  ): Promise<void> {
+    const withScore = players.map((player) => ({
+      player,
+      // Conservative score, as everywhere else: a high rating with a wide
+      // deviation should not outrank a proven one.
+      score: player.rating - 2 * player.rd,
+    }));
+
+    const ranked = withScore
+      .filter((p) => p.player.isRankingEligible)
+      .sort((a, b) => b.score - a.score);
+    const unranked = withScore
+      .filter((p) => !p.player.isRankingEligible)
+      .sort((a, b) => b.score - a.score);
+
+    // Ties share a rank, and the next rank skips accordingly (1, 1, 3).
+    const ranks: number[] = [];
+    let currentRank = 1;
+    for (let i = 0; i < ranked.length; i++) {
+      if (i > 0 && ranked[i].score < ranked[i - 1].score) {
+        currentRank = i + 1;
+      }
+      ranks.push(currentRank);
+    }
+
+    const toRow = (
+      player: PingpongPlayer,
+      rank: number | null,
+    ): ArchivedPingpongRanking =>
+      queryRunner.manager.create(ArchivedPingpongRanking, {
+        seasonArchiveId: archive.id,
+        playerId: player.id,
+        playerName: this.getPingpongPlayerName(player),
+        rank,
+        provisional: rank === null,
+        finalRating: player.rating,
+        finalRd: player.rd,
+        finalVol: player.vol,
+        totalMatches: player.matchCount,
+        wins: player.wins,
+        losses: player.losses,
+        setsWon: player.setsWon,
+        setsLost: player.setsLost,
+        bestStreak: player.bestStreak,
+      });
+
+    const BATCH_SIZE = 100;
+
+    for (let i = 0; i < ranked.length; i += BATCH_SIZE) {
+      const rows = ranked
+        .slice(i, i + BATCH_SIZE)
+        .map((item, batchIndex) => toRow(item.player, ranks[i + batchIndex]));
+      await queryRunner.manager.save(rows);
+    }
+
+    for (let i = 0; i < unranked.length; i += BATCH_SIZE) {
+      const rows = unranked
+        .slice(i, i + BATCH_SIZE)
+        .map((item) => toRow(item.player, null));
+      await queryRunner.manager.save(rows);
+    }
+
+    this.logger.log(
+      `Archived ${ranked.length} ranked + ${unranked.length} unranked ping-pong players for season ${archive.seasonNumber}/${archive.year}`,
+    );
+  }
+
+  /**
+   * Denormalised display name for the archive.
+   *
+   * The player row carries only a competitorId, and the relation may not be
+   * loaded — so fall back to the id rather than writing "undefined undefined"
+   * into a record meant to outlive the account.
+   */
+  private getPingpongPlayerName(player: PingpongPlayer): string {
+    const competitor = player.competitor;
+    if (competitor?.firstName || competitor?.lastName) {
+      return `${competitor.firstName ?? ''} ${competitor.lastName ?? ''}`.trim();
+    }
+    return player.competitorId;
   }
 
   /**
@@ -243,6 +381,19 @@ export class SeasonsService {
    * Get competitor rankings for a season, enriched with profile pictures
    * and character images from the live competitor data
    */
+  /**
+   * Ping-pong standings for an archived season.
+   *
+   * Ranked players first, then the unranked ones by rating — Postgres sorts
+   * NULLs last on ASC by default, which is the order we want anyway.
+   */
+  async getPingpongRankings(seasonId: string) {
+    return this.archivedPingpongRankingRepository.find({
+      where: { seasonArchiveId: seasonId },
+      order: { rank: 'ASC', finalRating: 'DESC' },
+    });
+  }
+
   async getCompetitorRankings(seasonId: string) {
     const rankings = await this.archivedCompetitorRankingRepository.find({
       where: { seasonArchiveId: seasonId },
@@ -289,9 +440,9 @@ export class SeasonsService {
         .where('acr.seasonArchiveId = :seasonId', { seasonId: season.id })
         .orderBy('acr.winStreak', 'DESC')
         .limit(1)
-        .getRawOne();
+        .getRawOne<RawNamedCount<'streak'>>();
 
-      if (longestWinStreakRaw && longestWinStreakRaw.streak > 0) {
+      if (longestWinStreakRaw && Number(longestWinStreakRaw.streak) > 0) {
         longestWinStreak = {
           competitorName: longestWinStreakRaw.competitorName,
           streak: Number(longestWinStreakRaw.streak),
@@ -308,9 +459,9 @@ export class SeasonsService {
         .where('acr.seasonArchiveId = :seasonId', { seasonId: season.id })
         .orderBy('acr.totalRaces', 'DESC')
         .limit(1)
-        .getRawOne();
+        .getRawOne<RawNamedCount<'count'>>();
 
-      if (mostRacesRaw && mostRacesRaw.count > 0) {
+      if (mostRacesRaw && Number(mostRacesRaw.count) > 0) {
         mostRaces = {
           competitorName: mostRacesRaw.competitorName,
           count: Number(mostRacesRaw.count),
@@ -339,9 +490,9 @@ export class SeasonsService {
         .groupBy('c.id, c."firstName", c."lastName"')
         .having('MAX(rr.score) = 60')
         .orderBy('"perfectCount"', 'DESC')
-        .getRawMany();
+        .getRawMany<RawBestScorer>();
 
-      if (bestRaceScorersRaw?.length > 0) {
+      if (bestRaceScorersRaw.length > 0) {
         bestRaceScorers = bestRaceScorersRaw.map((r) => ({
           competitorName: r.competitorName,
           maxScore: Number(r.maxScore),

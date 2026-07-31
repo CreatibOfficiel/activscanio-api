@@ -6,15 +6,29 @@ import {
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
-  OneToMany,
   Index,
 } from 'typeorm';
 import { Competitor } from '../competitors/competitor.entity';
 
 export enum UserRole {
   PENDING = 'pending', // New user, onboarding not completed
-  BETTOR = 'bettor', // Bettor only (watches and bets, doesn't compete)
-  PLAYER = 'player', // Player (competes, and can also bet)
+  BETTOR = 'bettor', // Legacy: watched without competing. Kept so existing
+  // rows still load; new users never get it.
+  PLAYER = 'player', // Player (competes)
+}
+
+/**
+ * Which sport a user follows.
+ *
+ * Deliberately a separate column from `role`, which already carries three
+ * overlapping meanings — onboarding stage, competitor status, and a legacy
+ * betting distinction. Overloading it with a fourth would make every read of
+ * it ambiguous.
+ */
+export enum SportPreference {
+  MARIO_KART = 'mario-kart',
+  PINGPONG = 'ping-pong',
+  BOTH = 'both',
 }
 
 @Entity('users')
@@ -44,17 +58,21 @@ export class User {
   })
   role: UserRole;
 
+  /**
+   * Which leaderboards and entry forms this user sees.
+   *
+   * Defaults to BOTH rather than MARIO_KART: existing users predate the
+   * choice, and showing them a sport they can ignore is a smaller wrong than
+   * hiding one they already play.
+   */
+  @Column({
+    type: 'varchar',
+    default: SportPreference.BOTH,
+  })
+  sportPreference: SportPreference;
+
   @Column({ nullable: true })
   competitorId: string | null;
-
-  @Column({ type: 'int', nullable: true })
-  lastBoostUsedMonth: number | null;
-
-  @Column({ type: 'int', nullable: true })
-  lastBoostUsedYear: number | null;
-
-  @Column({ type: 'int', nullable: true })
-  lastBoostUsedSeason: number | null;
 
   // Gamification fields
   @Column({ type: 'int', default: 0 })

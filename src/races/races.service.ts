@@ -120,10 +120,7 @@ export class RacesService {
       }
 
       // Emit race.created event for other modules to react
-      this.eventEmitter.emit(
-        'race.created',
-        new RaceCreatedEvent(savedRace),
-      );
+      this.eventEmitter.emit('race.created', new RaceCreatedEvent(savedRace));
       this.logger.log(`Race created event emitted for race ${savedRace.id}`);
 
       return savedRace;

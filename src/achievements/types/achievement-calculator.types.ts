@@ -1,22 +1,7 @@
-/**
- * Context passed when a bet is finalized
- */
-export interface BetFinalizedContext {
-  userId: string;
-  betId: string;
-  weekId: string;
-  pointsEarned: number;
-  isPerfectPodium: boolean;
-  correctPicks: number;
-  totalPicks: number;
-  hasBoost: boolean;
-  highestOdd?: number;
-}
+import { PingpongHighlightStats } from '../../pingpong/services/pingpong-highlight-stats.service';
 
-/**
- * User statistics aggregated for achievement evaluation
- */
-export interface UserStats {
+/** Stats read straight off the user, competitor and ping-pong player rows. */
+export interface BaseUserStats {
   // Basic stats
   userId: string;
 
@@ -39,7 +24,29 @@ export interface UserStats {
   competitorBestPlayStreak: number;
   competitorRating: number;
   competitorAvgRank12: number;
+
+  // Ping-pong stats. Prefixed because the metric namespace is flat and global:
+  // an unprefixed `wins` would answer for racing achievements too.
+  isPingpongPlayer: boolean;
+  pingpongMatchCount: number;
+  pingpongWeightedMatchCount: number;
+  pingpongWins: number;
+  pingpongLosses: number;
+  pingpongSetsWon: number;
+  pingpongCurrentStreak: number;
+  pingpongBestStreak: number;
+  pingpongRating: number;
+  pingpongDistinctOpponents: number;
+  pingpongDiversityScore: number;
 }
+
+/**
+ * Everything the achievement engine can read about a user.
+ *
+ * The per-match tallies are spread in from the ping-pong module rather than
+ * restated here, so adding one there cannot leave this type behind.
+ */
+export type UserStats = BaseUserStats & PingpongHighlightStats;
 
 /**
  * Achievement unlock result

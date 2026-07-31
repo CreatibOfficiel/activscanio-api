@@ -105,9 +105,15 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
       .select('MAX(rr.score)', 'bestScore')
       .from('race_results', 'rr')
       .where('rr."competitorId" = :competitorId', { competitorId })
-      .getRawOne();
+      .getRawOne<{ bestScore: string | number | null }>();
 
-    return result?.bestScore ?? null;
+    // MAX() comes back as a string through the driver, and as null when the
+    // competitor has never raced. The declared return type is number | null,
+    // so convert rather than pass the raw value through.
+    if (result?.bestScore === null || result?.bestScore === undefined) {
+      return null;
+    }
+    return Number(result.bestScore);
   }
 
   /**
@@ -147,12 +153,13 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
       .groupBy('rr."competitorId"')
       .orderBy('"raceCount"', 'DESC')
       .limit(1)
-      .getRawOne();
+      .getRawOne<{ competitorId: string; raceCount: string | number }>();
 
     if (!result) return null;
     return {
       competitorId: result.competitorId,
-      raceCount: parseInt(result.raceCount, 10),
+      // COUNT(*) is a bigint, which the driver hands back as a string.
+      raceCount: Number(result.raceCount),
     };
   }
 

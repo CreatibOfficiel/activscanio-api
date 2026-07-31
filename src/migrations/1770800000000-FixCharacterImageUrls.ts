@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { typedQuery } from './utils/typed-query';
 
 /**
  * Fix character image URLs that point to non-existent files.
@@ -40,16 +40,20 @@ export class FixCharacterImageUrls1770800000000 implements MigrationInterface {
   }
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const baseCharacters = await queryRunner.query(`
+    const baseCharacters = await typedQuery<{ id: string; name: string }>(
+      queryRunner,
+      `
       SELECT bc.id, bc.name
       FROM base_characters bc
-    `);
+    `,
+    );
 
     for (const bc of baseCharacters) {
       const characterSlug = this.toSlug(bc.name);
       const hasSubfolder = this.CHARACTERS_WITH_SUBFOLDERS.has(characterSlug);
 
-      const variants = await queryRunner.query(
+      const variants = await typedQuery<{ id: string; label: string }>(
+        queryRunner,
         `SELECT id, label FROM character_variants WHERE "baseCharacterId" = $1 ORDER BY label`,
         [bc.id],
       );

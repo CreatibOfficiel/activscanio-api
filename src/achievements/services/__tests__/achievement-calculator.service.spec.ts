@@ -14,6 +14,11 @@ import { UserAchievement } from '../../entities/user-achievement.entity';
 import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
+import { PingpongPlayer } from '../../../pingpong/entities/pingpong-player.entity';
+import {
+  PingpongHighlightStatsService,
+  EMPTY_HIGHLIGHT_STATS,
+} from '../../../pingpong/services/pingpong-highlight-stats.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { XPLevelService } from '../xp-level.service';
@@ -26,7 +31,6 @@ describe('AchievementCalculatorService', () => {
   let xpLevelService: XPLevelService;
   let userRepository: Repository<User>;
   let competitorRepository: Repository<Competitor>;
-  let eventEmitter: EventEmitter2;
 
   const mockCondition = {
     type: AchievementConditionType.COUNT,
@@ -49,7 +53,7 @@ describe('AchievementCalculatorService', () => {
       chainName: null,
       isTemporary: false,
       canBeLost: false,
-      domain: AchievementDomain.BETTING,
+      domain: AchievementDomain.RACING,
       condition: { ...mockCondition, value: 1 },
     },
     {
@@ -65,7 +69,7 @@ describe('AchievementCalculatorService', () => {
       chainName: 'participation_chain',
       isTemporary: false,
       canBeLost: false,
-      domain: AchievementDomain.BETTING,
+      domain: AchievementDomain.RACING,
       condition: { ...mockCondition, value: 5 },
     },
     {
@@ -81,7 +85,7 @@ describe('AchievementCalculatorService', () => {
       chainName: 'participation_chain',
       isTemporary: false,
       canBeLost: false,
-      domain: AchievementDomain.BETTING,
+      domain: AchievementDomain.RACING,
       condition: { ...mockCondition, value: 20 },
     },
   ];
@@ -101,7 +105,7 @@ describe('AchievementCalculatorService', () => {
           useValue: {
             find: jest.fn().mockResolvedValue([]),
             save: jest.fn(),
-            create: jest.fn().mockImplementation((data) => data),
+            create: jest.fn().mockImplementation((data: unknown) => data),
           },
         },
         {
@@ -122,6 +126,18 @@ describe('AchievementCalculatorService', () => {
           provide: getRepositoryToken(Competitor),
           useValue: {
             findOne: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: getRepositoryToken(PingpongPlayer),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: PingpongHighlightStatsService,
+          useValue: {
+            computeFor: jest.fn().mockResolvedValue(EMPTY_HIGHLIGHT_STATS),
           },
         },
         {
@@ -153,7 +169,6 @@ describe('AchievementCalculatorService', () => {
       getRepositoryToken(Competitor),
     );
     xpLevelService = module.get<XPLevelService>(XPLevelService);
-    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
   });
 
   it('should be defined', () => {
@@ -256,7 +271,7 @@ describe('AchievementCalculatorService', () => {
       // The user races, so competitorRaceCount >= 1 is satisfied.
       jest
         .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: 'user-123', competitorId: 'comp-1' } as any);
+        .mockResolvedValue({ id: 'user-123', competitorId: 'comp-1' } as User);
       jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
         id: 'comp-1',
         rating: 1500,
@@ -268,7 +283,7 @@ describe('AchievementCalculatorService', () => {
         playStreak: 0,
         bestPlayStreak: 0,
         avgRank12: 0,
-      } as any);
+      } as Competitor);
 
       const result = await service.checkAchievements('user-123');
 
@@ -299,10 +314,12 @@ describe('AchievementCalculatorService', () => {
       // first_bet is already unlocked
       jest
         .spyOn(userAchievementRepository, 'find')
-        .mockImplementation((options: any) => {
+        .mockImplementation((options?: { select?: unknown }) => {
           if (options?.select) {
             // The "get achievement IDs" call
-            return Promise.resolve([{ achievementId: '1' }] as any);
+            return Promise.resolve([
+              { achievementId: '1' },
+            ] as UserAchievement[]);
           }
           // The "get with relations" call
           return Promise.resolve([
@@ -313,15 +330,6 @@ describe('AchievementCalculatorService', () => {
             },
           ] as any);
         });
-
-      const mockBet = {
-        id: 'bet-1',
-        userId: 'user-123',
-        isFinalized: true,
-        pointsEarned: 10,
-        createdAt: new Date(),
-        picks: [{ isCorrect: true, hasBoost: false, oddAtBet: 2 }],
-      };
 
       const result = await service.checkAchievements('user-123');
 

@@ -57,56 +57,6 @@ describe('ExportService', () => {
     },
   ];
 
-  const mockBets = [
-    {
-      id: 'bet-1',
-      userId: 'user-123',
-      createdAt: new Date('2024-01-10'),
-      isFinalized: true,
-      pointsEarned: 45,
-      bettingWeek: {
-        weekNumber: 1,
-        year: 2024,
-      },
-    },
-    {
-      id: 'bet-2',
-      userId: 'user-123',
-      createdAt: new Date('2024-01-17'),
-      isFinalized: true,
-      pointsEarned: 60,
-      bettingWeek: {
-        weekNumber: 2,
-        year: 2024,
-      },
-    },
-    {
-      id: 'bet-3',
-      userId: 'user-123',
-      createdAt: new Date('2024-01-24'),
-      isFinalized: false,
-      pointsEarned: null,
-      bettingWeek: {
-        weekNumber: 3,
-        year: 2024,
-      },
-    },
-  ];
-
-  const mockRankings = [
-    {
-      id: 'rank-1',
-      userId: 'user-123',
-      month: 1,
-      year: 2024,
-      rank: 5,
-      totalPoints: 450,
-      betsPlaced: 10,
-      betsWon: 7,
-      perfectBets: 2,
-    },
-  ];
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -184,7 +134,6 @@ describe('ExportService', () => {
     });
   });
 
-
   describe('exportStatsToJSON', () => {
     it('should export comprehensive stats to JSON', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
@@ -203,7 +152,6 @@ describe('ExportService', () => {
         achievementCount: 15,
       });
     });
-
 
     it('should include achievements breakdown by rarity', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
@@ -258,7 +206,5 @@ describe('ExportService', () => {
         'User not found',
       );
     });
-
   });
-
 });

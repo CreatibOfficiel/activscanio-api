@@ -1,16 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { EventsGateway } from './events.gateway';
 
 @Injectable()
 export class WebSocketEventListener {
   private readonly logger = new Logger(WebSocketEventListener.name);
 
-  constructor(
-    private readonly eventsGateway: EventsGateway,
-  ) {}
+  constructor(private readonly eventsGateway: EventsGateway) {}
 
   /**
    * Listen to achievement unlocked events and relay to WebSocket
@@ -54,7 +50,6 @@ export class WebSocketEventListener {
     );
   }
 
-
   /**
    * Listen to betting streak lost events
    */
@@ -95,7 +90,6 @@ export class WebSocketEventListener {
     });
   }
 
-
   /**
    * Listen to race created events (broadcast to all)
    */
@@ -114,24 +108,14 @@ export class WebSocketEventListener {
     this.eventsGateway.broadcastRaceResults(payload.results);
   }
 
-
   /**
    * Listen to competitor created events (broadcast to all)
    */
   @OnEvent('competitor.created')
-  handleCompetitorCreated(payload: { competitor: any }) {
+  handleCompetitorCreated(payload: { competitor: { id: string } }) {
     this.logger.log(
       `Broadcasting competitor created event: ${payload.competitor.id}`,
     );
     this.eventsGateway.broadcastCompetitorUpdate(payload.competitor);
   }
-
-
-
-
-
-
-
-
-
 }

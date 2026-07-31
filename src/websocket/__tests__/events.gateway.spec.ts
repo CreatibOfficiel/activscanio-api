@@ -90,7 +90,7 @@ describe('EventsGateway', () => {
       } as any;
     });
 
-    it('should emit achievement to registered user', () => {
+    it('should emit achievement to registered user', async () => {
       const userId = 'user-123';
       const achievement = {
         id: '1',
@@ -101,7 +101,7 @@ describe('EventsGateway', () => {
       };
 
       // Register user first
-      gateway.handleRegister(userId, mockSocket as Socket);
+      await gateway.handleRegister(userId, mockSocket as Socket);
 
       // Emit achievement
       gateway.emitAchievementUnlocked(userId, achievement);
@@ -130,11 +130,11 @@ describe('EventsGateway', () => {
       } as any;
     });
 
-    it('should emit level up event to user', () => {
+    it('should emit level up event to user', async () => {
       const userId = 'user-123';
       const levelData = { newLevel: 5, rewards: [] };
 
-      gateway.handleRegister(userId, mockSocket as Socket);
+      await gateway.handleRegister(userId, mockSocket as Socket);
       gateway.emitLevelUp(userId, levelData);
 
       expect(gateway.server.to).toHaveBeenCalledWith(mockSocket.id);
@@ -165,12 +165,12 @@ describe('EventsGateway', () => {
       expect(gateway.getConnectedClientsCount()).toBe(0);
     });
 
-    it('should return correct count after registrations', () => {
-      gateway.handleRegister('user-1', {
+    it('should return correct count after registrations', async () => {
+      await gateway.handleRegister('user-1', {
         id: 'socket-1',
         emit: jest.fn(),
       } as unknown as Socket);
-      gateway.handleRegister('user-2', {
+      await gateway.handleRegister('user-2', {
         id: 'socket-2',
         emit: jest.fn(),
       } as unknown as Socket);
@@ -178,9 +178,9 @@ describe('EventsGateway', () => {
       expect(gateway.getConnectedClientsCount()).toBe(2);
     });
 
-    it('should update count after disconnection', () => {
+    it('should update count after disconnection', async () => {
       const socket1 = { id: 'socket-1', emit: jest.fn() } as unknown as Socket;
-      gateway.handleRegister('user-1', socket1);
+      await gateway.handleRegister('user-1', socket1);
       expect(gateway.getConnectedClientsCount()).toBe(1);
 
       gateway.handleDisconnect(socket1);
@@ -193,9 +193,9 @@ describe('EventsGateway', () => {
       expect(gateway.isUserConnected('non-existent-user')).toBe(false);
     });
 
-    it('should return true for registered user', () => {
+    it('should return true for registered user', async () => {
       const userId = 'user-123';
-      gateway.handleRegister(userId, mockSocket as Socket);
+      await gateway.handleRegister(userId, mockSocket as Socket);
 
       expect(gateway.isUserConnected(userId)).toBe(true);
     });
@@ -209,11 +209,17 @@ describe('EventsGateway', () => {
       } as any;
     });
 
-    it('should emit to both registered users and broadcast to the feed', () => {
-      const challengerSocket = { id: 'sock-challenger', emit: jest.fn() } as unknown as Socket;
-      const challengedSocket = { id: 'sock-challenged', emit: jest.fn() } as unknown as Socket;
-      gateway.handleRegister('challenger-1', challengerSocket);
-      gateway.handleRegister('challenged-1', challengedSocket);
+    it('should emit to both registered users and broadcast to the feed', async () => {
+      const challengerSocket = {
+        id: 'sock-challenger',
+        emit: jest.fn(),
+      } as unknown as Socket;
+      const challengedSocket = {
+        id: 'sock-challenged',
+        emit: jest.fn(),
+      } as unknown as Socket;
+      await gateway.handleRegister('challenger-1', challengerSocket);
+      await gateway.handleRegister('challenged-1', challengedSocket);
 
       const data = { duelId: 'd1', stakeEmoji: '🍺' };
       gateway.emitDuelSettled('challenger-1', 'challenged-1', data);
@@ -240,11 +246,17 @@ describe('EventsGateway', () => {
       } as any;
     });
 
-    it('should emit to both registered users and broadcast to the feed', () => {
-      const challengerSocket = { id: 'sock-c', emit: jest.fn() } as unknown as Socket;
-      const challengedSocket = { id: 'sock-d', emit: jest.fn() } as unknown as Socket;
-      gateway.handleRegister('chal-2', challengerSocket);
-      gateway.handleRegister('cged-2', challengedSocket);
+    it('should emit to both registered users and broadcast to the feed', async () => {
+      const challengerSocket = {
+        id: 'sock-c',
+        emit: jest.fn(),
+      } as unknown as Socket;
+      const challengedSocket = {
+        id: 'sock-d',
+        emit: jest.fn(),
+      } as unknown as Socket;
+      await gateway.handleRegister('chal-2', challengerSocket);
+      await gateway.handleRegister('cged-2', challengedSocket);
 
       const data = { duelId: 'd3' };
       gateway.emitDuelUnsettled('chal-2', 'cged-2', data);
