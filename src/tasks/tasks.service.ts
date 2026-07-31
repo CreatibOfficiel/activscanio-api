@@ -40,6 +40,7 @@ import { RaceResult } from '../races/race-result.entity';
 import { User } from '../users/user.entity';
 import { SeasonsService } from '../seasons/seasons.service';
 import { PingpongDecayService } from '../pingpong/services/pingpong-decay.service';
+import { PingpongRankSnapshotService } from '../pingpong/services/pingpong-rank-snapshot.service';
 import { PingpongEligibilityService } from '../pingpong/services/pingpong-eligibility.service';
 import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
 import { StreakTrackerService } from '../achievements/services/streak-tracker.service';
@@ -81,6 +82,7 @@ export class TasksService {
     private readonly competitorEloSnapshotRepo: CompetitorEloSnapshotRepository,
     private readonly seasonsService: SeasonsService,
     private readonly pingpongDecayService: PingpongDecayService,
+    private readonly pingpongRankSnapshotService: PingpongRankSnapshotService,
     private readonly pingpongEligibilityService: PingpongEligibilityService,
     @InjectRepository(PingpongPlayer)
     private readonly pingpongPlayerRepository: Repository<PingpongPlayer>,
@@ -474,6 +476,43 @@ export class TasksService {
       );
     } finally {
       this.releaseTaskLock('pingpong-rd-decay');
+    }
+  }
+
+  /**
+   * Record where each ping-pong player stood at the start of the week.
+   *
+   * Feeds the leaderboard's movement indicator. Weekly on purpose: a daily
+   * delta in a pool this size is mostly noise, and an arrow presents it as
+   * signal.
+   */
+  @Cron(CRON_SCHEDULES.PINGPONG_WEEKLY_RANKS, {
+    name: 'pingpong-weekly-ranks',
+    timeZone: TASK_EXECUTION_CONFIG.timezone,
+  })
+  async handlePingpongWeeklyRanks(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongWeeklyRanks) {
+      this.logger.warn('Task "pingpong-weekly-ranks" is disabled');
+      return;
+    }
+    if (!this.acquireTaskLock('pingpong-weekly-ranks')) return;
+
+    this.logger.log(
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongWeeklyRanks}`,
+    );
+
+    try {
+      const count = await this.pingpongRankSnapshotService.captureWeeklyRanks();
+      this.logger.log(
+        `✅ Weekly ping-pong ranks captured for ${count} players`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Weekly ping-pong rank capture failed: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.releaseTaskLock('pingpong-weekly-ranks');
     }
   }
 

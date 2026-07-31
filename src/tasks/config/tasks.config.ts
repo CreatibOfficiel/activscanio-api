@@ -61,6 +61,14 @@ export const CRON_SCHEDULES = {
   PINGPONG_RD_DECAY: '0 30 3 * * 1',
 
   /**
+   * Ping-pong weekly rank snapshot
+   * Monday 00:10 UTC — before the day's play, so the week opens on a
+   * settled position. Weekly rather than daily because a daily rank delta
+   * in a ~25-player pool is mostly sampling noise.
+   */
+  PINGPONG_WEEKLY_RANKS: '0 10 0 * * 1',
+
+  /**
    * Ping-pong ELO snapshot
    * Daily 00:02 UTC — one minute after the Mario Kart snapshot.
    */
@@ -89,6 +97,7 @@ export const TASK_EXECUTION_CONFIG = {
     playStreakWarning: true,
     snapshotCompetitorElo: true,
     pingpongRdDecay: true,
+    pingpongWeeklyRanks: true,
     pingpongSnapshotElo: true,
     pingpongRefreshEligibility: true,
   },
@@ -122,6 +131,7 @@ export const TASK_DESCRIPTIONS = {
   snapshotCompetitorElo:
     'Snapshot competitor ELO for history chart (Daily 00:01)',
   pingpongRdDecay: 'Widen the deviation of inactive ping-pong players',
+  pingpongWeeklyRanks: 'Record where each ping-pong player started the week',
   pingpongSnapshotElo: 'Snapshot ping-pong ratings for the history chart',
   pingpongRefreshEligibility: 'Recompute ping-pong ranking eligibility',
 };

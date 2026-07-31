@@ -114,6 +114,16 @@ export class PingpongPlayer {
   @Column({ type: 'int', nullable: true })
   previousDayRank: number | null;
 
+  /**
+   * The rank held at the start of the week, for the movement indicator.
+   *
+   * Weekly rather than daily on purpose: in a 25-person pool a daily delta
+   * is mostly sampling noise, and showing it as an arrow presents that noise
+   * as signal. Null for anyone unranked at capture time.
+   */
+  @Column({ type: 'int', nullable: true })
+  previousWeekRank: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
