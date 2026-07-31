@@ -8,9 +8,10 @@ import {
   MaxLength,
   Matches,
   IsNotEmpty,
-  IsBoolean,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SportPreference } from '../../users/user.entity';
 
 export class CreateCompetitorInOnboardingDto {
   @IsString()
@@ -39,10 +40,22 @@ export class CreateCompetitorInOnboardingDto {
 }
 
 export class CompleteOnboardingDto {
-  // Flag to indicate user is spectator only (no competitor/character)
-  @IsBoolean()
+  /**
+   * Which sport the user plays. Decides whether a Mario Kart character is
+   * required — it is a racing concept, meaningless to a ping-pong player.
+   *
+   * Replaces the old `isSpectator` flag, a betting-era distinction that
+   * assigned UserRole.BETTOR. A ping-pong-only player needs the same shape
+   * (competitor identity, no character) but is emphatically not a
+   * spectator, and must not be filed under a role meaning "does not
+   * compete".
+   *
+   * Optional so a client that predates the field can still onboard someone;
+   * the service defaults it to BOTH.
+   */
+  @IsEnum(SportPreference)
   @IsOptional()
-  isSpectator?: boolean;
+  sportPreference?: SportPreference;
 
   // Option 1: Link to existing competitor
   @IsUUID()

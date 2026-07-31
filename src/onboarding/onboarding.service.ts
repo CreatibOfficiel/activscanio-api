@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
-import { User, UserRole } from '../users/user.entity';
+import { SportPreference, User, UserRole } from '../users/user.entity';
 import { Competitor } from '../competitors/competitor.entity';
 import { CharacterVariant } from '../character-variants/character-variant.entity';
 import { SearchCompetitorDto } from './dto/search-competitor.dto';
@@ -178,7 +178,20 @@ export class OnboardingService {
       }
 
       // BETTOR PATH: User chose to be bettor only (no competitor/character)
-      if (dto.isSpectator) {
+      // A ping-pong player needs a competitor identity but no Mario Kart
+      // character — a character is a racing concept. This branch handles
+      // that shape; it used to be the "spectator" path, which also assigned
+      // UserRole.BETTOR. It no longer does: someone who plays ping-pong
+      // competes, and filing them under a role meaning "does not compete"
+      // would be plainly wrong.
+      const sportPreference = dto.sportPreference ?? SportPreference.BOTH;
+      const racesMarioKart =
+        sportPreference === SportPreference.MARIO_KART ||
+        sportPreference === SportPreference.BOTH;
+
+      user.sportPreference = sportPreference;
+
+      if (!racesMarioKart) {
         // Link to a competitor if provided (existing or new)
         if (dto.existingCompetitorId) {
           const competitor = await queryRunner.manager.findOne(Competitor, {
@@ -215,11 +228,11 @@ export class OnboardingService {
           user.competitorId = savedCompetitor.id;
         }
 
-        user.role = UserRole.BETTOR;
+        user.role = UserRole.PLAYER;
         const updatedUser = await queryRunner.manager.save(user);
         await queryRunner.commitTransaction();
         this.logger.log(
-          `User ${userId} completed onboarding as BETTOR${user.competitorId ? ` (linked to competitor ${user.competitorId})` : ''}`,
+          `User ${userId} completed onboarding as ping-pong PLAYER${user.competitorId ? ` (linked to competitor ${user.competitorId})` : ''}`,
         );
         return updatedUser;
       }
