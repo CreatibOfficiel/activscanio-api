@@ -43,7 +43,7 @@ import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.s
     PingpongRatingService,
     PingpongPlayersService,
     PingpongEligibilityService,
-    // Driven by a weekly cron in TasksService.
+    // Driven by crons in TasksService: decay weekly, rank capture daily.
     PingpongDecayService,
     PingpongRankSnapshotService,
     // Exported for the achievement engine, which reads per-match feats that

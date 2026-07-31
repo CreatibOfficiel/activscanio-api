@@ -61,12 +61,13 @@ export const CRON_SCHEDULES = {
   PINGPONG_RD_DECAY: '0 30 3 * * 1',
 
   /**
-   * Ping-pong weekly rank snapshot
-   * Monday 00:10 UTC — before the day's play, so the week opens on a
-   * settled position. Weekly rather than daily because a daily rank delta
-   * in a ~25-player pool is mostly sampling noise.
+   * Ping-pong daily rank snapshot
+   * Daily 00:10 UTC — before the day's play, so the day opens on a settled
+   * position. Daily rather than weekly because the movement indicator only
+   * shows an arrow to a player active in the last two days, and that window
+   * needs a comparison rank from the start of the day.
    */
-  PINGPONG_WEEKLY_RANKS: '0 10 0 * * 1',
+  PINGPONG_DAILY_RANKS: '0 10 0 * * *',
 
   /**
    * Ping-pong ELO snapshot
@@ -97,7 +98,7 @@ export const TASK_EXECUTION_CONFIG = {
     playStreakWarning: true,
     snapshotCompetitorElo: true,
     pingpongRdDecay: true,
-    pingpongWeeklyRanks: true,
+    pingpongDailyRanks: true,
     pingpongSnapshotElo: true,
     pingpongRefreshEligibility: true,
   },
@@ -131,7 +132,7 @@ export const TASK_DESCRIPTIONS = {
   snapshotCompetitorElo:
     'Snapshot competitor ELO for history chart (Daily 00:01)',
   pingpongRdDecay: 'Widen the deviation of inactive ping-pong players',
-  pingpongWeeklyRanks: 'Record where each ping-pong player started the week',
+  pingpongDailyRanks: 'Record where each ping-pong player started the day',
   pingpongSnapshotElo: 'Snapshot ping-pong ratings for the history chart',
   pingpongRefreshEligibility: 'Recompute ping-pong ranking eligibility',
 };

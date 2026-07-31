@@ -31,9 +31,8 @@ export interface RankedPingpongPlayer {
   currentStreak: number;
   bestStreak: number;
   lastMatchAt: Date | null;
+  /** Rank at the start of the day; null when unranked then. */
   previousDayRank: number | null;
-  /** Rank at the start of the week; null when unranked then. */
-  previousWeekRank: number | null;
   provisional: boolean;
   inactive: boolean;
   archived: boolean;
@@ -248,7 +247,6 @@ export class PingpongPlayersService {
       bestStreak: player.bestStreak,
       lastMatchAt: player.lastMatchAt,
       previousDayRank: player.previousDayRank,
-      previousWeekRank: player.previousWeekRank,
       provisional: classification.provisional,
       inactive: classification.inactive,
       archived: classification.archived,

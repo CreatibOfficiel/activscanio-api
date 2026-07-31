@@ -48,23 +48,40 @@ describe('entity / schema drift', () => {
     return dropped;
   }
 
-  const removalMigration = readFileSync(
-    join(SRC, 'migrations', '1773400000000-RemoveBettingSystem.ts'),
-    'utf8',
-  );
+  /**
+   * Every column dropped by any migration's `up`.
+   *
+   * Scanned across the whole directory rather than one named file: pinning
+   * this to a single migration meant the next drop shipped unguarded, which
+   * is exactly the case this test exists to catch. `down` is skipped — it
+   * drops the column the `up` added, so reading it would flag every
+   * additive migration as a removal.
+   */
+  function allDroppedColumns() {
+    const dropped: { table: string; column: string }[] = [];
+    const dir = join(SRC, 'migrations');
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      const source = readFileSync(join(dir, file), 'utf8');
+      const downAt = source.search(/public async down\s*\(/);
+      const upOnly = downAt === -1 ? source : source.slice(0, downAt);
+      dropped.push(...droppedColumns(upOnly));
+    }
+    return dropped;
+  }
 
   const entities = entityFiles(SRC).map((path) => ({
     path,
     source: readFileSync(path, 'utf8'),
   }));
 
-  it('finds the removal migration and the entities', () => {
+  it('finds the removal migrations and the entities', () => {
     // Guards the test itself: a rename would otherwise make it vacuous.
     expect(entities.length).toBeGreaterThan(5);
-    expect(droppedColumns(removalMigration).length).toBeGreaterThan(0);
+    expect(allDroppedColumns().length).toBeGreaterThan(0);
   });
 
-  it.each(droppedColumns(removalMigration))(
+  it.each(allDroppedColumns())(
     'no entity declares $table.$column, which the migration dropped',
     ({ column }) => {
       const declaring = entities.filter(({ source }) =>

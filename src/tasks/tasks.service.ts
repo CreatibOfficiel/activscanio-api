@@ -480,39 +480,38 @@ export class TasksService {
   }
 
   /**
-   * Record where each ping-pong player stood at the start of the week.
+   * Record where each ping-pong player stood at the start of the day.
    *
-   * Feeds the leaderboard's movement indicator. Weekly on purpose: a daily
-   * delta in a pool this size is mostly noise, and an arrow presents it as
-   * signal.
+   * Feeds the leaderboard's movement indicator, which compares the live rank
+   * against this one and only shows an arrow to a player active in the last
+   * two days. Daily because that window assumes a rank captured this
+   * morning.
    */
-  @Cron(CRON_SCHEDULES.PINGPONG_WEEKLY_RANKS, {
-    name: 'pingpong-weekly-ranks',
+  @Cron(CRON_SCHEDULES.PINGPONG_DAILY_RANKS, {
+    name: 'pingpong-daily-ranks',
     timeZone: TASK_EXECUTION_CONFIG.timezone,
   })
-  async handlePingpongWeeklyRanks(): Promise<void> {
-    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongWeeklyRanks) {
-      this.logger.warn('Task "pingpong-weekly-ranks" is disabled');
+  async handlePingpongDailyRanks(): Promise<void> {
+    if (!TASK_EXECUTION_CONFIG.enabledTasks.pingpongDailyRanks) {
+      this.logger.warn('Task "pingpong-daily-ranks" is disabled');
       return;
     }
-    if (!this.acquireTaskLock('pingpong-weekly-ranks')) return;
+    if (!this.acquireTaskLock('pingpong-daily-ranks')) return;
 
     this.logger.log(
-      `🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongWeeklyRanks}`,
+      `🚀 Starting task: ${TASK_DESCRIPTIONS.pingpongDailyRanks}`,
     );
 
     try {
-      const count = await this.pingpongRankSnapshotService.captureWeeklyRanks();
-      this.logger.log(
-        `✅ Weekly ping-pong ranks captured for ${count} players`,
-      );
+      const count = await this.pingpongRankSnapshotService.captureDailyRanks();
+      this.logger.log(`✅ Daily ping-pong ranks captured for ${count} players`);
     } catch (error) {
       this.logger.error(
-        `❌ Weekly ping-pong rank capture failed: ${error.message}`,
+        `❌ Daily ping-pong rank capture failed: ${error.message}`,
         error.stack,
       );
     } finally {
-      this.releaseTaskLock('pingpong-weekly-ranks');
+      this.releaseTaskLock('pingpong-daily-ranks');
     }
   }
 

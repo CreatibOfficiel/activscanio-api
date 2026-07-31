@@ -111,18 +111,15 @@ export class PingpongPlayer {
   @Column('float', { default: 0 })
   diversityScore21d: number;
 
-  @Column({ type: 'int', nullable: true })
-  previousDayRank: number | null;
-
   /**
-   * The rank held at the start of the week, for the movement indicator.
+   * The rank held at the start of the day, for the movement indicator.
    *
-   * Weekly rather than daily on purpose: in a 25-person pool a daily delta
-   * is mostly sampling noise, and showing it as an arrow presents that noise
-   * as signal. Null for anyone unranked at capture time.
+   * Written by the daily rank-snapshot cron. Null for anyone unranked at
+   * capture time, which is not the same as having been last. Same name as
+   * the Mario Kart column so both leaderboards read one field.
    */
   @Column({ type: 'int', nullable: true })
-  previousWeekRank: number | null;
+  previousDayRank: number | null;
 
   @CreateDateColumn()
   createdAt: Date;

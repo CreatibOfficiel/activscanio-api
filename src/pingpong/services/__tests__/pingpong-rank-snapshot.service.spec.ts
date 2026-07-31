@@ -1,4 +1,17 @@
-/* eslint-disable @typescript-eslint/unbound-method */
+/**
+ * Daily rank snapshot.
+ *
+ * The leaderboard shows "you moved up two places" against the rank a player
+ * held at the start of the day. The cadence is daily because the movement
+ * rule it feeds (see the front end's rank-movement) only shows an arrow to
+ * someone who played inside a two-day window — the arrow claims a reason,
+ * and the reason has to be a match the player actually played. A weekly
+ * capture would let a Sunday match be compared against a rank frozen the
+ * previous Monday, which is not a movement that player caused.
+ *
+ * The column is `previousDayRank`, the same name the Mario Kart leaderboard
+ * uses, and the one the front end reads.
+ */ /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -47,10 +60,10 @@ describe('PingpongRankSnapshotService', () => {
   });
 
   /** Every (id, patch) pair written. */
-  function writes(): [string, { previousWeekRank: number | null }][] {
+  function writes(): [string, { previousDayRank: number | null }][] {
     return (playerRepository.update as jest.Mock).mock.calls as [
       string,
-      { previousWeekRank: number | null },
+      { previousDayRank: number | null },
     ][];
   }
 
@@ -60,11 +73,11 @@ describe('PingpongRankSnapshotService', () => {
       ranked('b', 2),
     ]);
 
-    await service.captureWeeklyRanks();
+    await service.captureDailyRanks();
 
     expect(writes()).toEqual([
-      ['a', { previousWeekRank: 1 }],
-      ['b', { previousWeekRank: 2 }],
+      ['a', { previousDayRank: 1 }],
+      ['b', { previousDayRank: 2 }],
     ]);
   });
 
@@ -74,9 +87,9 @@ describe('PingpongRankSnapshotService', () => {
     // from the bottom of the table.
     playersService.getLeaderboard.mockResolvedValue([ranked('new', null)]);
 
-    await service.captureWeeklyRanks();
+    await service.captureDailyRanks();
 
-    expect(writes()).toEqual([['new', { previousWeekRank: null }]]);
+    expect(writes()).toEqual([['new', { previousDayRank: null }]]);
   });
 
   it('reports how many players it captured', async () => {
@@ -85,13 +98,13 @@ describe('PingpongRankSnapshotService', () => {
       ranked('b', null),
     ]);
 
-    expect(await service.captureWeeklyRanks()).toBe(2);
+    expect(await service.captureDailyRanks()).toBe(2);
   });
 
   it('does nothing on an empty board', async () => {
     playersService.getLeaderboard.mockResolvedValue([]);
 
-    expect(await service.captureWeeklyRanks()).toBe(0);
+    expect(await service.captureDailyRanks()).toBe(0);
     expect(playerRepository.update).not.toHaveBeenCalled();
   });
 
@@ -100,7 +113,7 @@ describe('PingpongRankSnapshotService', () => {
     // give two sources of truth that drift the first time a rule changes.
     playersService.getLeaderboard.mockResolvedValue([ranked('a', 1)]);
 
-    await service.captureWeeklyRanks();
+    await service.captureDailyRanks();
 
     expect(playersService.getLeaderboard).toHaveBeenCalledTimes(1);
   });
@@ -109,9 +122,9 @@ describe('PingpongRankSnapshotService', () => {
     // A display concern must not touch the measurement.
     playersService.getLeaderboard.mockResolvedValue([ranked('a', 1)]);
 
-    await service.captureWeeklyRanks();
+    await service.captureDailyRanks();
 
     const [, patch] = writes()[0];
-    expect(Object.keys(patch)).toEqual(['previousWeekRank']);
+    expect(Object.keys(patch)).toEqual(['previousDayRank']);
   });
 });

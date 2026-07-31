@@ -13,6 +13,7 @@ import { PingpongHighlightStatsService } from '../services/pingpong-highlight-st
 import { PingpongPlayersService } from '../services/pingpong-players.service';
 import { PingpongRatingService } from '../services/pingpong-rating.service';
 import { PingpongMatchService } from '../services/pingpong-match.service';
+import { PingpongRankSnapshotService } from '../services/pingpong-rank-snapshot.service';
 
 /**
  * Module wiring.
@@ -75,6 +76,7 @@ describe('PingpongModule', () => {
       PingpongEligibilityService,
       PingpongHighlightStatsService,
       PingpongDecayService,
+      PingpongRankSnapshotService,
     ]) {
       expect(module.get(service)).toBeDefined();
     }
@@ -92,5 +94,7 @@ describe('PingpongModule', () => {
     // PingpongEligibilityService and PingpongPlayersService likewise.
     expect(exports).toContain(PingpongEligibilityService);
     expect(exports).toContain(PingpongPlayersService);
+    // PingpongRankSnapshotService is driven by the daily rank-capture cron.
+    expect(exports).toContain(PingpongRankSnapshotService);
   });
 });
