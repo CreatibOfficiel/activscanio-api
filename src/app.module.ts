@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -17,10 +17,18 @@ import { RaceAnalysisModule } from './race-analysis/race-analysis.module';
 import { UploadModule } from './upload/upload.module';
 import { OpenAIModule } from './openai/openai.module';
 import { OpenAIService } from './openai/openai.service';
-// SeederModule only loaded in dev (requires @faker-js/faker devDependency)
-const SeederModule =
+/**
+ * SeederModule is loaded lazily, and only outside production.
+ *
+ * It pulls in @faker-js/faker, a devDependency that is not installed in the
+ * production image — a static import would crash the app at boot. Hence the
+ * require, which is the point of the two disables below rather than an
+ * oversight.
+ */
+const SeederModule: Type<unknown> | null =
   process.env.NODE_ENV !== 'production'
-    ? require('./seeder/seeder.module').SeederModule
+    ? // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-member-access
+      (require('./seeder/seeder.module').SeederModule as Type<unknown>)
     : null;
 import { BaseCharactersModule } from './base-characters/base-characters.module';
 import { CharacterVariantsModule } from './character-variants/character-variants.module';

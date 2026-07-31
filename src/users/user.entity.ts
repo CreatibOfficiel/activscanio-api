@@ -6,7 +6,6 @@ import {
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
-  OneToMany,
   Index,
 } from 'typeorm';
 import { Competitor } from '../competitors/competitor.entity';

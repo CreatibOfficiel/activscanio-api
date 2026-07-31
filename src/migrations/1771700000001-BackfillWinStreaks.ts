@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { typedQuery } from './utils/typed-query';
 
 export class BackfillWinStreaks1771700000001 implements MigrationInterface {
   name = 'BackfillWinStreaks1771700000001';
@@ -11,18 +12,21 @@ export class BackfillWinStreaks1771700000001 implements MigrationInterface {
     // A "win" is any week where pointsEarned > 0.
     // We track consecutive wins and compute currentWinStreak + bestWinStreak.
 
-    const bettorRows: Array<{
+    const bettorRows = await typedQuery<{
       userId: string;
       weekNumber: number;
       year: number;
       pointsEarned: number;
-    }> = await queryRunner.query(`
+    }>(
+      queryRunner,
+      `
       SELECT b."userId", bw."weekNumber", bw."year", b."pointsEarned"
       FROM bets b
       INNER JOIN betting_weeks bw ON bw.id = b."bettingWeekId"
       WHERE b."isFinalized" = true
       ORDER BY b."userId", bw."year" ASC, bw."weekNumber" ASC
-    `);
+    `,
+    );
 
     // Group by user
     const userBets = new Map<
@@ -95,16 +99,19 @@ export class BackfillWinStreaks1771700000001 implements MigrationInterface {
     // For each competitor, iterate races chronologically.
     // Track consecutive 1st place finishes.
 
-    const competitorRows: Array<{
+    const competitorRows = await typedQuery<{
       competitorId: string;
       rank12: number;
       raceDate: Date;
-    }> = await queryRunner.query(`
+    }>(
+      queryRunner,
+      `
       SELECT rr."competitorId", rr."rank12", r."date" as "raceDate"
       FROM race_results rr
       INNER JOIN races r ON r.id = rr."raceId"
       ORDER BY rr."competitorId", r."date" ASC
-    `);
+    `,
+    );
 
     // Group by competitor
     const competitorRaces = new Map<string, Array<{ rank12: number }>>();

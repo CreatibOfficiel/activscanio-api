@@ -47,7 +47,9 @@ export class PingpongDecayService {
    * @returns how many players were touched
    */
   async runDecay(): Promise<number> {
-    const rows = await this.playerRepository.query(`
+    // `query()` is declared as `any`; RETURNING gives one row per player
+    // actually touched, which is what the count below reports.
+    const rows: unknown = await this.playerRepository.query(`
       UPDATE "pingpong_players"
       SET "rd" = LEAST(sqrt("rd" * "rd" + ${DECAY_C} * ${DECAY_C}), ${MAX_RD}),
           "lastDecayAt" = now()

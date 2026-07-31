@@ -283,18 +283,21 @@ describe('SeasonsService', () => {
         .mockResolvedValueOnce([]); // Ping-pong players
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
-      mockQueryRunner.manager.create.mockImplementation((entity, data) => {
-        if (entity === SeasonArchive) {
-          // Verify date range is set (season-based, not month-based)
-          expect(data.startDate).toBeDefined();
-          expect(data.endDate).toBeDefined();
-          expect(data.startDate.getTime()).toBeLessThan(data.endDate.getTime());
+      mockQueryRunner.manager.create.mockImplementation(
+        (entity: unknown, data: { startDate: Date; endDate: Date }) => {
+          if (entity === SeasonArchive) {
+            // Verify date range is set (season-based, not month-based)
+            expect(data.startDate).toBeDefined();
+            expect(data.endDate).toBeDefined();
+            expect(data.startDate.getTime()).toBeLessThan(
+              data.endDate.getTime(),
+            );
+          }
           return data;
-        }
-        return data;
-      });
+        },
+      );
 
-      mockQueryRunner.manager.save.mockImplementation((entity) => {
+      mockQueryRunner.manager.save.mockImplementation((entity: unknown) => {
         return Promise.resolve(entity);
       });
 

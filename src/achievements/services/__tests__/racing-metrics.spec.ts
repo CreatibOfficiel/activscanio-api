@@ -37,31 +37,6 @@ describe('AchievementCalculatorService — racing metrics', () => {
   const COMPETITOR_ID = 'competitor-1';
 
   /** Query builder stub returning nothing, for the betting aggregates. */
-  function emptyQueryBuilder() {
-    const qb: Record<string, jest.Mock> = {};
-    for (const method of [
-      'select',
-      'addSelect',
-      'from',
-      'innerJoin',
-      'leftJoin',
-      'leftJoinAndSelect',
-      'where',
-      'andWhere',
-      'groupBy',
-      'addGroupBy',
-      'having',
-      'orderBy',
-      'addOrderBy',
-      'limit',
-    ]) {
-      qb[method] = jest.fn(() => qb);
-    }
-    qb.getRawOne = jest.fn().mockResolvedValue(null);
-    qb.getRawMany = jest.fn().mockResolvedValue([]);
-    qb.getMany = jest.fn().mockResolvedValue([]);
-    return qb;
-  }
 
   /** An achievement gated on a single numeric metric. */
   function racingAchievement(key: string, metric: string, value: number) {

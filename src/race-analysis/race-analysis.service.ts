@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OpenAIService } from 'src/openai/openai.service';
 import { CharacterVariantsService } from 'src/character-variants/character-variants.service';
@@ -34,7 +33,7 @@ export class RaceAnalysisService {
 
     /* 1 – Prepare exact labels and fast lookup maps */
 
-    const labelForVariant = (v: any) =>
+    const labelForVariant = (v: (typeof variants)[number]) =>
       v.baseCharacter.variants.length <= 1 || v.label === 'Default'
         ? v.baseCharacter.name
         : `${v.baseCharacter.name} ${v.label.toLowerCase()}`.trim();
@@ -62,7 +61,6 @@ export class RaceAnalysisService {
     const whitelist = [...nameToVariant.keys()];
 
     /* 2 – Call OpenAI */
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const aiRows = await this.openai.analyzeRaceImage(base64, whitelist);
 
     /* 3 – Direct conversion */
@@ -105,7 +103,12 @@ export class RaceAnalysisService {
       a.rank12 !== b.rank12 ? a.rank12 - b.rank12 : b.score - a.score,
     );
 
-    // Strip confidence field before returning
-    return resultsWithConfidence.map(({ confidence: _, ...rest }) => rest);
+    // Confidence drives the cut above but is internal — the caller gets the
+    // three fields of RaceCompetitorResult and nothing else.
+    return resultsWithConfidence.map(({ competitorId, rank12, score }) => ({
+      competitorId,
+      rank12,
+      score,
+    }));
   }
 }

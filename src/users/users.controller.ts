@@ -63,7 +63,9 @@ export class UsersController {
     if (type === 'user.created' || type === 'user.updated') {
       const syncDto: SyncClerkUserDto = {
         clerkId: data.id as string,
-        email: (data.email_addresses as any[])?.[0]?.email_address as string,
+        // Clerk sends a list; the primary address is the first entry.
+        email: (data.email_addresses as { email_address?: string }[])?.[0]
+          ?.email_address as string,
         firstName: data.first_name as string,
         lastName: data.last_name as string,
         profilePictureUrl: data.image_url as string,

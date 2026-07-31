@@ -20,6 +20,23 @@ describe('PingpongEligibilityService', () => {
 
   const PLAYER = 'player-1';
 
+  /**
+   * The payload of the first update() call.
+   *
+   * `mock.calls` is typed as any[][], so index into it once here rather than
+   * at every assertion site.
+   */
+  function firstUpdatePayload(): {
+    isRankingEligible: boolean;
+    diversityScore21d: number;
+  } {
+    const calls = (playerRepository.update as jest.Mock).mock.calls as [
+      unknown,
+      { isRankingEligible: boolean; diversityScore21d: number },
+    ][];
+    return calls[0][1];
+  }
+
   /** Matches where PLAYER faced the given opponents, one entry per match. */
   function matchesAgainst(opponentIds: string[]): PingpongMatch[] {
     return opponentIds.map(
@@ -94,10 +111,7 @@ describe('PingpongEligibilityService', () => {
 
     await service.refreshEligibility();
 
-    const call = (playerRepository.update as jest.Mock).mock.calls[0][1] as {
-      isRankingEligible: boolean;
-      diversityScore21d: number;
-    };
+    const call = firstUpdatePayload();
     expect(call.diversityScore21d).toBeLessThan(0.5);
     expect(call.isRankingEligible).toBe(false);
   });
@@ -141,8 +155,11 @@ describe('PingpongEligibilityService', () => {
 
     await service.refreshEligibility();
 
-    const payload = (playerRepository.update as jest.Mock).mock
-      .calls[0][1] as Record<string, unknown>;
+    const calls = (playerRepository.update as jest.Mock).mock.calls as [
+      unknown,
+      Record<string, unknown>,
+    ][];
+    const payload = calls[0][1];
     expect(payload).not.toHaveProperty('rating');
     expect(payload).not.toHaveProperty('rd');
     expect(payload).not.toHaveProperty('vol');

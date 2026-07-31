@@ -4,7 +4,6 @@ import { MoreThan, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
 import { Competitor } from '../../competitors/competitor.entity';
-import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 export interface UnseenStreakLosses {

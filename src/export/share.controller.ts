@@ -12,8 +12,6 @@ import { ImageStorageService } from '../image-generation/services/image-storage.
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SeasonUtils } from '../common/utils/season-utils';
-import { WeekUtils } from '../common/utils/week-utils';
 import { UserAchievement } from '../achievements/entities/user-achievement.entity';
 import { User } from '../users/user.entity';
 

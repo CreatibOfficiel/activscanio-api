@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Achievement } from '../entities/achievement.entity';
 import { UserAchievement } from '../entities/user-achievement.entity';
 import { UserStreak } from '../entities/user-streak.entity';
-import { SeasonUtils } from '../../common/utils/season-utils';
-import { WeekUtils } from '../../common/utils/week-utils';
 
 /**
  * TemporaryAchievementService

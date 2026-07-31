@@ -16,6 +16,9 @@ import { Competitor } from '../../../competitors/competitor.entity';
  * streak. Deleting them with the betting module would break the play-streak
  * modal for every player, so they live here now.
  */
+/** `expect.any()` is typed as `any` upstream; narrow it once here. */
+const anyDate = (): Date => expect.any(Date) as Date;
+
 describe('StreakTrackerService — streak losses', () => {
   let service: StreakTrackerService;
   let userStreakRepository: Repository<UserStreak>;
@@ -162,12 +165,12 @@ describe('StreakTrackerService — streak losses', () => {
       expect(userStreakRepository.update).toHaveBeenCalledWith(
         { userId: USER_ID },
         expect.objectContaining({
-          participationStreakLossSeenAt: expect.any(Date),
+          participationStreakLossSeenAt: anyDate(),
         }),
       );
       expect(competitorRepository.update).toHaveBeenCalledWith(
         COMPETITOR_ID,
-        expect.objectContaining({ playStreakLossSeenAt: expect.any(Date) }),
+        expect.objectContaining({ playStreakLossSeenAt: anyDate() }),
       );
     });
 

@@ -134,6 +134,8 @@ export class RemoveBettingSystem1773400000000 implements MigrationInterface {
     //    label changed, on the front end.
   }
 
+  // `async` is required by MigrationInterface even though this only throws.
+  // eslint-disable-next-line @typescript-eslint/require-await
   public async down(): Promise<void> {
     throw new Error(
       'RemoveBettingSystem is irreversible: eight tables were dropped and the ' +

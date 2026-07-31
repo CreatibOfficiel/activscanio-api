@@ -31,7 +31,6 @@ describe('AchievementCalculatorService', () => {
   let xpLevelService: XPLevelService;
   let userRepository: Repository<User>;
   let competitorRepository: Repository<Competitor>;
-  let eventEmitter: EventEmitter2;
 
   const mockCondition = {
     type: AchievementConditionType.COUNT,
@@ -106,7 +105,7 @@ describe('AchievementCalculatorService', () => {
           useValue: {
             find: jest.fn().mockResolvedValue([]),
             save: jest.fn(),
-            create: jest.fn().mockImplementation((data) => data),
+            create: jest.fn().mockImplementation((data: unknown) => data),
           },
         },
         {
@@ -170,7 +169,6 @@ describe('AchievementCalculatorService', () => {
       getRepositoryToken(Competitor),
     );
     xpLevelService = module.get<XPLevelService>(XPLevelService);
-    eventEmitter = module.get<EventEmitter2>(EventEmitter2);
   });
 
   it('should be defined', () => {
@@ -273,7 +271,7 @@ describe('AchievementCalculatorService', () => {
       // The user races, so competitorRaceCount >= 1 is satisfied.
       jest
         .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: 'user-123', competitorId: 'comp-1' } as any);
+        .mockResolvedValue({ id: 'user-123', competitorId: 'comp-1' } as User);
       jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
         id: 'comp-1',
         rating: 1500,
@@ -285,7 +283,7 @@ describe('AchievementCalculatorService', () => {
         playStreak: 0,
         bestPlayStreak: 0,
         avgRank12: 0,
-      } as any);
+      } as Competitor);
 
       const result = await service.checkAchievements('user-123');
 
@@ -316,10 +314,12 @@ describe('AchievementCalculatorService', () => {
       // first_bet is already unlocked
       jest
         .spyOn(userAchievementRepository, 'find')
-        .mockImplementation((options: any) => {
+        .mockImplementation((options?: { select?: unknown }) => {
           if (options?.select) {
             // The "get achievement IDs" call
-            return Promise.resolve([{ achievementId: '1' }] as any);
+            return Promise.resolve([
+              { achievementId: '1' },
+            ] as UserAchievement[]);
           }
           // The "get with relations" call
           return Promise.resolve([
@@ -330,15 +330,6 @@ describe('AchievementCalculatorService', () => {
             },
           ] as any);
         });
-
-      const mockBet = {
-        id: 'bet-1',
-        userId: 'user-123',
-        isFinalized: true,
-        pointsEarned: 10,
-        createdAt: new Date(),
-        picks: [{ isCorrect: true, hasBoost: false, oddAtBet: 2 }],
-      };
 
       const result = await service.checkAchievements('user-123');
 

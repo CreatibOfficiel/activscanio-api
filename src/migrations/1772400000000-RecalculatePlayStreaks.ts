@@ -1,13 +1,16 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { typedQuery } from './utils/typed-query';
 
 export class RecalculatePlayStreaks1772400000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const competitors: { id: string }[] = await queryRunner.query(
+    const competitors = await typedQuery<{ id: string }>(
+      queryRunner,
       `SELECT id FROM "competitors"`,
     );
 
     for (const comp of competitors) {
-      const raceDates: { date: string }[] = await queryRunner.query(
+      const raceDates = await typedQuery<{ date: string }>(
+        queryRunner,
         `SELECT DISTINCT r."date"::date as date
          FROM "race_results" rr
          JOIN "races" r ON r."id" = rr."raceId"

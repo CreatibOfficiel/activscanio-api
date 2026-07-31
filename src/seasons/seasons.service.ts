@@ -11,6 +11,25 @@ import { RaceEvent } from '../races/race-event.entity';
 import { SeasonUtils } from '../common/utils/season-utils';
 import { WeekUtils } from '../common/utils/week-utils';
 
+/**
+ * A raw row holding a name and one numeric column.
+ *
+ * Postgres returns aggregates and bigints as STRINGS through the driver, so
+ * the numeric field is typed as `string | number` and every read goes through
+ * `Number()`. Comparing the raw value would work by coercion today and break
+ * silently the day a column changes type.
+ */
+type RawNamedCount<K extends string> = {
+  competitorName: string;
+} & Record<K, string | number>;
+
+/** One row of the perfect-race aggregate. */
+interface RawBestScorer {
+  competitorName: string;
+  maxScore: string | number;
+  perfectCount: string | number;
+}
+
 export interface SeasonHighlights {
   longestWinStreak: { competitorName: string; streak: number } | null;
   mostRaces: { competitorName: string; count: number } | null;
@@ -423,9 +442,9 @@ export class SeasonsService {
         .where('acr.seasonArchiveId = :seasonId', { seasonId: season.id })
         .orderBy('acr.winStreak', 'DESC')
         .limit(1)
-        .getRawOne();
+        .getRawOne<RawNamedCount<'streak'>>();
 
-      if (longestWinStreakRaw && longestWinStreakRaw.streak > 0) {
+      if (longestWinStreakRaw && Number(longestWinStreakRaw.streak) > 0) {
         longestWinStreak = {
           competitorName: longestWinStreakRaw.competitorName,
           streak: Number(longestWinStreakRaw.streak),
@@ -442,9 +461,9 @@ export class SeasonsService {
         .where('acr.seasonArchiveId = :seasonId', { seasonId: season.id })
         .orderBy('acr.totalRaces', 'DESC')
         .limit(1)
-        .getRawOne();
+        .getRawOne<RawNamedCount<'count'>>();
 
-      if (mostRacesRaw && mostRacesRaw.count > 0) {
+      if (mostRacesRaw && Number(mostRacesRaw.count) > 0) {
         mostRaces = {
           competitorName: mostRacesRaw.competitorName,
           count: Number(mostRacesRaw.count),
@@ -473,9 +492,9 @@ export class SeasonsService {
         .groupBy('c.id, c."firstName", c."lastName"')
         .having('MAX(rr.score) = 60')
         .orderBy('"perfectCount"', 'DESC')
-        .getRawMany();
+        .getRawMany<RawBestScorer>();
 
-      if (bestRaceScorersRaw?.length > 0) {
+      if (bestRaceScorersRaw.length > 0) {
         bestRaceScorers = bestRaceScorersRaw.map((r) => ({
           competitorName: r.competitorName,
           maxScore: Number(r.maxScore),

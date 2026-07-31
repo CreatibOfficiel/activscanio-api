@@ -1,5 +1,8 @@
 import { ACHIEVEMENT_DEFINITIONS } from '../achievement-definitions';
-import { AchievementDomain } from '../../entities/achievement.entity';
+import {
+  AchievementDomain,
+  AchievementRarity,
+} from '../../entities/achievement.entity';
 
 /**
  * Integrity of the achievement catalogue.
@@ -92,16 +95,25 @@ describe('ACHIEVEMENT_DEFINITIONS', () => {
     it('keeps rarity falling away, with at most two legendaries', () => {
       // With 25 players, "legendary" means roughly one person. Two is the
       // ceiling before the trophy case reads as empty to everyone else.
-      const count = (rarity: string) =>
+      // Typed on the enum rather than a bare string: a typo would otherwise
+      // count zero and pass every assertion below.
+      const count = (rarity: AchievementRarity) =>
         pingpong.filter((d) => d.rarity === rarity).length;
 
-      expect(count('LEGENDARY')).toBeLessThanOrEqual(2);
-      expect(count('COMMON')).toBeGreaterThanOrEqual(count('LEGENDARY'));
+      expect(count(AchievementRarity.LEGENDARY)).toBeLessThanOrEqual(2);
+      expect(count(AchievementRarity.COMMON)).toBeGreaterThanOrEqual(
+        count(AchievementRarity.LEGENDARY),
+      );
     });
 
     it('awards more XP the rarer the achievement', () => {
-      const order = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY'];
-      const maxXpByRarity = new Map<string, number>();
+      const order = [
+        AchievementRarity.COMMON,
+        AchievementRarity.RARE,
+        AchievementRarity.EPIC,
+        AchievementRarity.LEGENDARY,
+      ];
+      const maxXpByRarity = new Map<AchievementRarity, number>();
       for (const definition of pingpong) {
         maxXpByRarity.set(
           definition.rarity,

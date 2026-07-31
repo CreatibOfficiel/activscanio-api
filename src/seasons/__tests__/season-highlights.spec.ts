@@ -63,9 +63,6 @@ describe('SeasonsService — surviving highlights', () => {
   }
 
   /** Query builder that yields nothing, for the betting highlights. */
-  function emptyQb() {
-    return queryBuilder(null, []);
-  }
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

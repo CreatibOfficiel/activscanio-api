@@ -48,18 +48,6 @@ describe('ShareController', () => {
     achievement: mockAchievement,
   };
 
-  const mockBet = {
-    id: 'bet-123',
-    userId: 'user-123',
-    pointsEarned: 60,
-    isFinalized: true,
-    createdAt: new Date(),
-    bettingWeek: {
-      weekNumber: 5,
-      year: 2024,
-    },
-  };
-
   const mockImageBuffer = Buffer.from('fake-image-data');
 
   beforeEach(async () => {

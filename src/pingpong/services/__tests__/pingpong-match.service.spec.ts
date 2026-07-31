@@ -226,9 +226,15 @@ describe('PingpongMatchService', () => {
         sets: straightWin,
       });
 
-      const saved = manager.save.mock.calls
-        .map((c) => c[1] ?? c[0])
-        .filter((v: { matchCount?: number }) => v?.matchCount !== undefined);
+      // save() is called both as save(entity) and save(Entity, data), so read
+      // whichever argument carries the payload.
+      const calls = manager.save.mock.calls as unknown[][];
+      const saved = calls
+        .map((c) => (c[1] ?? c[0]) as { matchCount?: number } | undefined)
+        .filter(
+          (v): v is { matchCount: number; weightedMatchCount: number } =>
+            v?.matchCount !== undefined,
+        );
 
       expect(saved.length).toBeGreaterThan(0);
       for (const p of saved) {
