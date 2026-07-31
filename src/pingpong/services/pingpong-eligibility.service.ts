@@ -4,25 +4,40 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 import { PingpongPlayer } from '../entities/pingpong-player.entity';
 import { PingpongMatch } from '../entities/pingpong-match.entity';
 import { shannonDiversity } from '../utils/diversity';
+import { PROVISIONAL_MIN_MATCHES } from '../utils/pingpong-classification';
 
-/** Distinct opponents needed over the window to enter the ranked table. */
-export const MIN_DISTINCT_OPPONENTS = 4;
-/** Normalised entropy needed over the window. */
-export const MIN_DIVERSITY_SCORE = 0.5;
-/** Rolling window, in days. */
+/** Rolling window over which diversity is measured, in days. */
 export const ELIGIBILITY_WINDOW_DAYS = 21;
 
 /**
- * Ranking eligibility — the third anti-farming layer.
+ * Opponent diversity — measured, never a gate.
  *
- * Unlike the pairing weight and the rating freeze, this one never touches a
- * rating. A player who only ever faces the same opponent keeps a perfectly
- * real rating; they just do not appear in the ranked table until they have
- * played a spread of people.
+ * An earlier version of this service hid players from the ranking until they
+ * had faced 4 distinct opponents inside the window. That rule is gone.
  *
- * Keeping it out of the rating path matters: a rating is a measurement, and
- * we do not distort the measurement to punish a scheduling habit. We only
- * decline to rank it.
+ * WHY IT WENT: no documented rating system gates ranking on who you played.
+ * FIDE requires 5 games against rated opponents with no distinctness
+ * qualifier; USATT has no minimum at all; Lichess gates on 30 games, recency
+ * and RD < 75; TrueSkill hides nobody and lets the conservative estimate
+ * sink the uncertain. Glickman's paper states outright that repeat matches
+ * against one opponent are treated as ordinary games. Those systems can
+ * ignore the problem because a matchmaker guarantees variety — but the fix
+ * for a hand-scheduled league is not to hide people. In a 25-person office,
+ * someone playing three lunchtime games a week with the same two colleagues
+ * reaches nine matches and would still never appear. The rule punished
+ * exactly the most engaged players.
+ *
+ * WHAT REPLACES IT: farming is handled in the rating path, where it belongs.
+ * The per-pair weighting gives a fourth match against the same person in one
+ * week half weight and a seventh none, so a farmed record stops moving the
+ * rating and never leaves calibration. The leaderboard then sorts on the
+ * conservative score, which sinks a thinly-tested rating on its own.
+ *
+ * WHAT REMAINS HERE: the diversity measurement itself, surfaced as a badge,
+ * and the one honest gate — whether the rating has left calibration.
+ *
+ * This service still never touches a rating. A rating is a measurement, and
+ * we do not distort a measurement to correct a scheduling habit.
  */
 @Injectable()
 export class PingpongEligibilityService {
@@ -36,10 +51,10 @@ export class PingpongEligibilityService {
   ) {}
 
   /**
-   * Recompute eligibility for every player.
+   * Recompute the diversity stats, and whether each player is ranked.
    *
    * Runs on a cron rather than after each match, because the window is
-   * rolling: a player can become ineligible purely through the passage of
+   * rolling: the diversity figures change purely through the passage of
    * time, with no new match to trigger a recalculation.
    */
   async refreshEligibility(now: Date = new Date()): Promise<number> {
@@ -59,22 +74,20 @@ export class PingpongEligibilityService {
       });
 
       const counts = this.countByOpponent(player.id, matches);
-      const distinctOpponents = counts.length;
-      const diversityScore = shannonDiversity(counts);
-
-      const isRankingEligible =
-        distinctOpponents >= MIN_DISTINCT_OPPONENTS &&
-        diversityScore >= MIN_DIVERSITY_SCORE;
 
       await this.playerRepository.update(player.id, {
-        isRankingEligible,
-        distinctOpponents21d: distinctOpponents,
-        diversityScore21d: diversityScore,
+        // The only gate: enough weighted matches for the rating to mean
+        // something. Reads the WEIGHTED count on purpose — farming one
+        // opponent inflates the raw count but not this one, so it cannot buy
+        // a way out of calibration.
+        isRankingEligible: player.weightedMatchCount >= PROVISIONAL_MIN_MATCHES,
+        distinctOpponents21d: counts.length,
+        diversityScore21d: shannonDiversity(counts),
       });
       updated += 1;
     }
 
-    this.logger.log(`Refreshed ranking eligibility for ${updated} players`);
+    this.logger.log(`Refreshed ranking status for ${updated} players`);
     return updated;
   }
 

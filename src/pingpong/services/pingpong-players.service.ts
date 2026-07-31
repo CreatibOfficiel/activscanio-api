@@ -36,6 +36,14 @@ export interface RankedPingpongPlayer {
   inactive: boolean;
   archived: boolean;
   isRankingEligible: boolean;
+  /**
+   * Distinct opponents faced over the last three weeks, and how evenly the
+   * matches were spread across them (0 = one opponent only, 1 = perfectly
+   * even). Reported so the front end can show a badge — neither figure
+   * withholds a rank.
+   */
+  distinctOpponents21d: number;
+  diversityScore21d: number;
   /** Null when the player is not in the ranked table. */
   rank: number | null;
 }
@@ -99,10 +107,17 @@ export class PingpongPlayersService {
     // rating with a wide deviation should not outrank a settled one.
     enriched.sort((a, b) => b.conservativeScore - a.conservativeScore);
 
+    // Everyone is returned; only settled ratings carry a rank. Opponent
+    // diversity is reported as a stat but never withholds one — see
+    // PingpongEligibilityService for why that gate was removed.
+    //
+    // Ranking reads `provisional`, computed live from the player's own row,
+    // rather than the stored `isRankingEligible` flag: the flag is refreshed
+    // by a nightly cron, so gating on it would leave someone who has just
+    // won their eighth match off the board until the following day.
     let rank = 0;
     for (const player of enriched) {
       if (player.provisional || player.inactive || player.archived) continue;
-      if (!player.isRankingEligible) continue;
       rank += 1;
       player.rank = rank;
     }
@@ -181,6 +196,8 @@ export class PingpongPlayersService {
       inactive: classification.inactive,
       archived: classification.archived,
       isRankingEligible: player.isRankingEligible,
+      distinctOpponents21d: player.distinctOpponents21d,
+      diversityScore21d: player.diversityScore21d,
       rank: null,
     };
   }
