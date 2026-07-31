@@ -110,9 +110,7 @@ export class SeasonsService {
         startDate,
         endDate,
         totalCompetitors: activeCompetitors.length,
-        totalBettors: 0,
         totalRaces,
-        totalBets: 0,
         totalPingpongPlayers: pingpongPlayers.length,
         totalPingpongMatches,
       });

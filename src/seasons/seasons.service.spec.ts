@@ -143,9 +143,7 @@ describe('SeasonsService', () => {
         year,
         seasonName: 'Saison 1 - 2024',
         totalCompetitors: 2,
-        totalBettors: 5,
         totalRaces: 0,
-        totalBets: 15,
         startDate: new Date(2024, 0, 1),
         endDate: new Date(2024, 1, 0, 23, 59, 59, 999),
       };
@@ -261,9 +259,7 @@ describe('SeasonsService', () => {
         year,
         seasonName: 'Saison 1 - 2024',
         totalCompetitors: 0,
-        totalBettors: 0,
         totalRaces: 0,
-        totalBets: 0,
         startDate: new Date(2024, 0, 1),
         endDate: new Date(2024, 1, 0, 23, 59, 59, 999),
       };

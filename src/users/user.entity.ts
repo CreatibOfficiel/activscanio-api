@@ -74,15 +74,6 @@ export class User {
   @Column({ nullable: true })
   competitorId: string | null;
 
-  @Column({ type: 'int', nullable: true })
-  lastBoostUsedMonth: number | null;
-
-  @Column({ type: 'int', nullable: true })
-  lastBoostUsedYear: number | null;
-
-  @Column({ type: 'int', nullable: true })
-  lastBoostUsedSeason: number | null;
-
   // Gamification fields
   @Column({ type: 'int', default: 0 })
   @Index()

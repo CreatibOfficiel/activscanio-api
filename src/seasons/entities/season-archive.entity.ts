@@ -39,19 +39,8 @@ export class SeasonArchive {
   @Column({ type: 'int' })
   totalCompetitors: number;
 
-  /**
-   * Left over from the betting feature, which is gone. Kept as a column so
-   * archives written before its removal still load; always written as 0 now.
-   */
-  @Column({ type: 'int' })
-  totalBettors: number;
-
   @Column({ type: 'int' })
   totalRaces: number;
-
-  /** Same as totalBettors: a betting leftover, always 0 for new archives. */
-  @Column({ type: 'int' })
-  totalBets: number;
 
   /** Ping-pong players who played at least one match during the season. */
   @Column({ type: 'int', default: 0 })
