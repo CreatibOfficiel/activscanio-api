@@ -53,6 +53,24 @@ export const CRON_SCHEDULES = {
    * Saves current rating/rd/vol for ELO history chart
    */
   SNAPSHOT_COMPETITOR_ELO: '0 1 0 * * *',
+
+  /**
+   * Ping-pong inactivity decay
+   * Monday 03:30 UTC — after the season transition (00:05), no contention.
+   */
+  PINGPONG_RD_DECAY: '0 30 3 * * 1',
+
+  /**
+   * Ping-pong ELO snapshot
+   * Daily 00:02 UTC — one minute after the Mario Kart snapshot.
+   */
+  PINGPONG_SNAPSHOT_ELO: '0 2 0 * * *',
+
+  /**
+   * Ping-pong ranking eligibility refresh
+   * Daily 00:15 UTC — rolling 21-day window, after the snapshots.
+   */
+  PINGPONG_REFRESH_ELIGIBILITY: '0 15 0 * * *',
 };
 
 /**
@@ -70,6 +88,9 @@ export const TASK_EXECUTION_CONFIG = {
     participationStreakWarning: true,
     playStreakWarning: true,
     snapshotCompetitorElo: true,
+    pingpongRdDecay: true,
+    pingpongSnapshotElo: true,
+    pingpongRefreshEligibility: true,
   },
 
   /**
@@ -100,6 +121,9 @@ export const TASK_DESCRIPTIONS = {
   playStreakWarning: 'Play streak warning (Mon-Fri 09:00)',
   snapshotCompetitorElo:
     'Snapshot competitor ELO for history chart (Daily 00:01)',
+  pingpongRdDecay: 'Widen the deviation of inactive ping-pong players',
+  pingpongSnapshotElo: 'Snapshot ping-pong ratings for the history chart',
+  pingpongRefreshEligibility: 'Recompute ping-pong ranking eligibility',
 };
 
 /**
