@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { PingpongPlayersService } from './services/pingpong-players.service';
@@ -8,6 +8,7 @@ import { PingpongMatchService } from './services/pingpong-match.service';
 import { PingpongMatch } from './entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from './entities/pingpong-elo-snapshot.entity';
 import { EnrolPlayerDto, RecordMatchDto } from './dtos/record-match.dto';
+import { MATCH_PLAYER_RELATIONS, sanitizeMatch } from './utils/sanitize-match';
 
 @ApiTags('pingpong')
 @Controller('pingpong')
@@ -71,11 +72,27 @@ export class PingpongController {
     since.setDate(since.getDate() - parseInt(days, 10));
 
     return this.snapshotRepository.find({
-      where: { playerId: player.id },
+      // `since` was computed and then dropped: the query filtered on the
+      // player alone, so every request returned the full history however
+      // narrow a window the caller asked for.
+      // The column is a DATE, held as a string. Compare on the same shape
+      // rather than a Date, which TypeORM would not accept here.
+      where: {
+        playerId: player.id,
+        date: MoreThanOrEqual(since.toISOString().slice(0, 10)),
+      },
       order: { date: 'ASC' },
     });
   }
 
+  /**
+   * A player's matches, most recent first.
+   *
+   * Both players are embedded, same as `GET /pingpong/matches` — a caller
+   * building a rivalry list needs the other side named, and asking it to
+   * fetch the leaderboard for that is a second request to hide a missing
+   * join.
+   */
   @Public()
   @Get('players/:competitorId/matches')
   @ApiOperation({ summary: 'A player’s matches, most recent first' })
@@ -83,11 +100,14 @@ export class PingpongController {
     const player =
       await this.playersService.getPlayerByCompetitorId(competitorId);
 
-    return this.matchRepository.find({
+    const matches = await this.matchRepository.find({
       where: [{ playerAId: player.id }, { playerBId: player.id }],
+      relations: [...MATCH_PLAYER_RELATIONS],
       order: { playedAt: 'DESC' },
       take: 50,
     });
+
+    return matches.map(sanitizeMatch);
   }
 
   @Post('players')
@@ -97,14 +117,28 @@ export class PingpongController {
     return this.playersService.enrol(dto.competitorId);
   }
 
+  /**
+   * Recent matches, with both players named.
+   *
+   * The relations are loaded here rather than left to the caller. Returning
+   * bare `playerAId` / `playerBId` forced every consumer to fetch the whole
+   * leaderboard as well and join on the id itself — two requests for one
+   * screen, and the same join written again in each new consumer.
+   *
+   * One `find` with relations, not a lookup per row: fifty matches would be
+   * a hundred extra queries.
+   */
   @Public()
   @Get('matches')
   @ApiOperation({ summary: 'Recent matches' })
   async getMatches(@Query('limit') limit = '50') {
-    return this.matchRepository.find({
+    const matches = await this.matchRepository.find({
+      relations: [...MATCH_PLAYER_RELATIONS],
       order: { playedAt: 'DESC' },
       take: Math.min(parseInt(limit, 10) || 50, 200),
     });
+
+    return matches.map(sanitizeMatch);
   }
 
   @Post('matches')
