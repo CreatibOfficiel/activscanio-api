@@ -7,6 +7,7 @@ import { RacesService } from './races.service';
 import { RacesController } from './races.controller';
 import { RaceEventRepository } from './repositories/race-event.repository';
 import { RaceResultRepository } from './repositories/race-result.repository';
+import { RaceBestWinService } from './services/race-best-win.service';
 
 import { CompetitorsModule } from 'src/competitors/competitors.module';
 
@@ -16,7 +17,17 @@ import { CompetitorsModule } from 'src/competitors/competitors.module';
     forwardRef(() => CompetitorsModule),
   ],
   controllers: [RacesController],
-  providers: [RacesService, RaceEventRepository, RaceResultRepository],
-  exports: [RacesService, RaceEventRepository, RaceResultRepository],
+  providers: [
+    RacesService,
+    RaceEventRepository,
+    RaceResultRepository,
+    RaceBestWinService,
+  ],
+  exports: [
+    RacesService,
+    RaceEventRepository,
+    RaceResultRepository,
+    RaceBestWinService,
+  ],
 })
 export class RacesModule {}

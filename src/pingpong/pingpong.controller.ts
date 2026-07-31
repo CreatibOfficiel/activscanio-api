@@ -5,6 +5,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { PingpongPlayersService } from './services/pingpong-players.service';
 import { PingpongMatchService } from './services/pingpong-match.service';
+import { PingpongBestWinService } from './services/pingpong-best-win.service';
 import { PingpongMatch } from './entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from './entities/pingpong-elo-snapshot.entity';
 import { EnrolPlayerDto, RecordMatchDto } from './dtos/record-match.dto';
@@ -16,6 +17,7 @@ export class PingpongController {
   constructor(
     private readonly playersService: PingpongPlayersService,
     private readonly matchService: PingpongMatchService,
+    private readonly bestWinService: PingpongBestWinService,
     @InjectRepository(PingpongMatch)
     private readonly matchRepository: Repository<PingpongMatch>,
     @InjectRepository(PingpongEloSnapshot)
@@ -108,6 +110,48 @@ export class PingpongController {
     });
 
     return matches.map(sanitizeMatch);
+  }
+
+  /**
+   * The highest-rated opponent this player has ever beaten.
+   *
+   * A monotone record: it only ever goes up, and nobody else's play can
+   * lower it. That is the point — the leaderboard is zero-sum, so most of
+   * the office is permanently in its bottom half, and a peak rating would
+   * be a number the decay cron has already pushed out of reach.
+   *
+   * The opponent is named here rather than returned as a bare id, the same
+   * choice `GET /pingpong/matches` makes: leaving the join to the caller
+   * costs a second request for one line of text.
+   *
+   * `null` for a player who has never won — never a zero, which would read
+   * as having beaten someone rated nothing.
+   */
+  @Public()
+  @Get('players/:competitorId/best-win')
+  @ApiOperation({ summary: 'Highest-rated opponent this player has beaten' })
+  @ApiResponse({ status: 404, description: 'Player not found' })
+  async getBestWin(@Param('competitorId') competitorId: string) {
+    const player =
+      await this.playersService.getPlayerByCompetitorId(competitorId);
+
+    const best = await this.bestWinService.computeFor(player.id);
+    if (!best) return null;
+
+    const opponent = await this.playersService.findById(best.opponentId);
+
+    return {
+      ...best,
+      opponent: opponent
+        ? {
+            id: opponent.id,
+            competitorId: opponent.competitorId,
+            firstName: opponent.competitor?.firstName ?? '',
+            lastName: opponent.competitor?.lastName ?? '',
+            profilePictureUrl: opponent.competitor?.profilePictureUrl ?? '',
+          }
+        : null,
+    };
   }
 
   @Post('players')

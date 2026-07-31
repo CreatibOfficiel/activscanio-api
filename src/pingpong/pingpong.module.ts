@@ -10,6 +10,7 @@ import { PingpongMatchService } from './services/pingpong-match.service';
 import { PingpongPlayersService } from './services/pingpong-players.service';
 import { PingpongEligibilityService } from './services/pingpong-eligibility.service';
 import { PingpongHighlightStatsService } from './services/pingpong-highlight-stats.service';
+import { PingpongBestWinService } from './services/pingpong-best-win.service';
 import { PingpongDecayService } from './services/pingpong-decay.service';
 import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.service';
 
@@ -36,6 +37,7 @@ import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.s
     PingpongPlayersService,
     PingpongEligibilityService,
     PingpongHighlightStatsService,
+    PingpongBestWinService,
     PingpongDecayService,
     PingpongRankSnapshotService,
   ],
@@ -49,6 +51,7 @@ import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.s
     // Exported for the achievement engine, which reads per-match feats that
     // no column on the player can hold.
     PingpongHighlightStatsService,
+    PingpongBestWinService,
   ],
 })
 export class PingpongModule {}

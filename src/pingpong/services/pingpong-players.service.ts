@@ -180,6 +180,21 @@ export class PingpongPlayersService {
     return enriched;
   }
 
+  /**
+   * A player by their ping-pong id, or null.
+   *
+   * Returns null rather than throwing, unlike getPlayerByCompetitorId: this
+   * is used to name an opponent found in a match row, and a match whose
+   * opponent has since been deleted should degrade to an unnamed record
+   * rather than fail the whole request.
+   */
+  async findById(playerId: string): Promise<PingpongPlayer | null> {
+    return this.playerRepository.findOne({
+      where: { id: playerId },
+      relations: ['competitor'],
+    });
+  }
+
   async getPlayerByCompetitorId(
     competitorId: string,
     now: Date = new Date(),

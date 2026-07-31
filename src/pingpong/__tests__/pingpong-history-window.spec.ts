@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { PingpongController } from '../pingpong.controller';
 import { PingpongPlayersService } from '../services/pingpong-players.service';
 import { PingpongMatchService } from '../services/pingpong-match.service';
+import { PingpongBestWinService } from '../services/pingpong-best-win.service';
 import { PingpongMatch } from '../entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from '../entities/pingpong-elo-snapshot.entity';
 
@@ -35,6 +36,7 @@ describe('PingpongController — history window', () => {
           },
         },
         { provide: PingpongMatchService, useValue: {} },
+        { provide: PingpongBestWinService, useValue: {} },
         { provide: getRepositoryToken(PingpongMatch), useValue: {} },
         {
           provide: getRepositoryToken(PingpongEloSnapshot),
