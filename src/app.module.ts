@@ -28,6 +28,7 @@ import { UsersModule } from './users/users.module';
 import { TasksModule } from './tasks/tasks.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { SeasonsModule } from './seasons/seasons.module';
+import { PingpongModule } from './pingpong/pingpong.module';
 import { AchievementsModule } from './achievements/achievements.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ImageGenerationModule } from './image-generation/image-generation.module';
@@ -62,6 +63,7 @@ import { ExportModule } from './export/export.module';
     TasksModule,
     OnboardingModule,
     SeasonsModule,
+    PingpongModule,
     AchievementsModule,
     NotificationsModule,
     ImageGenerationModule,
