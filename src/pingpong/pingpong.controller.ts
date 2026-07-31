@@ -29,6 +29,20 @@ export class PingpongController {
     return this.playersService.getLeaderboard();
   }
 
+  /**
+   * Everyone who could play, enrolled or not.
+   *
+   * Feeds the match entry form. The leaderboard is the wrong source there:
+   * it is empty until someone plays, which leaves a first-time user with an
+   * empty picker and no way to start.
+   */
+  @Public()
+  @Get('selectable')
+  @ApiOperation({ summary: 'All competitors, with their enrolment status' })
+  async getSelectable() {
+    return this.playersService.getSelectableOpponents();
+  }
+
   @Public()
   @Get('players')
   @ApiOperation({ summary: 'All ping-pong players' })
@@ -97,9 +111,18 @@ export class PingpongController {
   @ApiOperation({ summary: 'Record a match' })
   @ApiResponse({ status: 400, description: 'Impossible score' })
   async recordMatch(@Body() dto: RecordMatchDto) {
+    // The ids arriving here are COMPETITOR ids: the entry form lists the
+    // whole office, most of whom have never played. Enrol both sides first,
+    // idempotently, so a first match needs no separate "join" step — one
+    // nobody would find, on a leaderboard that starts empty.
+    const [playerA, playerB] = await Promise.all([
+      this.playersService.ensureEnrolled(dto.playerAId),
+      this.playersService.ensureEnrolled(dto.playerBId),
+    ]);
+
     return this.matchService.recordMatch({
-      playerAId: dto.playerAId,
-      playerBId: dto.playerBId,
+      playerAId: playerA.id,
+      playerBId: playerB.id,
       sets: dto.sets,
       playedAt: dto.playedAt,
     });

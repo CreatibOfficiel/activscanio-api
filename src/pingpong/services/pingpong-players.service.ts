@@ -64,6 +64,60 @@ export class PingpongPlayersService {
     private readonly ratingService: PingpongRatingService,
   ) {}
 
+  /**
+   * Everyone in the office who could play, enrolled or not.
+   *
+   * The match entry form needs this rather than the leaderboard: on day one
+   * nobody is enrolled, so a form listing only enrolled players shows an
+   * empty search box with no explanation and no way forward. Enrolment then
+   * happens on the first recorded match.
+   */
+  async getSelectableOpponents(): Promise<
+    {
+      competitorId: string;
+      firstName: string;
+      lastName: string;
+      profilePictureUrl: string;
+      /** The ping-pong player id, or null for someone not yet enrolled. */
+      playerId: string | null;
+    }[]
+  > {
+    const [competitors, players] = await Promise.all([
+      this.competitorRepository.find(),
+      this.playerRepository.find(),
+    ]);
+
+    const playerByCompetitor = new Map(
+      players.map((player) => [player.competitorId, player]),
+    );
+
+    return competitors.map((competitor) => ({
+      competitorId: competitor.id,
+      firstName: competitor.firstName,
+      lastName: competitor.lastName,
+      profilePictureUrl: competitor.profilePictureUrl,
+      playerId: playerByCompetitor.get(competitor.id)?.id ?? null,
+    }));
+  }
+
+  /**
+   * Enrol a competitor, or return the player they already are.
+   *
+   * `enrol` rejects a duplicate with a 409, which is right for someone
+   * pressing a "join" button twice and wrong as a building block: recording
+   * a first match must enrol both sides, and two colleagues playing each
+   * other for the first time would otherwise race, one of them getting a
+   * conflict for a match they genuinely played.
+   */
+  async ensureEnrolled(competitorId: string): Promise<PingpongPlayer> {
+    const existing = await this.playerRepository.findOne({
+      where: { competitorId },
+    });
+    if (existing) return existing;
+
+    return this.enrol(competitorId);
+  }
+
   /** Enrol an existing competitor into ping-pong. */
   async enrol(competitorId: string): Promise<PingpongPlayer> {
     const competitor = await this.competitorRepository.findOne({
