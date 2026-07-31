@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { SeasonsService } from '../seasons.service';
 import { SeasonArchive } from '../entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from '../entities/archived-competitor-ranking.entity';
+import { ArchivedPingpongRanking } from '../entities/archived-pingpong-ranking.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { RaceEvent } from '../../races/race-event.entity';
 
@@ -81,6 +82,10 @@ describe('SeasonsService — surviving highlights', () => {
         {
           provide: getRepositoryToken(ArchivedCompetitorRanking),
           useValue: { createQueryBuilder: jest.fn(), find: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(ArchivedPingpongRanking),
+          useValue: { find: jest.fn() },
         },
         { provide: getRepositoryToken(Competitor), useValue: { find: jest.fn() } },
         { provide: getRepositoryToken(RaceEvent), useValue: { count: jest.fn() } },

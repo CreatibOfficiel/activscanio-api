@@ -100,4 +100,33 @@ export class SeasonsController {
     return await this.seasonsService.getCompetitorRankings(season.id);
   }
 
+  @Public()
+  @Get(':year/:month/pingpong')
+  @ApiOperation({ summary: 'Get ping-pong rankings for a specific season' })
+  @ApiParam({ name: 'year', description: 'Season year', example: '2024' })
+  @ApiParam({
+    name: 'month',
+    description: 'Season number (1-13)',
+    example: '1',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of ping-pong players with their final standings',
+  })
+  @ApiResponse({ status: 404, description: 'Season not found' })
+  async getPingpongRankings(
+    @Param('year') year: string,
+    @Param('month') month: string,
+  ) {
+    const season = await this.seasonsService.getSeason(
+      parseInt(month),
+      parseInt(year),
+    );
+
+    if (!season) {
+      throw new NotFoundException('Season not found');
+    }
+
+    return await this.seasonsService.getPingpongRankings(season.id);
+  }
 }

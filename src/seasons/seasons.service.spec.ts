@@ -5,6 +5,7 @@ import { Repository, QueryRunner } from 'typeorm';
 import { SeasonsService } from './seasons.service';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';
+import { ArchivedPingpongRanking } from './entities/archived-pingpong-ranking.entity';
 import { Competitor } from '../competitors/competitor.entity';
 
 describe('SeasonsService', () => {
@@ -51,6 +52,12 @@ describe('SeasonsService', () => {
         },
         {
           provide: getRepositoryToken(ArchivedCompetitorRanking),
+          useValue: {
+            find: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ArchivedPingpongRanking),
           useValue: {
             find: jest.fn(),
           },
@@ -121,7 +128,9 @@ describe('SeasonsService', () => {
     });
 
     it('should archive season successfully', async () => {
-      mockQueryRunner.manager.find.mockResolvedValueOnce(mockCompetitors); // Find competitors
+      mockQueryRunner.manager.find
+        .mockResolvedValueOnce(mockCompetitors) // Competitors
+        .mockResolvedValueOnce([]); // Ping-pong players
 
       mockQueryRunner.manager.count
         .mockResolvedValueOnce(10) // RaceEvent count
@@ -185,7 +194,9 @@ describe('SeasonsService', () => {
         currentMonthRaceCount: 3,
       }));
 
-      mockQueryRunner.manager.find.mockResolvedValueOnce(manyCompetitors);
+      mockQueryRunner.manager.find
+        .mockResolvedValueOnce(manyCompetitors)
+        .mockResolvedValueOnce([]); // Ping-pong players
 
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
@@ -217,7 +228,9 @@ describe('SeasonsService', () => {
     });
 
     it('should rollback transaction on error', async () => {
-      mockQueryRunner.manager.find.mockResolvedValueOnce([]); // Competitors
+      mockQueryRunner.manager.find
+        .mockResolvedValueOnce([]) // Competitors
+        .mockResolvedValueOnce([]); // Ping-pong players
       // clearAllMocks resets calls but not implementations, so a persistent
       // mockResolvedValue from an earlier test would swallow the rejection.
       mockQueryRunner.manager.count.mockReset();
@@ -236,7 +249,9 @@ describe('SeasonsService', () => {
     });
 
     it('should handle empty competitors list', async () => {
-      mockQueryRunner.manager.find.mockResolvedValueOnce([]); // No competitors
+      mockQueryRunner.manager.find
+        .mockResolvedValueOnce([]) // No competitors
+        .mockResolvedValueOnce([]); // Ping-pong players
 
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
@@ -263,7 +278,9 @@ describe('SeasonsService', () => {
     });
 
     it('should calculate correct date range', async () => {
-      mockQueryRunner.manager.find.mockResolvedValueOnce([]);
+      mockQueryRunner.manager.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]); // Ping-pong players
       mockQueryRunner.manager.count.mockResolvedValue(0);
 
       mockQueryRunner.manager.create.mockImplementation((entity, data) => {
