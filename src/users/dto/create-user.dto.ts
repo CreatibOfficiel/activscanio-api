@@ -1,5 +1,5 @@
 import { IsEmail, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { UserRole } from '../user.entity';
+import { SportPreference, UserRole } from '../user.entity';
 
 export class CreateUserDto {
   @IsString()
@@ -21,6 +21,11 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   @IsOptional()
   role?: UserRole;
+
+  /** Which sport this user follows. Defaults to both when omitted. */
+  @IsEnum(SportPreference)
+  @IsOptional()
+  sportPreference?: SportPreference;
 
   @IsOptional()
   @IsUUID()

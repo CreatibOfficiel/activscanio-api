@@ -17,6 +17,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { LinkCompetitorDto } from './dto/link-competitor.dto';
 import { SyncClerkUserDto } from './dto/sync-clerk-user.dto';
 import { ChangeCharacterDto } from './dto/change-character.dto';
+import { ChangeSportPreferenceDto } from './dto/change-sport-preference.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 
@@ -139,6 +140,27 @@ export class UsersController {
       dbUser.id,
       changeCharacterDto.characterVariantId,
     );
+  }
+
+  /**
+   * Change which sport the current user follows.
+   *
+   * A dedicated route rather than the generic PATCH :id, whose body accepts
+   * the whole UpdateUserDto — role and competitorId included. Users may
+   * change their own sport; they may not promote themselves or reassign
+   * which competitor they are.
+   *
+   * MUST stay above @Patch(':id') or the parameterised route shadows it.
+   */
+  @Patch('me/sport-preference')
+  async changeSportPreference(
+    @CurrentUser('clerkId') clerkId: string,
+    @Body() dto: ChangeSportPreferenceDto,
+  ) {
+    const dbUser = await this.usersService.getOrCreateByClerkId(clerkId);
+    return await this.usersService.update(dbUser.id, {
+      sportPreference: dto.sportPreference,
+    });
   }
 
   /**
