@@ -5,15 +5,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserAchievement } from '../../achievements/entities/user-achievement.entity';
 import { User } from '../../users/user.entity';
-import { Bet } from '../../betting/entities/bet.entity';
-import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
 
 describe('ExportService', () => {
   let service: ExportService;
   let userAchievementRepository: Repository<UserAchievement>;
   let userRepository: Repository<User>;
-  let betRepository: Repository<Bet>;
-  let rankingRepository: Repository<BettorRanking>;
 
   const mockUser = {
     id: 'user-123',
@@ -127,18 +123,6 @@ describe('ExportService', () => {
             findOne: jest.fn(),
           },
         },
-        {
-          provide: getRepositoryToken(Bet),
-          useValue: {
-            find: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(BettorRanking),
-          useValue: {
-            find: jest.fn(),
-          },
-        },
       ],
     }).compile();
 
@@ -147,10 +131,6 @@ describe('ExportService', () => {
       getRepositoryToken(UserAchievement),
     );
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    betRepository = module.get<Repository<Bet>>(getRepositoryToken(Bet));
-    rankingRepository = module.get<Repository<BettorRanking>>(
-      getRepositoryToken(BettorRanking),
-    );
   });
 
   it('should be defined', () => {
@@ -204,48 +184,6 @@ describe('ExportService', () => {
     });
   });
 
-  describe('exportBettingHistoryToCSV', () => {
-    it('should export betting history to CSV', async () => {
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-
-      const csv = await service.exportBettingHistoryToCSV('user-123');
-
-      expect(csv).toContain('"Betting Week"');
-      expect(csv).toContain('"Year"');
-      expect(csv).toContain('"Points Earned"');
-      expect(csv).toContain('Week 1');
-      expect(csv).toContain('Week 2');
-      expect(csv).toContain('45');
-      expect(csv).toContain('60');
-      expect(betRepository.find).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-        relations: ['bettingWeek'],
-        order: { createdAt: 'DESC' },
-        take: 500,
-      });
-    });
-
-    it('should show correct status for finalized and pending bets', async () => {
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-
-      const csv = await service.exportBettingHistoryToCSV('user-123');
-
-      expect(csv).toContain('Finalized');
-      expect(csv).toContain('Pending');
-    });
-
-    it('should limit to 500 bets', async () => {
-      jest.spyOn(betRepository, 'find').mockResolvedValue([]);
-
-      await service.exportBettingHistoryToCSV('user-123');
-
-      expect(betRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 500,
-        }),
-      );
-    });
-  });
 
   describe('exportStatsToJSON', () => {
     it('should export comprehensive stats to JSON', async () => {
@@ -253,10 +191,6 @@ describe('ExportService', () => {
       jest
         .spyOn(userAchievementRepository, 'find')
         .mockResolvedValue(mockAchievements as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
 
       const json = await service.exportStatsToJSON('user-123');
 
@@ -270,35 +204,12 @@ describe('ExportService', () => {
       });
     });
 
-    it('should calculate lifetime stats correctly', async () => {
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(userAchievementRepository, 'find')
-        .mockResolvedValue(mockAchievements as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
-
-      const json = await service.exportStatsToJSON('user-123');
-
-      expect(json.stats.lifetime).toEqual({
-        totalBetsPlaced: 3,
-        totalBetsWon: 2, // 2 finalized with points
-        winRate: 100, // 2/2 finalized bets won
-        totalPoints: 105, // 45 + 60
-      });
-    });
 
     it('should include achievements breakdown by rarity', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
       jest
         .spyOn(userAchievementRepository, 'find')
         .mockResolvedValue(mockAchievements as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
 
       const json = await service.exportStatsToJSON('user-123');
 
@@ -315,10 +226,6 @@ describe('ExportService', () => {
       jest
         .spyOn(userAchievementRepository, 'find')
         .mockResolvedValue(mockAchievements as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
 
       const json = await service.exportStatsToJSON('user-123');
 
@@ -333,10 +240,6 @@ describe('ExportService', () => {
       jest
         .spyOn(userAchievementRepository, 'find')
         .mockResolvedValue(mockAchievements as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(mockBets as any);
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
 
       const json = await service.exportStatsToJSON('user-123');
 
@@ -356,94 +259,6 @@ describe('ExportService', () => {
       );
     });
 
-    it('should handle zero win rate correctly', async () => {
-      const noBets = [];
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(userAchievementRepository, 'find')
-        .mockResolvedValue(mockAchievements as any);
-      jest.spyOn(betRepository, 'find').mockResolvedValue(noBets);
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
-
-      const json = await service.exportStatsToJSON('user-123');
-
-      expect(json.stats.lifetime.winRate).toBe(0);
-    });
   });
 
-  describe('exportLeaderboardToCSV', () => {
-    it('should export leaderboard to CSV', async () => {
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
-
-      const csv = await service.exportLeaderboardToCSV(1, 2024, 100);
-
-      expect(csv).toContain('"Rank"');
-      expect(csv).toContain('"User ID"');
-      expect(csv).toContain('"Points"');
-      expect(csv).toContain('5');
-      expect(csv).toContain('user-123');
-      expect(csv).toContain('450');
-      expect(rankingRepository.find).toHaveBeenCalledWith({
-        where: { seasonNumber: 1, year: 2024 },
-        order: { rank: 'ASC' },
-        take: 100,
-      });
-    });
-
-    it('should calculate win rate correctly', async () => {
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(mockRankings as any);
-
-      const csv = await service.exportLeaderboardToCSV(1, 2024, 100);
-
-      // 7 wins / 10 bets = 70%
-      expect(csv).toContain('70.00%');
-    });
-
-    it('should show "-" for win rate if no bets placed', async () => {
-      const rankingNoBets = [
-        {
-          ...mockRankings[0],
-          betsPlaced: 0,
-          betsWon: 0,
-        },
-      ];
-      jest
-        .spyOn(rankingRepository, 'find')
-        .mockResolvedValue(rankingNoBets as any);
-
-      const csv = await service.exportLeaderboardToCSV(1, 2024, 100);
-
-      expect(csv).toContain('-');
-    });
-
-    it('should respect limit parameter', async () => {
-      jest.spyOn(rankingRepository, 'find').mockResolvedValue([]);
-
-      await service.exportLeaderboardToCSV(1, 2024, 50);
-
-      expect(rankingRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 50,
-        }),
-      );
-    });
-
-    it('should default to 100 if no limit provided', async () => {
-      jest.spyOn(rankingRepository, 'find').mockResolvedValue([]);
-
-      await service.exportLeaderboardToCSV(1, 2024);
-
-      expect(rankingRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 100,
-        }),
-      );
-    });
-  });
 });

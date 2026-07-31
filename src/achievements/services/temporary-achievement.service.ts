@@ -4,8 +4,6 @@ import { Repository, MoreThanOrEqual, IsNull } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Achievement } from '../entities/achievement.entity';
 import { UserAchievement } from '../entities/user-achievement.entity';
-import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
-import { Bet } from '../../betting/entities/bet.entity';
 import { UserStreak } from '../entities/user-streak.entity';
 import { SeasonUtils } from '../../common/utils/season-utils';
 import { WeekUtils } from '../../common/utils/week-utils';
@@ -29,10 +27,6 @@ export class TemporaryAchievementService {
     private readonly achievementRepository: Repository<Achievement>,
     @InjectRepository(UserAchievement)
     private readonly userAchievementRepository: Repository<UserAchievement>,
-    @InjectRepository(BettorRanking)
-    private readonly bettorRankingRepository: Repository<BettorRanking>,
-    @InjectRepository(Bet)
-    private readonly betRepository: Repository<Bet>,
     @InjectRepository(UserStreak)
     private readonly userStreakRepository: Repository<UserStreak>,
     private readonly eventEmitter: EventEmitter2,
@@ -46,195 +40,10 @@ export class TemporaryAchievementService {
   async checkTemporaryAchievements(userId: string): Promise<void> {
     this.logger.debug(`Checking temporary achievements for user ${userId}`);
 
-    await this.checkRankingAchievements(userId);
-    await this.checkPerformanceAchievements(userId);
     await this.checkStreakAchievements(userId);
   }
 
-  /**
-   * Check ranking-based achievements (bronze/silver/gold medals)
-   * Awards based on current month ranking, revokes if rank changes
-   *
-   * @param userId - User ID
-   */
-  async checkRankingAchievements(userId: string): Promise<void> {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentSeason = SeasonUtils.getSeasonNumber(
-      WeekUtils.getISOWeek(now),
-      currentYear,
-    );
 
-    // Get user's current ranking for this season
-    const ranking = await this.bettorRankingRepository.findOne({
-      where: { userId, seasonNumber: currentSeason, year: currentYear },
-    });
-
-    if (!ranking) {
-      // User has no ranking this season, revoke all medals
-      await this.revokeAchievement(
-        userId,
-        'bronze_medal',
-        'No ranking for current month',
-      );
-      await this.revokeAchievement(
-        userId,
-        'silver_medal',
-        'No ranking for current month',
-      );
-      await this.revokeAchievement(
-        userId,
-        'gold_medal',
-        'No ranking for current month',
-      );
-      return;
-    }
-
-    // Check gold medal (rank = 1)
-    if (ranking.rank === 1) {
-      await this.awardTemporaryAchievement(userId, 'gold_medal');
-      await this.revokeAchievement(userId, 'silver_medal', 'Promoted to gold');
-      await this.revokeAchievement(userId, 'bronze_medal', 'Promoted to gold');
-    }
-    // Check silver medal (rank = 2)
-    else if (ranking.rank === 2) {
-      await this.awardTemporaryAchievement(userId, 'silver_medal');
-      await this.revokeAchievement(userId, 'gold_medal', 'Rank changed to 2');
-      await this.revokeAchievement(
-        userId,
-        'bronze_medal',
-        'Promoted to silver',
-      );
-    }
-    // Check bronze medal (rank = 3)
-    else if (ranking.rank === 3) {
-      await this.awardTemporaryAchievement(userId, 'bronze_medal');
-      await this.revokeAchievement(userId, 'gold_medal', 'Rank changed to 3');
-      await this.revokeAchievement(userId, 'silver_medal', 'Rank changed to 3');
-    }
-    // Rank > 3, revoke all medals
-    else {
-      await this.revokeAchievement(
-        userId,
-        'bronze_medal',
-        `Rank dropped to ${ranking.rank}`,
-      );
-      await this.revokeAchievement(
-        userId,
-        'silver_medal',
-        `Rank dropped to ${ranking.rank}`,
-      );
-      await this.revokeAchievement(
-        userId,
-        'gold_medal',
-        `Rank dropped to ${ranking.rank}`,
-      );
-    }
-  }
-
-  /**
-   * Check performance-based achievements (winrate over rolling 30 days)
-   *
-   * Achievements:
-   * - in_form: 60% winrate, min 10 bets
-   * - olympic_form: 75% winrate, min 15 bets
-   * - invincible: 90% winrate, min 20 bets
-   *
-   * @param userId - User ID
-   */
-  async checkPerformanceAchievements(userId: string): Promise<void> {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Get all finalized bets from last 30 days
-    const recentBets = await this.betRepository.find({
-      where: {
-        userId,
-        isFinalized: true,
-        createdAt: MoreThanOrEqual(thirtyDaysAgo),
-      },
-      relations: ['picks'],
-    });
-
-    if (recentBets.length === 0) {
-      // No recent bets, revoke all performance achievements
-      await this.revokeAchievement(
-        userId,
-        'in_form',
-        'No bets in last 30 days',
-      );
-      await this.revokeAchievement(
-        userId,
-        'olympic_form',
-        'No bets in last 30 days',
-      );
-      await this.revokeAchievement(
-        userId,
-        'invincible',
-        'No bets in last 30 days',
-      );
-      return;
-    }
-
-    // Calculate winrate (at least one correct pick = win)
-    const wins = recentBets.filter((bet) =>
-      bet.picks.some((pick) => pick.isCorrect),
-    ).length;
-    const winRate = (wins / recentBets.length) * 100;
-
-    this.logger.debug(
-      `User ${userId} - 30-day performance: ${wins}/${recentBets.length} (${winRate.toFixed(1)}%)`,
-    );
-
-    // Check invincible (90%, min 20 bets)
-    if (recentBets.length >= 20 && winRate >= 90) {
-      await this.awardTemporaryAchievement(userId, 'invincible');
-      await this.revokeAchievement(
-        userId,
-        'olympic_form',
-        'Upgraded to invincible',
-      );
-      await this.revokeAchievement(userId, 'in_form', 'Upgraded to invincible');
-    }
-    // Check olympic_form (75%, min 15 bets)
-    else if (recentBets.length >= 15 && winRate >= 75) {
-      await this.awardTemporaryAchievement(userId, 'olympic_form');
-      await this.revokeAchievement(
-        userId,
-        'invincible',
-        `Winrate dropped to ${winRate.toFixed(1)}%`,
-      );
-      await this.revokeAchievement(
-        userId,
-        'in_form',
-        'Upgraded to olympic form',
-      );
-    }
-    // Check in_form (60%, min 10 bets)
-    else if (recentBets.length >= 10 && winRate >= 60) {
-      await this.awardTemporaryAchievement(userId, 'in_form');
-      await this.revokeAchievement(
-        userId,
-        'invincible',
-        `Winrate dropped to ${winRate.toFixed(1)}%`,
-      );
-      await this.revokeAchievement(
-        userId,
-        'olympic_form',
-        `Winrate dropped to ${winRate.toFixed(1)}%`,
-      );
-    }
-    // Below threshold, revoke all
-    else {
-      const reason =
-        recentBets.length < 10
-          ? `Not enough bets (${recentBets.length}/10)`
-          : `Winrate too low (${winRate.toFixed(1)}%)`;
-      await this.revokeAchievement(userId, 'in_form', reason);
-      await this.revokeAchievement(userId, 'olympic_form', reason);
-      await this.revokeAchievement(userId, 'invincible', reason);
-    }
-  }
 
   /**
    * Check streak-based achievements (consecutive weekly participation)
@@ -440,11 +249,11 @@ export class TemporaryAchievementService {
   async checkAllUsersTemporaryAchievements(): Promise<void> {
     this.logger.log('Checking temporary achievements for all users...');
 
-    // Get all users who have at least one bet
-    const userIds = await this.betRepository
-      .createQueryBuilder('bet')
-      .select('DISTINCT bet.userId')
-      .getRawMany();
+    // Every user carrying a participation streak
+    const streaks = await this.userStreakRepository.find({
+      select: { userId: true },
+    });
+    const userIds = streaks.map((s) => ({ bet_userId: s.userId }));
 
     let processedCount = 0;
     let errorCount = 0;

@@ -12,8 +12,6 @@ import {
 import { UserAchievement } from '../entities/user-achievement.entity';
 import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
-import { BettorRanking } from '../../betting/entities/bettor-ranking.entity';
-import { Bet } from '../../betting/entities/bet.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { RaceCreatedEvent } from '../../races/events/race-created.event';
 import { XPLevelService, XPSource } from './xp-level.service';
@@ -38,51 +36,11 @@ export class AchievementCalculatorService {
     private readonly userStreakRepository: Repository<UserStreak>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(BettorRanking)
-    private readonly bettorRankingRepository: Repository<BettorRanking>,
-    @InjectRepository(Bet)
-    private readonly betRepository: Repository<Bet>,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
     private readonly xpLevelService: XPLevelService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
-
-  /**
-   * Listen to bet.finalized events and check for achievements
-   */
-  @OnEvent('bet.finalized')
-  async handleBetFinalized(context: BetFinalizedContext): Promise<void> {
-    this.logger.log(
-      `Checking achievements for user ${context.userId} after bet finalized`,
-    );
-
-    try {
-      const unlockedAchievements = await this.checkAchievements(
-        context.userId,
-        context,
-      );
-
-      if (unlockedAchievements.length > 0) {
-        this.logger.log(
-          `User ${context.userId} unlocked ${unlockedAchievements.length} achievement(s): ${unlockedAchievements.map((a) => a.achievementKey).join(', ')}`,
-        );
-
-        // Emit events for each unlocked achievement
-        for (const achievement of unlockedAchievements) {
-          this.eventEmitter.emit('achievement.unlocked', {
-            userId: context.userId,
-            achievement,
-            unlockedAt: achievement.unlockedAt,
-          });
-        }
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to check achievements for user ${context.userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    }
-  }
 
   /**
    * Listen to race.created events and check racing achievements for competitors
@@ -126,7 +84,6 @@ export class AchievementCalculatorService {
    * Check and unlock achievements for a user
    *
    * @param userId - User ID
-   * @param context - Bet finalized context (optional, for optimization)
    * @returns List of newly unlocked achievements
    */
 
@@ -291,62 +248,9 @@ export class AchievementCalculatorService {
   ): number {
     // Determine if we should use monthly or lifetime stats
     const isMonthly = scope === AchievementScope.MONTHLY;
+    void isMonthly;
 
     switch (metric) {
-      // Betting counts
-      case 'betsPlaced':
-        return isMonthly
-          ? userStats.monthlyBetsPlaced
-          : userStats.totalBetsPlaced;
-      case 'betsWon':
-        return isMonthly ? userStats.monthlyBetsWon : userStats.totalBetsWon;
-      case 'perfectBets':
-        return isMonthly
-          ? userStats.monthlyPerfectBets
-          : userStats.totalPerfectBets;
-      case 'totalPoints':
-        return isMonthly ? userStats.monthlyPoints : userStats.totalPoints;
-
-      // Win rate
-      case 'winRate':
-        return userStats.winRate;
-
-      // Partial wins
-      case 'partialWins':
-        return userStats.partialWins;
-
-      // Boosts
-      case 'boostsUsed':
-        return userStats.totalBoostsUsed;
-      case 'consecutiveBoostMonths':
-        return userStats.consecutiveBoostMonths;
-
-      // High odds
-      case 'highOddsWins':
-        return userStats.highOddsWins;
-      case 'boostedHighOddsWins':
-        return userStats.boostedHighOddsWins;
-
-      // Streaks
-      case 'monthlyStreak':
-        return userStats.currentMonthlyStreak;
-      case 'lifetimeStreak':
-        return userStats.longestLifetimeStreak;
-      case 'consecutiveWins':
-        return userStats.currentWinStreak;
-
-      // Ranking
-      case 'rank':
-        return isMonthly
-          ? userStats.monthlyRank || 999
-          : userStats.bestMonthlyRank || 999;
-      case 'consecutiveMonthlyWins':
-        return userStats.consecutiveMonthlyWins;
-
-      // Special
-      case 'comebackBets':
-        return userStats.comebackBets;
-
       // Competitor (racing) metrics
       case 'competitorTotalWins':
         return userStats.competitorTotalWins;
@@ -378,180 +282,11 @@ export class AchievementCalculatorService {
    * @returns User statistics
    */
   private async getUserStats(userId: string): Promise<UserStats> {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentSeason = SeasonUtils.getSeasonNumber(
-      WeekUtils.getISOWeek(now),
-      currentYear,
-    );
-
-    // Get all user bets
-    const allBets = await this.betRepository.find({
-      where: { userId },
-      relations: ['picks'],
-    });
-
-    // Get current season ranking
-    const currentMonthRanking = await this.bettorRankingRepository.findOne({
-      where: { userId, seasonNumber: currentSeason, year: currentYear },
-    });
-
-    // Get all historical rankings for best rank
-    const allRankings = await this.bettorRankingRepository.find({
-      where: { userId },
-      order: { rank: 'ASC' },
-    });
-
-    // Get user streak
     const userStreak = await this.userStreakRepository.findOne({
       where: { userId },
     });
 
-    // Calculate stats
-    const totalBetsPlaced = allBets.length;
-    const totalBetsWon = allBets.filter(
-      (bet) => bet.isFinalized && bet.pointsEarned > 0,
-    ).length;
-    const totalPerfectBets = allBets.filter(
-      (bet) => bet.isFinalized && bet.picks.every((pick) => pick.isCorrect),
-    ).length;
-    const totalPoints = allBets.reduce(
-      (sum, bet) => sum + (bet.pointsEarned || 0),
-      0,
-    );
-
-    const winRate =
-      totalBetsPlaced > 0 ? (totalBetsWon / totalBetsPlaced) * 100 : 0;
-
-    // Partial wins (2/3 correct)
-    const partialWins = allBets.filter((bet) => {
-      if (!bet.isFinalized) return false;
-      const correctCount = bet.picks.filter((pick) => pick.isCorrect).length;
-      return correctCount === 2 && bet.picks.length === 3;
-    }).length;
-
-    // Boost stats
-    const totalBoostsUsed = allBets.filter((bet) =>
-      bet.picks.some((pick) => pick.hasBoost),
-    ).length;
-
-    // High odds wins
-    const highOddsWins = allBets.filter((bet) => {
-      if (!bet.isFinalized || bet.pointsEarned <= 0) return false;
-      return bet.picks.some((pick) => pick.isCorrect && pick.oddAtBet > 10);
-    }).length;
-
-    const boostedHighOddsWins = allBets.filter((bet) => {
-      if (!bet.isFinalized || bet.pointsEarned <= 0) return false;
-      return bet.picks.some(
-        (pick) => pick.isCorrect && pick.hasBoost && pick.oddAtBet > 10,
-      );
-    }).length;
-
-    // Calculate consecutive boost seasons
-    const boostsBySeason = new Map<string, boolean>();
-    allBets.forEach((bet) => {
-      const hasBoost = bet.picks.some((pick) => pick.hasBoost);
-      if (hasBoost) {
-        const betDate = new Date(bet.createdAt);
-        const betSeason = SeasonUtils.getSeasonNumber(
-          WeekUtils.getISOWeek(betDate),
-          betDate.getFullYear(),
-        );
-        const seasonKey = `${betDate.getFullYear()}-${betSeason}`;
-        boostsBySeason.set(seasonKey, true);
-      }
-    });
-
-    // Count consecutive seasons with boosts (from current season backwards)
-    let consecutiveBoostMonths = 0;
-    let checkYear = currentYear;
-    let checkSeason = currentSeason;
-    while (true) {
-      const seasonKey = `${checkYear}-${checkSeason}`;
-      if (boostsBySeason.has(seasonKey)) {
-        consecutiveBoostMonths++;
-        // Go to previous season
-        const prev = SeasonUtils.getPreviousSeason(checkSeason, checkYear);
-        checkSeason = prev.seasonNumber;
-        checkYear = prev.year;
-      } else {
-        break;
-      }
-      // Safety: don't go back more than 26 seasons
-      if (consecutiveBoostMonths >= 26) break;
-    }
-
-    // Calculate comeback bets (winning after 3+ consecutive losses)
-    const sortedBets = [...allBets].sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    );
-    let comebackBets = 0;
-    let consecutiveLosses = 0;
-
-    for (const bet of sortedBets) {
-      if (!bet.isFinalized) continue;
-
-      const isWin = bet.pointsEarned > 0;
-
-      if (isWin) {
-        // If we had 3+ consecutive losses, this is a comeback
-        if (consecutiveLosses >= 3) {
-          comebackBets++;
-        }
-        consecutiveLosses = 0;
-      } else {
-        consecutiveLosses++;
-      }
-    }
-
-    // Season stats (filter bets belonging to the current season)
-    const monthlyBets = allBets.filter((bet) => {
-      const betDate = new Date(bet.createdAt);
-      const betSeason = SeasonUtils.getSeasonNumber(
-        WeekUtils.getISOWeek(betDate),
-        betDate.getFullYear(),
-      );
-      return (
-        betSeason === currentSeason && betDate.getFullYear() === currentYear
-      );
-    });
-
-    const monthlyBetsPlaced = monthlyBets.length;
-    const monthlyBetsWon = monthlyBets.filter(
-      (bet) => bet.isFinalized && bet.pointsEarned > 0,
-    ).length;
-    const monthlyPerfectBets = monthlyBets.filter(
-      (bet) => bet.isFinalized && bet.picks.every((pick) => pick.isCorrect),
-    ).length;
-    const monthlyPoints = monthlyBets.reduce(
-      (sum, bet) => sum + (bet.pointsEarned || 0),
-      0,
-    );
-
-    // Best rank
-    const bestMonthlyRank =
-      allRankings.length > 0 && allRankings[0].rank !== null
-        ? allRankings[0].rank
-        : null;
-
-    // Consecutive monthly wins (rank 1)
-    let consecutiveMonthlyWins = 0;
-    const sortedRankings = allRankings.sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      return b.seasonNumber - a.seasonNumber;
-    });
-
-    for (const ranking of sortedRankings) {
-      if (ranking.rank === 1) {
-        consecutiveMonthlyWins++;
-      } else {
-        break;
-      }
-    }
-
-    // Load competitor stats if user is a competitor
+    // Load competitor stats if the user is linked to one
     const user = await this.userRepository.findOne({ where: { id: userId } });
     let isCompetitor = false;
     let competitor: Competitor | null = null;
@@ -565,29 +300,11 @@ export class AchievementCalculatorService {
 
     return {
       userId,
-      totalBetsPlaced,
-      totalBetsWon,
-      totalPerfectBets,
-      totalPoints,
-      winRate,
-      partialWins,
-      totalBoostsUsed,
-      consecutiveBoostMonths,
-      highOddsWins,
-      boostedHighOddsWins,
       currentMonthlyStreak: userStreak?.currentMonthlyStreak || 0,
       longestLifetimeStreak: userStreak?.longestLifetimeStreak || 0,
       currentLifetimeStreak: userStreak?.currentLifetimeStreak || 0,
       currentWinStreak: userStreak?.currentWinStreak || 0,
       bestWinStreak: userStreak?.bestWinStreak || 0,
-      monthlyBetsPlaced,
-      monthlyBetsWon,
-      monthlyPerfectBets,
-      monthlyPoints,
-      monthlyRank: currentMonthRanking?.rank || null,
-      bestMonthlyRank,
-      consecutiveMonthlyWins,
-      comebackBets,
       isCompetitor,
       competitorTotalWins: competitor?.totalWins ?? 0,
       competitorRaceCount: competitor?.raceCount ?? 0,

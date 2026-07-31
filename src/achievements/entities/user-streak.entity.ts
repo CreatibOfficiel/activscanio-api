@@ -24,10 +24,10 @@ export class UserStreak {
   currentMonthlyStreak: number;
 
   @Column({ type: 'int', nullable: true })
-  lastBetWeekNumber: number | null; // ISO week number (1-52)
+  lastParticipationWeekNumber: number | null; // ISO week number (1-52)
 
   @Column({ type: 'int', nullable: true })
-  lastBetYear: number | null;
+  lastParticipationYear: number | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   monthlyStreakStartedAt: Date | null;
@@ -45,10 +45,10 @@ export class UserStreak {
 
   // Warning dedup
   @Column({ type: 'int', nullable: true })
-  lastBettingWarningWeek: number | null;
+  lastParticipationWarningWeek: number | null;
 
   @Column({ type: 'int', nullable: true })
-  lastBettingWarningYear: number | null;
+  lastParticipationWarningYear: number | null;
 
   // Win streaks
   @Column({ type: 'int', default: 0 })
@@ -66,13 +66,13 @@ export class UserStreak {
 
   // Betting streak loss tracking
   @Column({ type: 'int', nullable: true })
-  bettingStreakLostValue: number | null;
+  participationStreakLostValue: number | null;
 
   @Column({ type: 'timestamptz', nullable: true })
-  bettingStreakLostAt: Date | null;
+  participationStreakLostAt: Date | null;
 
   @Column({ type: 'timestamptz', nullable: true })
-  bettingStreakLossSeenAt: Date | null;
+  participationStreakLossSeenAt: Date | null;
 
   // Metadata
   @Column({ type: 'int', default: 0 })

@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { UserStreak } from '../entities/user-streak.entity';
-import { BettingWeek } from '../../betting/entities/betting-week.entity';
 import { User } from '../../users/user.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
@@ -24,8 +23,6 @@ export class StreakTrackerService {
   constructor(
     @InjectRepository(UserStreak)
     private readonly userStreakRepository: Repository<UserStreak>,
-    @InjectRepository(BettingWeek)
-    private readonly bettingWeekRepository: Repository<BettingWeek>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(Competitor)
@@ -48,13 +45,13 @@ export class StreakTrackerService {
 
     let bettingStreakLoss: { lostValue: number; lostAt: Date } | null = null;
     if (
-      userStreak?.bettingStreakLostValue &&
-      userStreak.bettingStreakLostAt &&
-      !userStreak.bettingStreakLossSeenAt
+      userStreak?.participationStreakLostValue &&
+      userStreak.participationStreakLostAt &&
+      !userStreak.participationStreakLossSeenAt
     ) {
       bettingStreakLoss = {
-        lostValue: userStreak.bettingStreakLostValue,
-        lostAt: userStreak.bettingStreakLostAt,
+        lostValue: userStreak.participationStreakLostValue,
+        lostAt: userStreak.participationStreakLostAt,
       };
     }
 
@@ -90,7 +87,7 @@ export class StreakTrackerService {
 
     await this.userStreakRepository.update(
       { userId },
-      { bettingStreakLossSeenAt: now },
+      { participationStreakLossSeenAt: now },
     );
 
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -102,15 +99,17 @@ export class StreakTrackerService {
   }
 
   /**
-   * Update user streak when they place a bet
+   * Update a user's weekly participation streak.
    *
    * @param userId - User ID
-   * @param bettingWeekId - Betting week ID
+   * @param weekNumber - ISO week of the participation
+   * @param year - ISO week-numbering year
    * @returns Updated UserStreak
    */
   async updateStreak(
     userId: string,
-    bettingWeekId: string,
+    weekNumber: number,
+    year: number,
   ): Promise<UserStreak> {
     // Get or create user streak
     let userStreak = await this.userStreakRepository.findOne({
@@ -127,24 +126,13 @@ export class StreakTrackerService {
       });
     }
 
-    // Get betting week to determine the week number
-    const bettingWeek = await this.bettingWeekRepository.findOne({
-      where: { id: bettingWeekId },
-    });
-
-    if (!bettingWeek) {
-      throw new Error(`Betting week ${bettingWeekId} not found`);
-    }
-
-    // Calculate ISO week number and year
-    const weekDate = new Date(bettingWeek.startDate);
-    const currentWeekNumber = getISOWeek(weekDate);
-    const currentYear = getISOWeekYear(weekDate);
+    const currentWeekNumber = weekNumber;
+    const currentYear = year;
 
     // Check if this is a consecutive week
     const isConsecutive = this.isConsecutiveWeek(
-      userStreak.lastBetWeekNumber,
-      userStreak.lastBetYear,
+      userStreak.lastParticipationWeekNumber,
+      userStreak.lastParticipationYear,
       currentWeekNumber,
       currentYear,
     );
@@ -160,8 +148,8 @@ export class StreakTrackerService {
     } else {
       // Check if it's the same week (duplicate bet, shouldn't happen but handle it)
       if (
-        userStreak.lastBetWeekNumber === currentWeekNumber &&
-        userStreak.lastBetYear === currentYear
+        userStreak.lastParticipationWeekNumber === currentWeekNumber &&
+        userStreak.lastParticipationYear === currentYear
       ) {
         // Same week, don't update streak
         this.logger.debug(`User ${userId}: Bet in same week, streak unchanged`);
@@ -175,12 +163,12 @@ export class StreakTrackerService {
         );
 
         // Track the lost streak for notification
-        userStreak.bettingStreakLostValue = userStreak.currentMonthlyStreak;
-        userStreak.bettingStreakLostAt = new Date();
-        userStreak.bettingStreakLossSeenAt = null;
+        userStreak.participationStreakLostValue = userStreak.currentMonthlyStreak;
+        userStreak.participationStreakLostAt = new Date();
+        userStreak.participationStreakLossSeenAt = null;
 
         // Emit streak lost event
-        this.eventEmitter.emit('streak.betting_lost', {
+        this.eventEmitter.emit('streak.participation_lost', {
           userId,
           lostValue: userStreak.currentMonthlyStreak,
           lostAt: new Date(),
@@ -219,8 +207,8 @@ export class StreakTrackerService {
     }
 
     // Update last bet info
-    userStreak.lastBetWeekNumber = currentWeekNumber;
-    userStreak.lastBetYear = currentYear;
+    userStreak.lastParticipationWeekNumber = currentWeekNumber;
+    userStreak.lastParticipationYear = currentYear;
     userStreak.totalWeeksParticipated += 1;
 
     // Save and return
@@ -284,7 +272,8 @@ export class StreakTrackerService {
    */
   async updateWinStreak(
     userId: string,
-    bettingWeekId: string,
+    weekNumber: number,
+    year: number,
     isWin: boolean,
   ): Promise<void> {
     let userStreak = await this.userStreakRepository.findOne({
@@ -303,18 +292,8 @@ export class StreakTrackerService {
       });
     }
 
-    // Get betting week to determine the week number
-    const bettingWeek = await this.bettingWeekRepository.findOne({
-      where: { id: bettingWeekId },
-    });
-
-    if (!bettingWeek) {
-      throw new Error(`Betting week ${bettingWeekId} not found`);
-    }
-
-    const weekDate = new Date(bettingWeek.startDate);
-    const currentWeekNumber = getISOWeek(weekDate);
-    const currentYear = getISOWeekYear(weekDate);
+    const currentWeekNumber = weekNumber;
+    const currentYear = year;
 
     // Dedup: skip if already processed this week
     if (
@@ -416,7 +395,7 @@ export class StreakTrackerService {
       {
         currentMonthlyStreak: 0,
         monthlyStreakStartedAt: null,
-        lastBetWeekNumber: null,
+        lastParticipationWeekNumber: null,
         currentLifetimeStreak: 0,
         lifetimeStreakStartedAt: null,
       },
@@ -429,13 +408,13 @@ export class StreakTrackerService {
         await this.userStreakRepository.update(
           { id: streak.id },
           {
-            bettingStreakLostValue: streak.currentMonthlyStreak,
-            bettingStreakLostAt: now,
-            bettingStreakLossSeenAt: null,
+            participationStreakLostValue: streak.currentMonthlyStreak,
+            participationStreakLostAt: now,
+            participationStreakLossSeenAt: null,
           },
         );
 
-        this.eventEmitter.emit('streak.betting_lost', {
+        this.eventEmitter.emit('streak.participation_lost', {
           userId: streak.userId,
           lostValue: streak.currentMonthlyStreak,
           lostAt: now,
@@ -501,11 +480,11 @@ export class StreakTrackerService {
       if (bettedUserIds.includes(streak.userId)) continue;
 
       if (streak.currentMonthlyStreak > 0) {
-        streak.bettingStreakLostValue = streak.currentMonthlyStreak;
-        streak.bettingStreakLostAt = new Date();
-        streak.bettingStreakLossSeenAt = null;
+        streak.participationStreakLostValue = streak.currentMonthlyStreak;
+        streak.participationStreakLostAt = new Date();
+        streak.participationStreakLossSeenAt = null;
 
-        this.eventEmitter.emit('streak.betting_lost', {
+        this.eventEmitter.emit('streak.participation_lost', {
           userId: streak.userId,
           lostValue: streak.currentMonthlyStreak,
           lostAt: new Date(),

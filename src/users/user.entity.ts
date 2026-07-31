@@ -10,8 +10,6 @@ import {
   Index,
 } from 'typeorm';
 import { Competitor } from '../competitors/competitor.entity';
-import { Bet } from '../betting/entities/bet.entity';
-import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 
 export enum UserRole {
   PENDING = 'pending', // New user, onboarding not completed
@@ -79,12 +77,6 @@ export class User {
   @OneToOne(() => Competitor, { nullable: true, eager: false })
   @JoinColumn({ name: 'competitorId' })
   competitor: Competitor;
-
-  @OneToMany(() => Bet, (bet) => bet.user)
-  bets: Bet[];
-
-  @OneToMany(() => BettorRanking, (ranking) => ranking.user)
-  rankings: BettorRanking[];
 
   @CreateDateColumn()
   createdAt: Date;

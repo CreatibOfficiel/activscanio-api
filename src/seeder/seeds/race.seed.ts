@@ -3,10 +3,6 @@ import { Logger } from '@nestjs/common';
 import { RaceEvent } from 'src/races/race-event.entity';
 import { RaceResult } from 'src/races/race-result.entity';
 import { Competitor } from 'src/competitors/competitor.entity';
-import {
-  BettingWeek,
-  BettingWeekStatus,
-} from 'src/betting/entities/betting-week.entity';
 import { seededRandom, getScoreForRank, addDays } from '../utils/seed-helpers';
 
 const logger = new Logger('RaceSeed');
@@ -17,7 +13,6 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
   const raceRepository = dataSource.getRepository(RaceEvent);
   const raceResultRepository = dataSource.getRepository(RaceResult);
   const competitorRepository = dataSource.getRepository(Competitor);
-  const bettingWeekRepository = dataSource.getRepository(BettingWeek);
 
   // Check if we already have races
   const existingCount = await raceRepository.count();
@@ -27,8 +22,12 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
   }
 
   const competitors = await competitorRepository.find();
-  const bettingWeeks = await bettingWeekRepository.find({
-    order: { startDate: 'ASC' },
+  // Eight recent weeks, Monday-anchored, replacing the old betting weeks.
+  const bettingWeeks = Array.from({ length: 8 }, (_, i) => {
+    const start = new Date();
+    start.setDate(start.getDate() - (7 - i) * 7);
+    start.setHours(0, 0, 0, 0);
+    return { startDate: start, isCurrent: i === 7 };
   });
 
   if (competitors.length === 0) {
@@ -36,10 +35,6 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
     return [];
   }
 
-  if (bettingWeeks.length === 0) {
-    logger.warn('⚠️ No betting weeks found. Please seed betting weeks first.');
-    return [];
-  }
 
   const racesToCreate: RaceEvent[] = [];
   const resultsToCreate: RaceResult[] = [];
@@ -72,7 +67,7 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
   today.setHours(23, 59, 59, 999); // End of today
 
   for (const week of bettingWeeks) {
-    const isOpenWeek = week.status === BettingWeekStatus.OPEN;
+    const isOpenWeek = week.isCurrent;
 
     // For open weeks, generate fewer races (2-4) only for past days
     // For closed weeks, generate 3-7 races
@@ -114,7 +109,6 @@ export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
       race.date = raceDate;
       race.month = raceDate.getMonth() + 1;
       race.year = raceDate.getFullYear();
-      race.bettingWeekId = week.id;
 
       // Select 4 random participants
       const participants = seededRandom.pickMultiple(

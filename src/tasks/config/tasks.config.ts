@@ -14,69 +14,32 @@
  * │ │ │ │ │ │
  * * * * * * *
  */
-
-/**
- * Cron schedules for betting system
- */
-export const BETTING_CRON_SCHEDULES = {
+export const CRON_SCHEDULES = {
   /**
-   * Reset weekly activity flags
-   * Every Monday at 00:00 UTC (BEFORE week creation so odds use fresh flags)
+   * Season transition (archive, streak reset, ELO reset)
+   * Monday 00:05 UTC, only on the first week of a 4-week season.
+   */
+  SEASON_TRANSITION: '0 5 0 * * 1',
+
+  /**
+   * Weekly activity reset
+   * Every Monday at 00:00 UTC
    */
   RESET_WEEKLY_ACTIVITY: '0 0 0 * * 1',
 
   /**
-   * Create new betting week
-   * Every Monday at 00:05 UTC (after reset so initial odds use current week flags)
-   */
-  CREATE_WEEK: '0 5 0 * * 1',
-
-  /**
-   * Close current betting week
-   * Every Tuesday at 00:00 UTC (= Monday midnight)
-   * This gives 6 days of uncertainty (Tuesday to Sunday)
-   * before the podium is determined on Sunday 20:00
-   */
-  CLOSE_WEEK: '0 0 0 * * 2',
-
-  /**
-   * Finalize betting week (determine podium + calculate points)
-   * Every Sunday at 20:00 UTC (after closing)
-   */
-  FINALIZE_WEEK: '0 0 20 * * 0',
-
-  /**
-   * Recalculate season rankings
-   * Every Sunday at 20:03 UTC (after all finalization)
-   */
-  RECALCULATE_RANKINGS: '0 3 20 * * 0',
-
-  // Season transition tasks (archive, reset boosts, streaks, ELO) are now
-  // triggered by handleCreateWeek on the first week of each 4-week season,
-  // instead of running on the 1st of every month. This guarantees the reset
-  // happens AFTER the last Sunday finalization of the previous season.
-
-  /**
-   * Snapshot competitor ranks (daily)
-   * Every weekday (Mon-Fri) at 00:00 UTC
-   * Saves current rank based on conservativeScore for trend calculation
+   * Snapshot competitor ranks (weekdays)
+   * Mon-Fri at 00:00 UTC
    */
   SNAPSHOT_COMPETITOR_RANKS: '0 0 0 * * 1-5',
 
   /**
-   * Snapshot bettor ranks (weekly)
-   * Every Sunday at 20:05 UTC (after RECALCULATE_RANKINGS at 20:03)
-   * Saves current rank based on totalPoints for trend calculation
-   */
-  SNAPSHOT_BETTOR_RANKS: '0 5 20 * * 0',
-
-  /**
-   * Betting streak warning
+   * Participation streak warning
    * Every Monday at 18:00 UTC (20h Paris)
    * Since the betting window closes at Tuesday 00:00 UTC,
    * this is the last chance reminder on the only betting day.
    */
-  BETTING_STREAK_WARNING_EARLY: '0 0 18 * * 1',
+  PARTICIPATION_STREAK_WARNING: '0 0 18 * * 1',
 
   /**
    * Play streak warning
@@ -101,14 +64,10 @@ export const TASK_EXECUTION_CONFIG = {
    * Useful for development or maintenance
    */
   enabledTasks: {
-    createWeek: true,
+    seasonTransition: true,
     resetWeeklyActivity: true,
-    closeWeek: true,
-    finalizeWeek: true,
-    recalculateRankings: true,
     snapshotCompetitorRanks: true,
-    snapshotBettorRanks: true,
-    bettingStreakWarningEarly: true,
+    participationStreakWarning: true,
     playStreakWarning: true,
     snapshotCompetitorElo: true,
   },
@@ -133,15 +92,11 @@ export const TASK_EXECUTION_CONFIG = {
  */
 export const TASK_DESCRIPTIONS = {
   resetWeeklyActivity: 'Reset weekly activity flags (Monday 00:00)',
-  createWeek:
+  seasonTransition:
     'Create new betting week + season transition if needed (Monday 00:05)',
-  closeWeek: 'Close betting week (Tuesday 00:00 = Monday midnight)',
-  finalizeWeek: 'Finalize betting week and calculate points (Sunday 20:00)',
-  recalculateRankings: 'Recalculate season rankings (Sunday 20:03)',
   snapshotCompetitorRanks:
     'Snapshot competitor ranks for trends (Mon-Fri 00:00)',
-  snapshotBettorRanks: 'Snapshot bettor ranks for trends (Sunday 20:05)',
-  bettingStreakWarningEarly: 'Betting streak warning (Monday 18:00)',
+  participationStreakWarning: 'Betting streak warning (Monday 18:00)',
   playStreakWarning: 'Play streak warning (Mon-Fri 09:00)',
   snapshotCompetitorElo:
     'Snapshot competitor ELO for history chart (Daily 00:01)',
@@ -153,20 +108,3 @@ export const TASK_DESCRIPTIONS = {
  * How to determine the top 3 competitors for a week.
  * Based on conservative score (ELO - 2*RD) at end of week.
  */
-export const PODIUM_DETERMINATION_CONFIG = {
-  /**
-   * Scoring method for podium determination
-   * - 'conservative': rating - 2 * rd (default, more stable)
-   * - 'rating': raw rating (more volatile)
-   * - 'race_count': most races wins (activity-based)
-   */
-  scoringMethod: 'conservative' as 'conservative' | 'rating' | 'race_count',
-
-  /**
-   * Tie-breaking rules (in order of priority)
-   * 1. Higher rating
-   * 2. Lower RD (more consistent)
-   * 3. More races played
-   */
-  tieBreakers: ['rating', 'rd', 'raceCount'] as const,
-};

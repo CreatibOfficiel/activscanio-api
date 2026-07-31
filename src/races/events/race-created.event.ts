@@ -5,8 +5,5 @@ import { RaceEvent } from '../race-event.entity';
  * Used to trigger odds recalculation and other side effects
  */
 export class RaceCreatedEvent {
-  constructor(
-    public readonly race: RaceEvent,
-    public readonly bettingWeekId?: string,
-  ) {}
+  constructor(public readonly race: RaceEvent) {}
 }

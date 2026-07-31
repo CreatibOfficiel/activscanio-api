@@ -4,29 +4,11 @@ import { In, Repository, QueryRunner, Between } from 'typeorm';
 import { SeasonArchive } from './entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from './entities/archived-competitor-ranking.entity';
 import { Competitor } from '../competitors/competitor.entity';
-import { BettingWeek } from '../betting/entities/betting-week.entity';
-import { Bet } from '../betting/entities/bet.entity';
-import { BetPick } from '../betting/entities/bet-pick.entity';
-import { BettorRanking } from '../betting/entities/bettor-ranking.entity';
 import { RaceEvent } from '../races/race-event.entity';
 import { SeasonUtils } from '../common/utils/season-utils';
 import { WeekUtils } from '../common/utils/week-utils';
 
 export interface SeasonHighlights {
-  perfectScores: { userName: string; week: number; points: number }[];
-  perfectPodiums: { userName: string; week: number; points: number }[];
-  highestBetScore: {
-    userName: string;
-    week: number;
-    points: number;
-  } | null;
-  biggestUpset: {
-    userName: string;
-    competitorName: string;
-    odd: number;
-    week: number;
-  } | null;
-  longestParticipationStreak: { userName: string; streak: number } | null;
   longestWinStreak: { competitorName: string; streak: number } | null;
   mostRaces: { competitorName: string; count: number } | null;
   bestRaceScorers:
@@ -45,14 +27,6 @@ export class SeasonsService {
     private readonly archivedCompetitorRankingRepository: Repository<ArchivedCompetitorRanking>,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
-    @InjectRepository(BettingWeek)
-    private readonly bettingWeekRepository: Repository<BettingWeek>,
-    @InjectRepository(Bet)
-    private readonly betRepository: Repository<Bet>,
-    @InjectRepository(BetPick)
-    private readonly betPickRepository: Repository<BetPick>,
-    @InjectRepository(BettorRanking)
-    private readonly bettorRankingRepository: Repository<BettorRanking>,
   ) {}
 
   /**
@@ -90,16 +64,6 @@ export class SeasonsService {
         where: { date: Between(startDate, endDate) },
       });
 
-      const bets = await queryRunner.manager.count(Bet, {
-        where: {
-          bettingWeek: { seasonNumber, year },
-        },
-      });
-
-      const bettorRankings = await queryRunner.manager.count(BettorRanking, {
-        where: { seasonNumber, year },
-      });
-
       // Create season archive
       const archive = queryRunner.manager.create(SeasonArchive, {
         month: seasonNumber, // backward compat
@@ -109,9 +73,9 @@ export class SeasonsService {
         startDate,
         endDate,
         totalCompetitors: activeCompetitors.length,
-        totalBettors: bettorRankings,
+        totalBettors: 0,
         totalRaces,
-        totalBets: bets,
+        totalBets: 0,
       });
 
       await queryRunner.manager.save(archive);
@@ -121,13 +85,6 @@ export class SeasonsService {
         queryRunner,
         archive,
         competitors,
-      );
-
-      // Link betting weeks to archive
-      await queryRunner.manager.update(
-        BettingWeek,
-        { seasonNumber, year },
-        { seasonArchiveId: archive.id },
       );
 
       await queryRunner.commitTransaction();
@@ -311,155 +268,12 @@ export class SeasonsService {
   }
 
   /**
-   * Get bettor rankings for a season (enriched with user info)
-   */
-  async getBettorRankings(seasonNumber: number, year: number) {
-    const rankings = await this.bettorRankingRepository.find({
-      where: { seasonNumber, year },
-      order: { rank: 'ASC' },
-      relations: ['user', 'user.competitor'],
-    });
-
-    return rankings.map((r) => ({
-      userId: r.userId,
-      userName: r.user
-        ? `${r.user.firstName} ${r.user.lastName}`.trim()
-        : 'Inconnu',
-      profilePictureUrl:
-        r.user?.competitor?.profilePictureUrl ??
-        r.user?.profilePictureUrl ??
-        null,
-      rank: r.rank,
-      totalPoints: r.totalPoints,
-      betsPlaced: r.betsPlaced,
-    }));
-  }
-
-  /**
-   * Get betting weeks for a season
-   */
-  async getBettingWeeks(
-    seasonNumber: number,
-    year: number,
-  ): Promise<BettingWeek[]> {
-    return await this.bettingWeekRepository.find({
-      where: { seasonNumber, year },
-      order: { weekNumber: 'ASC' },
-    });
-  }
-
-  /**
    * Get season highlights for the "Wrapped" recap
    */
   async getSeasonHighlights(
     seasonNumber: number,
     year: number,
   ): Promise<SeasonHighlights> {
-    // Perfect scores (60 pts)
-    const perfectScores = await this.betRepository
-      .createQueryBuilder('bet')
-      .innerJoin('bet.user', 'user')
-      .innerJoin('bet.bettingWeek', 'week')
-      .select([
-        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
-        'week.seasonWeekNumber AS week',
-        'bet.pointsEarned AS points',
-      ])
-      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
-        seasonNumber,
-        year,
-      })
-      .andWhere('bet.pointsEarned = 60')
-      .andWhere('bet.isFinalized = true')
-      .orderBy('week.seasonWeekNumber', 'ASC')
-      .getRawMany();
-
-    // Perfect podiums (all 3 picks correct)
-    const perfectPodiums = await this.betRepository
-      .createQueryBuilder('bet')
-      .innerJoin('bet.user', 'user')
-      .innerJoin('bet.bettingWeek', 'week')
-      .innerJoin('bet.picks', 'pick')
-      .select([
-        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
-        'week.seasonWeekNumber AS week',
-        'bet.pointsEarned AS points',
-      ])
-      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
-        seasonNumber,
-        year,
-      })
-      .andWhere('bet.isFinalized = true')
-      .groupBy('bet.id')
-      .addGroupBy('user.firstName')
-      .addGroupBy('user.lastName')
-      .addGroupBy('week.seasonWeekNumber')
-      .addGroupBy('bet.pointsEarned')
-      .having(
-        'COUNT(pick.id) = SUM(CASE WHEN pick.isCorrect = true THEN 1 ELSE 0 END)',
-      )
-      .andHaving('COUNT(pick.id) = 3')
-      .orderBy('week.seasonWeekNumber', 'ASC')
-      .getRawMany();
-
-    // Highest single bet score
-    const highestBetScoreRaw = await this.betRepository
-      .createQueryBuilder('bet')
-      .innerJoin('bet.user', 'user')
-      .innerJoin('bet.bettingWeek', 'week')
-      .select([
-        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
-        'week.seasonWeekNumber AS week',
-        'bet.pointsEarned AS points',
-      ])
-      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
-        seasonNumber,
-        year,
-      })
-      .andWhere('bet.isFinalized = true')
-      .andWhere('bet.pointsEarned IS NOT NULL')
-      .orderBy('bet.pointsEarned', 'DESC')
-      .limit(1)
-      .getRawOne();
-
-    // Biggest upset: correct pick with highest odd
-    const biggestUpsetRaw = await this.betPickRepository
-      .createQueryBuilder('pick')
-      .innerJoin('pick.bet', 'bet')
-      .innerJoin('bet.user', 'user')
-      .innerJoin('bet.bettingWeek', 'week')
-      .innerJoin('pick.competitor', 'competitor')
-      .select([
-        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
-        'CONCAT(competitor.firstName, \' \', competitor.lastName) AS "competitorName"',
-        'pick.oddAtBet AS odd',
-        'week.seasonWeekNumber AS week',
-      ])
-      .where('week."seasonNumber" = :seasonNumber AND week.year = :year', {
-        seasonNumber,
-        year,
-      })
-      .andWhere('pick.isCorrect = true')
-      .orderBy('pick.oddAtBet', 'DESC')
-      .limit(1)
-      .getRawOne();
-
-    // Longest participation streak
-    const longestParticipationStreakRaw = await this.bettorRankingRepository
-      .createQueryBuilder('ranking')
-      .innerJoin('ranking.user', 'user')
-      .select([
-        'CONCAT(user.firstName, \' \', user.lastName) AS "userName"',
-        'ranking.weeklyParticipationStreak AS streak',
-      ])
-      .where(
-        'ranking."seasonNumber" = :seasonNumber AND ranking.year = :year',
-        { seasonNumber, year },
-      )
-      .orderBy('ranking.weeklyParticipationStreak', 'DESC')
-      .limit(1)
-      .getRawOne();
-
     // Longest win streak (from archived competitor rankings)
     const season = await this.getSeason(seasonNumber, year);
     let longestWinStreak: SeasonHighlights['longestWinStreak'] = null;
@@ -537,39 +351,6 @@ export class SeasonsService {
     }
 
     return {
-      perfectScores: perfectScores.map((r) => ({
-        userName: r.userName,
-        week: Number(r.week),
-        points: Number(r.points),
-      })),
-      perfectPodiums: perfectPodiums.map((r) => ({
-        userName: r.userName,
-        week: Number(r.week),
-        points: Number(r.points),
-      })),
-      highestBetScore: highestBetScoreRaw
-        ? {
-            userName: highestBetScoreRaw.userName,
-            week: Number(highestBetScoreRaw.week),
-            points: Number(highestBetScoreRaw.points),
-          }
-        : null,
-      biggestUpset: biggestUpsetRaw
-        ? {
-            userName: biggestUpsetRaw.userName,
-            competitorName: biggestUpsetRaw.competitorName,
-            odd: Number(biggestUpsetRaw.odd),
-            week: Number(biggestUpsetRaw.week),
-          }
-        : null,
-      longestParticipationStreak:
-        longestParticipationStreakRaw &&
-        longestParticipationStreakRaw.streak > 0
-          ? {
-              userName: longestParticipationStreakRaw.userName,
-              streak: Number(longestParticipationStreakRaw.streak),
-            }
-          : null,
       longestWinStreak,
       mostRaces,
       bestRaceScorers,

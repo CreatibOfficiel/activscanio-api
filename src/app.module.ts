@@ -25,7 +25,6 @@ const SeederModule =
 import { BaseCharactersModule } from './base-characters/base-characters.module';
 import { CharacterVariantsModule } from './character-variants/character-variants.module';
 import { UsersModule } from './users/users.module';
-import { BettingModule } from './betting/betting.module';
 import { TasksModule } from './tasks/tasks.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { SeasonsModule } from './seasons/seasons.module';
@@ -34,8 +33,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ImageGenerationModule } from './image-generation/image-generation.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { ExportModule } from './export/export.module';
-import { DuelsModule } from './duels/duels.module';
-import { LiveBettingModule } from './live-betting/live-betting.module';
 
 @Module({
   imports: [
@@ -62,7 +59,6 @@ import { LiveBettingModule } from './live-betting/live-betting.module';
     BaseCharactersModule,
     CharacterVariantsModule,
     UsersModule,
-    BettingModule,
     TasksModule,
     OnboardingModule,
     SeasonsModule,
@@ -71,8 +67,6 @@ import { LiveBettingModule } from './live-betting/live-betting.module';
     ImageGenerationModule,
     WebsocketModule,
     ExportModule,
-    DuelsModule,
-    LiveBettingModule,
   ],
   controllers: [AppController],
   providers: [
