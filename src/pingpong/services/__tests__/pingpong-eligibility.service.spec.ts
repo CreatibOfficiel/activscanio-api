@@ -89,11 +89,7 @@ describe('PingpongEligibilityService', () => {
 
   it('refuses eligibility when one opponent dominates the record', async () => {
     // Five distinct opponents, but 90% of matches against a single one.
-    const lopsided = [
-      ...Array<string>(18).fill('main'),
-      'a',
-      'b',
-    ];
+    const lopsided = [...Array<string>(18).fill('main'), 'a', 'b'];
     withMatches(matchesAgainst(lopsided));
 
     await service.refreshEligibility();

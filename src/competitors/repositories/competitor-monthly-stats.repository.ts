@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { CompetitorMonthlyStats } from '../entities/competitor-monthly-stats.entity';
 import { BaseRepository } from '../../common/repositories/base.repository';
 
-
 /**
  * Competitor monthly stats repository with domain-specific queries
  */

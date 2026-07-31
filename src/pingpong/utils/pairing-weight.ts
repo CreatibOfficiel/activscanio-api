@@ -8,7 +8,9 @@
  *
  * @param matchesAlreadyPlayedThisWeek matches this pair played before this one
  */
-export function computePairWeight(matchesAlreadyPlayedThisWeek: number): number {
+export function computePairWeight(
+  matchesAlreadyPlayedThisWeek: number,
+): number {
   if (matchesAlreadyPlayedThisWeek < 3) return 1;
   if (matchesAlreadyPlayedThisWeek < 6) return 0.5;
   return 0;

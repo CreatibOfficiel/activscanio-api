@@ -177,6 +177,4 @@ describe('ShareController', () => {
       });
     });
   });
-
-
 });

@@ -67,10 +67,7 @@ export class SeasonArchive {
   )
   competitorRankings: ArchivedCompetitorRanking[];
 
-  @OneToMany(
-    () => ArchivedPingpongRanking,
-    (ranking) => ranking.seasonArchive,
-  )
+  @OneToMany(() => ArchivedPingpongRanking, (ranking) => ranking.seasonArchive)
   pingpongRankings: ArchivedPingpongRanking[];
 
   @CreateDateColumn()

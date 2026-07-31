@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -134,7 +133,9 @@ describe('AchievementCalculatorService — ping-pong metrics', () => {
     await buildService([achievement('pp_first', 'pingpongMatchCount', 1)]);
     withPingpongPlayer({ matchCount: 1 });
 
-    expect(keys(await service.checkAchievements(USER_ID))).toContain('pp_first');
+    expect(keys(await service.checkAchievements(USER_ID))).toContain(
+      'pp_first',
+    );
   });
 
   it('unlocks on wins', async () => {

@@ -210,8 +210,14 @@ describe('EventsGateway', () => {
     });
 
     it('should emit to both registered users and broadcast to the feed', () => {
-      const challengerSocket = { id: 'sock-challenger', emit: jest.fn() } as unknown as Socket;
-      const challengedSocket = { id: 'sock-challenged', emit: jest.fn() } as unknown as Socket;
+      const challengerSocket = {
+        id: 'sock-challenger',
+        emit: jest.fn(),
+      } as unknown as Socket;
+      const challengedSocket = {
+        id: 'sock-challenged',
+        emit: jest.fn(),
+      } as unknown as Socket;
       gateway.handleRegister('challenger-1', challengerSocket);
       gateway.handleRegister('challenged-1', challengedSocket);
 
@@ -241,8 +247,14 @@ describe('EventsGateway', () => {
     });
 
     it('should emit to both registered users and broadcast to the feed', () => {
-      const challengerSocket = { id: 'sock-c', emit: jest.fn() } as unknown as Socket;
-      const challengedSocket = { id: 'sock-d', emit: jest.fn() } as unknown as Socket;
+      const challengerSocket = {
+        id: 'sock-c',
+        emit: jest.fn(),
+      } as unknown as Socket;
+      const challengedSocket = {
+        id: 'sock-d',
+        emit: jest.fn(),
+      } as unknown as Socket;
       gateway.handleRegister('chal-2', challengerSocket);
       gateway.handleRegister('cged-2', challengedSocket);
 

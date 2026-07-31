@@ -43,8 +43,6 @@ export class TemporaryAchievementService {
     await this.checkStreakAchievements(userId);
   }
 
-
-
   /**
    * Check streak-based achievements (consecutive weekly participation)
    *
@@ -259,8 +257,7 @@ export class TemporaryAchievementService {
     let errorCount = 0;
 
     for (const row of userIds) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const bet_userId = row.bet_userId as string;
+      const bet_userId = row.bet_userId;
       try {
         await this.checkTemporaryAchievements(bet_userId);
         processedCount++;

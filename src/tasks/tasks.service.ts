@@ -52,7 +52,7 @@ import {
   CRON_SCHEDULES,
   TASK_EXECUTION_CONFIG,
   TASK_DESCRIPTIONS,
-  } from './config/tasks.config';
+} from './config/tasks.config';
 
 @Injectable()
 export class TasksService {
@@ -123,7 +123,10 @@ export class TasksService {
       currentWeekNumber,
       currentYear,
     );
-    const prev = SeasonUtils.getPreviousSeason(currentSeasonNumber, currentYear);
+    const prev = SeasonUtils.getPreviousSeason(
+      currentSeasonNumber,
+      currentYear,
+    );
 
     this.logger.log(
       `🔄 Season transition: season ${prev.seasonNumber}/${prev.year} → season ${currentSeasonNumber}/${currentYear}`,
@@ -284,7 +287,9 @@ export class TasksService {
 
     try {
       const warned =
-        await this.streakWarningService.checkParticipationStreakWarnings('urgent');
+        await this.streakWarningService.checkParticipationStreakWarnings(
+          'urgent',
+        );
       this.logger.log(`✅ Betting streak warning: ${warned} users warned`);
     } catch (error) {
       this.logger.error(
@@ -551,5 +556,4 @@ export class TasksService {
       this.releaseTaskLock('pingpong-refresh-eligibility');
     }
   }
-
 }

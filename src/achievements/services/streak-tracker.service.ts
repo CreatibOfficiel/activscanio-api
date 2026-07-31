@@ -163,7 +163,8 @@ export class StreakTrackerService {
         );
 
         // Track the lost streak for notification
-        userStreak.participationStreakLostValue = userStreak.currentMonthlyStreak;
+        userStreak.participationStreakLostValue =
+          userStreak.currentMonthlyStreak;
         userStreak.participationStreakLostAt = new Date();
         userStreak.participationStreakLossSeenAt = null;
 

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -87,8 +86,14 @@ describe('SeasonsService — surviving highlights', () => {
           provide: getRepositoryToken(ArchivedPingpongRanking),
           useValue: { find: jest.fn() },
         },
-        { provide: getRepositoryToken(Competitor), useValue: { find: jest.fn() } },
-        { provide: getRepositoryToken(RaceEvent), useValue: { count: jest.fn() } },
+        {
+          provide: getRepositoryToken(Competitor),
+          useValue: { find: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(RaceEvent),
+          useValue: { count: jest.fn() },
+        },
         // Betting repositories still injected by SeasonsService. They go away
         // when the betting highlights are cut; these stubs go with them.
       ],

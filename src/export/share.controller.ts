@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Get,
@@ -112,8 +111,6 @@ export class ShareController {
         .getRepository('achievements')
         .count();
 
-
-
       // Generate the image
       const imageBuffer = await this.shareImageService.generateStatsShareImage(
         `${user.firstName} ${user.lastName}`,
@@ -139,5 +136,4 @@ export class ShareController {
       );
     }
   }
-
 }

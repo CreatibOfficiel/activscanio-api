@@ -33,8 +33,6 @@ export class NotificationEventListener {
     }
   }
 
-
-
   @OnEvent('user.level_up')
   async handleLevelUp(payload: {
     userId: string;
@@ -58,6 +56,4 @@ export class NotificationEventListener {
       );
     }
   }
-
-
 }

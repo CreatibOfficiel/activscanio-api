@@ -105,7 +105,10 @@ describe('ACHIEVEMENT_DEFINITIONS', () => {
       for (const definition of pingpong) {
         maxXpByRarity.set(
           definition.rarity,
-          Math.max(maxXpByRarity.get(definition.rarity) ?? 0, definition.xpReward),
+          Math.max(
+            maxXpByRarity.get(definition.rarity) ?? 0,
+            definition.xpReward,
+          ),
         );
       }
       const present = order.filter((r) => maxXpByRarity.has(r));

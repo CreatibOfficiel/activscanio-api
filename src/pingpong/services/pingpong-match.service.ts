@@ -93,8 +93,7 @@ export class PingpongMatchService {
         weight,
       });
 
-      const winnerId =
-        validation.winner === 'A' ? playerA.id : playerB.id;
+      const winnerId = validation.winner === 'A' ? playerA.id : playerB.id;
 
       const match = queryRunner.manager.create(PingpongMatch, {
         playerAId: playerA.id,

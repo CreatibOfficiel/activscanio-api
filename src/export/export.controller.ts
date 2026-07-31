@@ -41,7 +41,6 @@ export class ExportController {
     }
   }
 
-
   /**
    * Export user's comprehensive stats to JSON
    * GET /api/export/stats/json
@@ -58,5 +57,4 @@ export class ExportController {
       );
     }
   }
-
 }

@@ -53,7 +53,6 @@ export class ExportService {
     return parser.parse(data);
   }
 
-
   /**
    * Export complete user stats to JSON
    */
@@ -72,7 +71,6 @@ export class ExportService {
       where: { userId },
       relations: ['achievement'],
     });
-
 
     return {
       user: {
@@ -126,5 +124,4 @@ export class ExportService {
       },
     };
   }
-
 }

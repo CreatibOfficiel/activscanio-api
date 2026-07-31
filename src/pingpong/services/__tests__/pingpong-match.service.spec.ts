@@ -94,8 +94,9 @@ describe('PingpongMatchService', () => {
     playerRepository = module.get(getRepositoryToken(PingpongPlayer));
 
     // Both players exist by default.
-    manager.findOne.mockImplementation((_e: unknown, opts: { where: { id: string } }) =>
-      Promise.resolve(player(opts.where.id)),
+    manager.findOne.mockImplementation(
+      (_e: unknown, opts: { where: { id: string } }) =>
+        Promise.resolve(player(opts.where.id)),
     );
   });
 

@@ -197,17 +197,31 @@ describe('PingpongHighlightStatsService', () => {
 
   it('keeps the largest gap, not the most recent', async () => {
     await buildService([
-      match([{ a: 11, b: 8 }, { a: 11, b: 9 }], {
-        ratingABefore: 1400,
-        ratingBBefore: 1700,
-      }),
-      match([{ a: 11, b: 8 }, { a: 11, b: 9 }], {
-        ratingABefore: 1400,
-        ratingBBefore: 1560,
-      }),
+      match(
+        [
+          { a: 11, b: 8 },
+          { a: 11, b: 9 },
+        ],
+        {
+          ratingABefore: 1400,
+          ratingBBefore: 1700,
+        },
+      ),
+      match(
+        [
+          { a: 11, b: 8 },
+          { a: 11, b: 9 },
+        ],
+        {
+          ratingABefore: 1400,
+          ratingBBefore: 1560,
+        },
+      ),
     ]);
 
-    expect((await service.computeFor(PLAYER)).pingpongBiggestUpsetGap).toBe(300);
+    expect((await service.computeFor(PLAYER)).pingpongBiggestUpsetGap).toBe(
+      300,
+    );
   });
 
   it('counts a heist', async () => {

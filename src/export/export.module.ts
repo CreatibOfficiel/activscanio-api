@@ -9,9 +9,7 @@ import { ShareImageService } from '../image-generation/services/share-image.serv
 import { ImageStorageService } from '../image-generation/services/image-storage.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([UserAchievement, User]),
-  ],
+  imports: [TypeOrmModule.forFeature([UserAchievement, User])],
   controllers: [ExportController, ShareController],
   providers: [ExportService, ShareImageService, ImageStorageService],
   exports: [ExportService],

@@ -444,7 +444,6 @@ export class AchievementsController {
     };
   }
 
-
   /**
    * Get XP history
    */

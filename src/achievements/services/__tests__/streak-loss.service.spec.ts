@@ -85,9 +85,10 @@ describe('StreakTrackerService — streak losses', () => {
     it('reports an unseen play streak loss from the linked competitor', async () => {
       const lostAt = new Date('2026-07-02T10:00:00Z');
       jest.spyOn(userStreakRepository, 'findOne').mockResolvedValue(null);
-      jest
-        .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: USER_ID, competitorId: COMPETITOR_ID } as User);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: USER_ID,
+        competitorId: COMPETITOR_ID,
+      } as User);
       jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
         id: COMPETITOR_ID,
         playStreakLostValue: 3,
@@ -107,9 +108,10 @@ describe('StreakTrackerService — streak losses', () => {
 
     it('returns an empty missedDays list when none are recorded', async () => {
       jest.spyOn(userStreakRepository, 'findOne').mockResolvedValue(null);
-      jest
-        .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: USER_ID, competitorId: COMPETITOR_ID } as User);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: USER_ID,
+        competitorId: COMPETITOR_ID,
+      } as User);
       jest.spyOn(competitorRepository, 'findOne').mockResolvedValue({
         id: COMPETITOR_ID,
         playStreakLostValue: 2,
@@ -150,9 +152,10 @@ describe('StreakTrackerService — streak losses', () => {
 
   describe('markStreakLossesSeen', () => {
     it('stamps both the participation streak and the competitor play streak', async () => {
-      jest
-        .spyOn(userRepository, 'findOne')
-        .mockResolvedValue({ id: USER_ID, competitorId: COMPETITOR_ID } as User);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue({
+        id: USER_ID,
+        competitorId: COMPETITOR_ID,
+      } as User);
 
       await service.markStreakLossesSeen(USER_ID);
 

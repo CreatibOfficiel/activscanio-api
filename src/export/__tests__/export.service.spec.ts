@@ -184,7 +184,6 @@ describe('ExportService', () => {
     });
   });
 
-
   describe('exportStatsToJSON', () => {
     it('should export comprehensive stats to JSON', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
@@ -203,7 +202,6 @@ describe('ExportService', () => {
         achievementCount: 15,
       });
     });
-
 
     it('should include achievements breakdown by rarity', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(mockUser as any);
@@ -258,7 +256,5 @@ describe('ExportService', () => {
         'User not found',
       );
     });
-
   });
-
 });

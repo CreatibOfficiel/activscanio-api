@@ -8,7 +8,6 @@ import {
 } from '../entities/achievement.entity';
 
 export const ACHIEVEMENT_DEFINITIONS = [
-
   // ==================== RACING - Victoires en course ====================
   {
     key: 'first_win',
@@ -517,7 +516,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_institution',
     name: 'Institution',
-    description: "250 matchs. Tu fais partie du mobilier, et c'est un compliment.",
+    description:
+      "250 matchs. Tu fais partie du mobilier, et c'est un compliment.",
     category: AchievementCategory.REGULARITY,
     rarity: AchievementRarity.EPIC,
     icon: '🏆',
@@ -564,7 +564,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_en_chaleur',
     name: 'En Chaleur',
-    description: "5 victoires d'affilée. Plus personne ne veut prendre la raquette.",
+    description:
+      "5 victoires d'affilée. Plus personne ne veut prendre la raquette.",
     category: AchievementCategory.RANKING,
     rarity: AchievementRarity.RARE,
     icon: '🔥',
@@ -587,7 +588,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_intouchable',
     name: 'Intouchable',
-    description: '10 victoires consécutives. On organise une cagnotte pour te faire tomber.',
+    description:
+      '10 victoires consécutives. On organise une cagnotte pour te faire tomber.',
     category: AchievementCategory.RANKING,
     rarity: AchievementRarity.LEGENDARY,
     icon: '👑',
@@ -611,7 +613,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_tour_du_bureau',
     name: 'Le Tour du Bureau',
-    description: '10 adversaires différents en trois semaines. Tu ne fuis personne.',
+    description:
+      '10 adversaires différents en trois semaines. Tu ne fuis personne.',
     category: AchievementCategory.AUDACITY,
     rarity: AchievementRarity.RARE,
     icon: '🌍',
@@ -634,7 +637,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_calibre',
     name: 'Calibré',
-    description: 'Assez de matchs variés pour que ton classement veuille dire quelque chose',
+    description:
+      'Assez de matchs variés pour que ton classement veuille dire quelque chose',
     category: AchievementCategory.PRECISION,
     rarity: AchievementRarity.COMMON,
     icon: '🎯',
@@ -717,7 +721,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_creme_fraiche',
     name: 'Crème Fraîche',
-    description: 'Prendre un set 0-11. Ça arrive aux meilleurs. Enfin, surtout aux autres.',
+    description:
+      'Prendre un set 0-11. Ça arrive aux meilleurs. Enfin, surtout aux autres.',
     category: AchievementCategory.AUDACITY,
     rarity: AchievementRarity.COMMON,
     icon: '🥛',
@@ -809,7 +814,8 @@ export const ACHIEVEMENT_DEFINITIONS = [
   {
     key: 'pp_le_casse',
     name: 'Le Casse',
-    description: 'Premier set perdu, puis deux sets arrachés au-delà de 10-10. Du grand art.',
+    description:
+      'Premier set perdu, puis deux sets arrachés au-delà de 10-10. Du grand art.',
     category: AchievementCategory.AUDACITY,
     rarity: AchievementRarity.LEGENDARY,
     icon: '🎭',

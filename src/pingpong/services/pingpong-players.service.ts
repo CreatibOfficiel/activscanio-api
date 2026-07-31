@@ -86,14 +86,14 @@ export class PingpongPlayersService {
    * Hiding the others would make a new player invisible to themselves, which
    * is a worse outcome than showing them unranked.
    */
-  async getLeaderboard(now: Date = new Date()): Promise<RankedPingpongPlayer[]> {
+  async getLeaderboard(
+    now: Date = new Date(),
+  ): Promise<RankedPingpongPlayer[]> {
     const players = await this.playerRepository.find({
       relations: ['competitor'],
     });
 
-    const enriched = players.map((player) =>
-      this.toRanked(player, now),
-    );
+    const enriched = players.map((player) => this.toRanked(player, now));
 
     // Sort on the conservative score, same convention as Mario Kart: a high
     // rating with a wide deviation should not outrank a settled one.
@@ -146,10 +146,7 @@ export class PingpongPlayersService {
     return { playerAId, playerBId, winsA, winsB, matches };
   }
 
-  private toRanked(
-    player: PingpongPlayer,
-    now: Date,
-  ): RankedPingpongPlayer {
+  private toRanked(player: PingpongPlayer, now: Date): RankedPingpongPlayer {
     const classification = classifyPingpongPlayer(
       player.weightedMatchCount,
       player.rd,

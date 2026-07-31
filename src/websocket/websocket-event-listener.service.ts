@@ -8,9 +8,7 @@ import { EventsGateway } from './events.gateway';
 export class WebSocketEventListener {
   private readonly logger = new Logger(WebSocketEventListener.name);
 
-  constructor(
-    private readonly eventsGateway: EventsGateway,
-  ) {}
+  constructor(private readonly eventsGateway: EventsGateway) {}
 
   /**
    * Listen to achievement unlocked events and relay to WebSocket
@@ -54,7 +52,6 @@ export class WebSocketEventListener {
     );
   }
 
-
   /**
    * Listen to betting streak lost events
    */
@@ -95,7 +92,6 @@ export class WebSocketEventListener {
     });
   }
 
-
   /**
    * Listen to race created events (broadcast to all)
    */
@@ -114,7 +110,6 @@ export class WebSocketEventListener {
     this.eventsGateway.broadcastRaceResults(payload.results);
   }
 
-
   /**
    * Listen to competitor created events (broadcast to all)
    */
@@ -125,13 +120,4 @@ export class WebSocketEventListener {
     );
     this.eventsGateway.broadcastCompetitorUpdate(payload.competitor);
   }
-
-
-
-
-
-
-
-
-
 }
