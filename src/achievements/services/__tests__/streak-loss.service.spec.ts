@@ -67,7 +67,7 @@ describe('StreakTrackerService — streak losses', () => {
 
       const result = await service.getUnseenStreakLosses(USER_ID);
 
-      expect(result.bettingStreakLoss).toEqual({ lostValue: 5, lostAt });
+      expect(result.participationStreakLoss).toEqual({ lostValue: 5, lostAt });
       expect(result.playStreakLoss).toBeNull();
     });
 
@@ -82,7 +82,7 @@ describe('StreakTrackerService — streak losses', () => {
 
       const result = await service.getUnseenStreakLosses(USER_ID);
 
-      expect(result.bettingStreakLoss).toBeNull();
+      expect(result.participationStreakLoss).toBeNull();
     });
 
     it('reports an unseen play streak loss from the linked competitor', async () => {
@@ -147,7 +147,7 @@ describe('StreakTrackerService — streak losses', () => {
       const result = await service.getUnseenStreakLosses(USER_ID);
 
       expect(result).toEqual({
-        bettingStreakLoss: null,
+        participationStreakLoss: null,
         playStreakLoss: null,
       });
     });
