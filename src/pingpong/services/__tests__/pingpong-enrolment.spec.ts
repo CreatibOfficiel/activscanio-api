@@ -113,9 +113,8 @@ describe('PingpongPlayersService — enrolment', () => {
 
       await service.ensureEnrolled(COMPETITOR_ID);
 
-      const [created] = (playerRepository.create as jest.Mock).mock.calls[0] as [
-        Record<string, unknown>,
-      ];
+      const [created] = (playerRepository.create as jest.Mock).mock
+        .calls[0] as [Record<string, unknown>];
       expect(created).toMatchObject({ rating: 1500, rd: 350 });
     });
   });
