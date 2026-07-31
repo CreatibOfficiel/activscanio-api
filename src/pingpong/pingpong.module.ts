@@ -10,6 +10,7 @@ import { PingpongMatchService } from './services/pingpong-match.service';
 import { PingpongPlayersService } from './services/pingpong-players.service';
 import { PingpongEligibilityService } from './services/pingpong-eligibility.service';
 import { PingpongHighlightStatsService } from './services/pingpong-highlight-stats.service';
+import { PingpongDecayService } from './services/pingpong-decay.service';
 
 /**
  * Ping-pong module.
@@ -34,11 +35,14 @@ import { PingpongHighlightStatsService } from './services/pingpong-highlight-sta
     PingpongPlayersService,
     PingpongEligibilityService,
     PingpongHighlightStatsService,
+    PingpongDecayService,
   ],
   exports: [
     PingpongRatingService,
     PingpongPlayersService,
     PingpongEligibilityService,
+    // Driven by a weekly cron in TasksService.
+    PingpongDecayService,
     // Exported for the achievement engine, which reads per-match feats that
     // no column on the player can hold.
     PingpongHighlightStatsService,
