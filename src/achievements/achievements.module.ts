@@ -17,6 +17,8 @@ import { AchievementsController } from './achievements.controller';
 import { User } from '../users/user.entity';
 import { Competitor } from '../competitors/competitor.entity';
 import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
+import { PingpongMatch } from '../pingpong/entities/pingpong-match.entity';
+import { PingpongHighlightStatsService } from '../pingpong/services/pingpong-highlight-stats.service';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -31,6 +33,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       User,
       Competitor,
       PingpongPlayer,
+      PingpongMatch,
     ]),
     UsersModule,
     NotificationsModule,
@@ -45,6 +48,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     TemporaryAchievementService,
     AchievementCronService,
     StreakWarningService,
+    // Provided here rather than imported from PingpongModule: this module
+    // already reads the ping-pong tables directly, and importing the other way
+    // would drag its controller in for the sake of one stateless service.
+    PingpongHighlightStatsService,
   ],
   exports: [
     AchievementSeedService,

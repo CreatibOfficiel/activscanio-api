@@ -14,12 +14,13 @@ import { UserStreak } from '../entities/user-streak.entity';
 import { User } from '../../users/user.entity';
 import { Competitor } from '../../competitors/competitor.entity';
 import { PingpongPlayer } from '../../pingpong/entities/pingpong-player.entity';
+import {
+  PingpongHighlightStatsService,
+  EMPTY_HIGHLIGHT_STATS,
+} from '../../pingpong/services/pingpong-highlight-stats.service';
 import { RaceCreatedEvent } from '../../races/events/race-created.event';
 import { XPLevelService, XPSource } from './xp-level.service';
-import { SeasonUtils } from '../../common/utils/season-utils';
-import { WeekUtils } from '../../common/utils/week-utils';
 import {
-  BetFinalizedContext,
   UserStats,
   AchievementUnlockResult,
 } from '../types/achievement-calculator.types';
@@ -41,6 +42,7 @@ export class AchievementCalculatorService {
     private readonly competitorRepository: Repository<Competitor>,
     @InjectRepository(PingpongPlayer)
     private readonly pingpongPlayerRepository: Repository<PingpongPlayer>,
+    private readonly pingpongHighlightStatsService: PingpongHighlightStatsService,
     private readonly xpLevelService: XPLevelService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -90,11 +92,7 @@ export class AchievementCalculatorService {
    * @returns List of newly unlocked achievements
    */
 
-  async checkAchievements(
-    userId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _context?: BetFinalizedContext,
-  ): Promise<AchievementUnlockResult[]> {
+  async checkAchievements(userId: string): Promise<AchievementUnlockResult[]> {
     // Get user stats
     const userStats = await this.getUserStats(userId);
 
@@ -302,6 +300,23 @@ export class AchievementCalculatorService {
       case 'pingpongDiversityScore':
         return userStats.pingpongDiversityScore;
 
+      // Per-match feats, replayed from the match log rather than read off a
+      // column: a shutout set only exists inside one match.
+      case 'pingpongShutoutSetsDealt':
+        return userStats.pingpongShutoutSetsDealt;
+      case 'pingpongShutoutSetsConceded':
+        return userStats.pingpongShutoutSetsConceded;
+      case 'pingpongComebacks':
+        return userStats.pingpongComebacks;
+      case 'pingpongDeuceSetsWon':
+        return userStats.pingpongDeuceSetsWon;
+      case 'pingpongUpsets':
+        return userStats.pingpongUpsets;
+      case 'pingpongBiggestUpsetGap':
+        return userStats.pingpongBiggestUpsetGap;
+      case 'pingpongHeists':
+        return userStats.pingpongHeists;
+
       default:
         this.logger.warn(`Unknown metric: ${metric}`);
         return 0;
@@ -338,6 +353,12 @@ export class AchievementCalculatorService {
       });
     }
 
+    // Only replay the match log for someone who actually has one. For the
+    // rest — every Mario Kart-only player — this stays zero without a query.
+    const highlights = pingpongPlayer
+      ? await this.pingpongHighlightStatsService.computeFor(pingpongPlayer.id)
+      : EMPTY_HIGHLIGHT_STATS;
+
     return {
       userId,
       currentMonthlyStreak: userStreak?.currentMonthlyStreak || 0,
@@ -369,6 +390,7 @@ export class AchievementCalculatorService {
         : 0,
       pingpongDistinctOpponents: pingpongPlayer?.distinctOpponents21d ?? 0,
       pingpongDiversityScore: pingpongPlayer?.diversityScore21d ?? 0,
+      ...highlights,
     };
   }
 

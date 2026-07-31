@@ -15,6 +15,10 @@ import { UserStreak } from '../../entities/user-streak.entity';
 import { User } from '../../../users/user.entity';
 import { Competitor } from '../../../competitors/competitor.entity';
 import { PingpongPlayer } from '../../../pingpong/entities/pingpong-player.entity';
+import {
+  PingpongHighlightStatsService,
+  EMPTY_HIGHLIGHT_STATS,
+} from '../../../pingpong/services/pingpong-highlight-stats.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { XPLevelService } from '../xp-level.service';
@@ -129,6 +133,12 @@ describe('AchievementCalculatorService', () => {
           provide: getRepositoryToken(PingpongPlayer),
           useValue: {
             findOne: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: PingpongHighlightStatsService,
+          useValue: {
+            computeFor: jest.fn().mockResolvedValue(EMPTY_HIGHLIGHT_STATS),
           },
         },
         {
