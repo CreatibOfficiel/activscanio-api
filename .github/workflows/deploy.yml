@@ -1,0 +1,117 @@
+# Deploy the API to the self-hosted VPS.
+#
+# This workflow carries NO privilege. It opens an SSH connection and that is
+# all. The key it uses is pinned server-side to a forced command:
+#
+#   restrict,command="/usr/local/bin/deploy-mushroombet api" ssh-ed25519 AAAA...
+#
+# sshd runs that one program no matter what this workflow asks for, and the
+# wrapper ignores $SSH_ORIGINAL_COMMAND entirely. So the ssh command line
+# below is decorative — the server decides what happens. That is deliberate:
+# it means a leaked DEPLOY_SSH_KEY buys an attacker one thing, the ability to
+# deploy the api at a commit that is already on main.
+#
+# The real work lives in deploy/scripts/04-deploy.sh ON THE VPS. That script
+# is NOT in this repo — deploy/ is not tracked here — so it has to be copied
+# to the VPS out of band. See deploy/README.md.
+#
+# Manual deploys do not need any of this:
+#   ssh root@109.239.158.6
+#   /opt/mushroom-bet/deploy/scripts/04-deploy.sh api
+
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# ONE DEPLOY AT A TIME. This is a correctness constraint, not politeness.
+#
+# Two overlapping `docker compose up` runs can leave two API containers alive
+# at once. socket.io uses an in-memory adapter (a per-process userId->socketId
+# map) and the cron lock is an in-process Set, so two API processes means
+# dropped socket events and double-fired weekly finalization / ELO
+# recalculation. season-transition resets ELO with no idempotency guard.
+#
+# cancel-in-progress is FALSE on purpose. Cancelling a running deploy would
+# kill the SSH client mid-`docker compose up`, leaving the stack half
+# recreated with no rollback step ever running. Queue instead; the second run
+# picks up the newer commit anyway.
+#
+# LIMIT WORTH KNOWING: GitHub concurrency groups are scoped to a REPOSITORY.
+# This group does not serialise against the front repo's workflow, so an api
+# push and a web push CAN reach the VPS simultaneously. That is covered on the
+# server by the flock in 04-deploy.sh, which is the only mechanism that sees
+# all three trigger paths (this repo, the front repo, and a human on SSH).
+concurrency:
+  group: deploy-vps-mushroombet-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy api to VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # No checkout. This workflow never touches the source — the VPS fetches
+      # the commit itself. Checking out here would only slow the job down.
+
+      - name: Trigger deploy over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_HOST_KEY: ${{ secrets.DEPLOY_SSH_HOST_KEY }}
+          DEPLOY_HOST: 109.239.158.6
+          DEPLOY_USER: deploy
+        run: |
+          set -euo pipefail
+
+          # Plain ssh, not a marketplace action. A third-party action here
+          # would run with the deploy key in its environment, and this is
+          # eight lines of shell. The dependency is not worth it.
+
+          test -n "${DEPLOY_SSH_KEY}" || { echo "::error::secret DEPLOY_SSH_KEY is empty or unset"; exit 1; }
+          test -n "${DEPLOY_SSH_HOST_KEY}" || { echo "::error::secret DEPLOY_SSH_HOST_KEY is empty or unset"; exit 1; }
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # ssh refuses a key file readable by anyone else, so write it with a
+          # restrictive umask rather than chmod'ing after the fact.
+          ( umask 077 && printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key )
+
+          # A key pasted into the secret without its trailing newline is the
+          # single most common failure here, and ssh reports it as "invalid
+          # format" rather than anything useful. Check it before connecting.
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1 || {
+            echo "::error::DEPLOY_SSH_KEY is not a valid private key. Paste the WHOLE file, including the BEGIN/END lines and the trailing newline."
+            exit 1
+          }
+
+          # HOST KEY PINNING. Never StrictHostKeyChecking=no — that accepts
+          # whatever key answers, which is exactly the machine-in-the-middle
+          # this is supposed to prevent. The expected key comes from a secret
+          # so that changing it is a deliberate act with an audit trail.
+          printf '%s\n' "${DEPLOY_SSH_HOST_KEY}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          echo "Connecting to ${DEPLOY_USER}@${DEPLOY_HOST} (forced command decides what runs)"
+
+          # The trailing 'deploy api' is ignored by the server. It is here so
+          # anyone reading the workflow can see the intent, and so the string
+          # shows up in /var/log/mushroombet-deploy.log as the SSH_ORIGINAL_
+          # COMMAND the wrapper discarded. Do not make the server read it.
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o ConnectTimeout=15 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=20 \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              'deploy api'
+
+      - name: Clean up the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
