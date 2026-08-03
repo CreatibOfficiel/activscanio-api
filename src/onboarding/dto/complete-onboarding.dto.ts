@@ -4,6 +4,7 @@ import {
   ValidateNested,
   IsString,
   IsUrl,
+  ValidateIf,
   MinLength,
   MaxLength,
   Matches,
@@ -34,8 +35,15 @@ export class CreateCompetitorInOnboardingDto {
   })
   lastName: string;
 
+  /**
+   * `@IsOptional` exempts undefined and null but not the empty string, and
+   * onboarding sends `user?.imageUrl || ''` — so anyone whose Clerk account
+   * has no avatar would be blocked from completing it.
+   */
+  @ValidateIf(
+    (_, value) => value !== undefined && value !== null && value !== '',
+  )
   @IsUrl({}, { message: 'Profile picture URL must be a valid URL' })
-  @IsOptional()
   profilePictureUrl?: string;
 }
 
