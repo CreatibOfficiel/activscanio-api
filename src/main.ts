@@ -35,6 +35,30 @@ async function bootstrap() {
     }),
   );
 
+  /**
+   * Trust exactly one reverse proxy hop.
+   *
+   * In production nginx sits in front of this process, so every connection
+   * arrives from the proxy's address. Express reports that single address as
+   * req.ip for every request unless it is told to trust the proxy.
+   *
+   * That matters because ThrottlerGuard is registered globally at 100
+   * requests per minute keyed on req.ip. Without this, all users share one
+   * bucket: a few hundred requests a minute across the whole userbase — which
+   * a handful of active people generate easily — would start returning 429 to
+   * everyone at once, and the rate limit would effectively be a global cap
+   * rather than a per-client one.
+   *
+   * The value is 1, not `true`. It means "the last hop is our nginx, trust
+   * exactly one entry from the right of X-Forwarded-For". `true` would trust
+   * the entire header, letting any client spoof req.ip by sending their own
+   * X-Forwarded-For and bypass the throttler entirely.
+   *
+   * If another proxy is ever added in front of nginx (a CDN, for instance),
+   * this number must increase to match the number of trusted hops.
+   */
+  app.set('trust proxy', 1);
+
   // Register global exception filters
   // Order matters: HttpExceptionFilter catches HttpException, AllExceptionsFilter catches everything else
   app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());

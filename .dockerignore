@@ -1,4 +1,56 @@
+# Build context exclusions for the API image.
+#
+# The Dockerfile does `COPY . .` into the builder stage, so anything not
+# listed here is shipped into the build context and can land in a layer.
+
+# Dependencies and build output — rebuilt inside the image.
+# Critically, a host node_modules is arm64 on a Mac and would poison an
+# amd64 build if it leaked in.
 node_modules
 dist
-.env*
+build
+
+# Secrets. Never bake these into an image layer.
+.env
+.env.*
+!.env.example
+
+# RUNTIME USER DATA — must not be baked into the image.
+# public/images/ holds profiles/, proofs/ and celebrations/: real uploaded
+# user content that lives in a named volume in production (~9.7MB today).
+# Shipping local copies would bloat the image with stale user files.
+public/images
+uploads
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# Tests and coverage.
+# NOTE: *.spec.ts files are deliberately NOT excluded. tsconfig.build.json
+# defines no `exclude`, so they are part of what `nest build` compiles; the
+# emitted .js is dead weight in dist/ but removing the sources from the
+# context would change build behaviour for a trivial size win. The test/
+# directory (e2e, separate jest config) is safe to drop.
+test
+coverage
+
+# Local compose files. The production stack lives in deploy/docker-compose.yml.
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Tooling / editor / OS noise
+.vscode
+.idea
+.DS_Store
 *.log
+npm-debug.log*
+.eslintcache
+
+# Docs and scratch files
+README.md
+*.md
+deploy-back.sh
+test-websocket.js
