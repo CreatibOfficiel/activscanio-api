@@ -45,8 +45,9 @@ export class OnboardingController {
   })
   @ApiQuery({
     name: 'query',
-    description: 'Search query (min 2 characters)',
+    description: 'Search query. Omit or leave empty to list every competitor.',
     example: 'john',
+    required: false,
   })
   @ApiResponse({
     status: 200,
@@ -59,7 +60,7 @@ export class OnboardingController {
   })
   async searchCompetitors(@Query() dto: SearchCompetitorDto) {
     return await this.onboardingService.searchCompetitorsWithAvailability(
-      dto.query,
+      dto.query ?? '',
     );
   }
 
