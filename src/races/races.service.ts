@@ -26,6 +26,46 @@ interface Opponent {
   id: string;
 }
 
+/**
+ * How far back the duplicate guard looks around a submitted race.
+ *
+ * The window has to cover a human re-submitting the same race after thinking
+ * the first POST failed. 60s did not: a duplicate reached production on
+ * 2026-08-04 at 65s apart, five seconds past the old boundary. Five minutes
+ * covers a realistic re-entry (re-reading the screen, re-typing four scores)
+ * without needing to be exact, because the window alone no longer decides
+ * what a duplicate is; the results have to match too.
+ */
+const DUPLICATE_WINDOW_MS = 5 * 60_000;
+
+/**
+ * Below this gap, the client clock and server clock are close enough that both
+ * windows would overlap anyway and a single query is enough. See
+ * `findDuplicateCandidates`.
+ */
+const CLOCK_SKEW_TOLERANCE_MS = 10 * 60_000;
+
+/** A race result reduced to the fields that identify a duplicate. */
+interface ResultFingerprint {
+  competitorId: string;
+  rank12: number;
+  score: number;
+}
+
+/**
+ * Build a stable, order-independent signature of a race's outcome.
+ *
+ * Sorting by competitorId makes the signature independent of the order the
+ * client happened to send the rows in, so the same race entered twice produces
+ * the same string whichever way the form was filled.
+ */
+function fingerprintResults(results: ResultFingerprint[]): string {
+  return results
+    .map((r) => `${r.competitorId}:${r.rank12}:${r.score}`)
+    .sort()
+    .join('|');
+}
+
 @Injectable()
 export class RacesService {
   private readonly logger = new Logger(RacesService.name);
@@ -36,31 +76,84 @@ export class RacesService {
     private eventEmitter: EventEmitter2,
   ) {}
 
+  /**
+   * Load the races that could be duplicates of the one being submitted.
+   *
+   * Which timestamp to centre the window on is the subtle part. `dto.date` is
+   * what actually gets stored: TypeORM inserts an explicitly assigned
+   * `@CreateDateColumn` value and only falls back to the column's `now()`
+   * default when the property is left unset, which `createRace` never does.
+   * Verified against the generated SQL — assigning `race.date` emits
+   * `INSERT INTO "races"("id","date",...) VALUES (DEFAULT,$1,...)` with the
+   * client timestamp as `$1`, versus `VALUES (DEFAULT,DEFAULT,...)` when it is
+   * omitted. So stored rows carry client time and `dto.date` is the anchor
+   * that compares like with like.
+   *
+   * The catch is that `dto.date` is client-supplied and only validated as
+   * ISO-8601. A device with a skewed clock anchors the window away from where
+   * its own earlier rows landed, and the guard scans an empty range. Anchoring
+   * on server time instead just moves the blind spot: rows written with the
+   * skewed client's timestamp would then be the ones missed.
+   *
+   * So when the two references disagree by more than the tolerance we query
+   * both windows rather than choosing between them. Duplicates are rare and
+   * this is a bounded, indexed range scan, so the second query is cheap
+   * insurance against a whole class of misses. When the clocks broadly agree
+   * the windows overlap and one query does.
+   */
+  private async findDuplicateCandidates(
+    raceDate: Date,
+    now: Date,
+  ): Promise<RaceEvent[]> {
+    const anchors = [raceDate];
+
+    const skew = Math.abs(raceDate.getTime() - now.getTime());
+    if (skew > CLOCK_SKEW_TOLERANCE_MS) {
+      this.logger.warn(
+        `Race date ${raceDate.toISOString()} is ${Math.round(skew / 1000)}s from server time; checking both windows for duplicates`,
+      );
+      anchors.push(now);
+    }
+
+    const batches = await Promise.all(
+      anchors.map((anchor) =>
+        this.raceEventRepository.repository.find({
+          where: {
+            date: Between(
+              new Date(anchor.getTime() - DUPLICATE_WINDOW_MS),
+              new Date(anchor.getTime() + DUPLICATE_WINDOW_MS),
+            ),
+          },
+          relations: ['results'],
+        }),
+      ),
+    );
+
+    return batches.flat();
+  }
+
   // CREATE a new race
   async createRace(dto: CreateRaceDto): Promise<RaceEvent> {
     const raceDate = new Date(dto.date);
 
-    // Idempotence check: prevent duplicate races with same competitors within 60s
-    const competitorIds = dto.results.map((r) => r.competitorId).sort();
-    const windowStart = new Date(raceDate.getTime() - 60_000);
-    const windowEnd = new Date(raceDate.getTime() + 60_000);
+    // Idempotence check. A duplicate is the same four players AND the same
+    // finishing order AND the same scores. Matching on the player set alone
+    // was too blunt once the window grew: the same group routinely races
+    // several times in a row (11:17 and 11:28 on 2026-08-04, different
+    // podiums each time), and those are distinct races that must be accepted.
+    const fingerprint = fingerprintResults(dto.results);
+    const recentRaces = await this.findDuplicateCandidates(
+      raceDate,
+      new Date(),
+    );
 
-    const recentRaces = await this.raceEventRepository.repository.find({
-      where: { date: Between(windowStart, windowEnd) },
-      relations: ['results'],
-    });
-
-    const duplicate = recentRaces.find((race) => {
-      const existingIds = race.results.map((r) => r.competitorId).sort();
-      return (
-        existingIds.length === competitorIds.length &&
-        existingIds.every((id, i) => id === competitorIds[i])
-      );
-    });
+    const duplicate = recentRaces.find(
+      (race) => fingerprintResults(race.results) === fingerprint,
+    );
 
     if (duplicate) {
       throw new ConflictException(
-        `A race with the same competitors already exists within 60s (id: ${duplicate.id})`,
+        `An identical race (same competitors, ranks and scores) already exists within ${DUPLICATE_WINDOW_MS / 60_000} minutes (id: ${duplicate.id})`,
       );
     }
 
