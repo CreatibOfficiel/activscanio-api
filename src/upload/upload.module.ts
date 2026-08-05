@@ -5,6 +5,7 @@ import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import { UploadService } from './upload.service';
+import { ImageProcessingService } from './image-processing.service';
 
 @Global() // ← ① visible dans tous les modules
 @Module({
@@ -39,7 +40,7 @@ import { UploadService } from './upload.service';
       limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo
     }),
   ],
-  providers: [UploadService],
-  exports: [UploadService, MulterModule], // ← ③
+  providers: [UploadService, ImageProcessingService],
+  exports: [UploadService, ImageProcessingService, MulterModule], // ← ③
 })
 export class UploadModule {}

@@ -121,8 +121,11 @@ export class CompetitorsService {
       this.uploadService.removeProfileImage(competitor.profilePictureUrl);
     }
 
-    // Move uploaded file to profiles directory
-    competitor.profilePictureUrl = this.uploadService.moveToProfiles(
+    // Downscale + re-encode the upload, then move it into the profiles dir.
+    // The returned URL ends in .webp regardless of what was uploaded — that
+    // is the value persisted in profilePictureUrl, so it must come from
+    // moveToProfiles rather than be rebuilt from file.filename anywhere.
+    competitor.profilePictureUrl = await this.uploadService.moveToProfiles(
       file.filename,
     );
 

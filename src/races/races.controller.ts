@@ -12,6 +12,10 @@ import {
 } from '@nestjs/common';
 import { RacesService } from './races.service';
 import { CreateRaceDto } from './dtos/create-race.dto';
+import {
+  DEFAULT_RACES_LIMIT,
+  MAX_RACES_LIMIT,
+} from './repositories/race-event.repository';
 
 @Controller('races')
 export class RacesController {
@@ -37,11 +41,22 @@ export class RacesController {
   }
 
   // GET /races?recent=true
+  // Without recent=true the listing is capped at DEFAULT_RACES_LIMIT races.
+  // `limit` may raise or lower it, clamped to MAX_RACES_LIMIT. Consumers that
+  // need the full history should use GET /races/paginated.
   @Get()
-  async findAll(@Query('recent') recent: string) {
+  async findAll(
+    @Query('recent') recent: string,
+    @Query('limit') limitStr?: string,
+  ) {
     try {
       const isRecent = recent === 'true';
-      return await this.racesService.findAll(isRecent);
+      const parsedLimit = parseInt(limitStr ?? '', 10);
+      const limit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0
+          ? Math.min(parsedLimit, MAX_RACES_LIMIT)
+          : DEFAULT_RACES_LIMIT;
+      return await this.racesService.findAll(isRecent, limit);
     } catch (error) {
       this.logger.error('Error finding races:', error.stack);
       throw new HttpException(

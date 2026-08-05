@@ -335,12 +335,12 @@ export class RacesService {
   }
 
   // GET /races?recent=true
-  async findAll(recent?: boolean): Promise<RaceEvent[]> {
+  async findAll(recent?: boolean, limit?: number): Promise<RaceEvent[]> {
     if (recent) {
       return this.raceEventRepository.findRecent(30, 50);
     }
 
-    return this.raceEventRepository.findAllWithResults();
+    return this.raceEventRepository.findAllWithResults(limit);
   }
 
   // GET /competitors/:competitorId/recent-races (via CompetitorsController)

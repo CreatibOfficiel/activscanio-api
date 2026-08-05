@@ -127,6 +127,11 @@ export class AchievementsController {
         unlockedAchievements.map((ua) => [ua.achievementId, ua]),
       );
 
+      // Progress for every locked achievement reads the same stats snapshot,
+      // so it is loaded once here rather than once per achievement.
+      const userStats =
+        await this.achievementCalculatorService.loadUserStats(userId);
+
       const results: AchievementResponseDto[] = [];
 
       for (const achievement of achievements) {
@@ -144,6 +149,7 @@ export class AchievementsController {
             await this.achievementCalculatorService.getAchievementProgress(
               userId,
               achievement.id,
+              { achievement, isUnlocked, userStats },
             );
         }
 
@@ -306,7 +312,7 @@ export class AchievementsController {
 
     // Get user stats from calculator service
     const userStats =
-      await this.achievementCalculatorService['getUserStats'](userId);
+      await this.achievementCalculatorService.loadUserStats(userId);
 
     // Get XP info
     const currentLevel = user.level;

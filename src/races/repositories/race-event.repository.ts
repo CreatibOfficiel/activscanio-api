@@ -11,6 +11,22 @@ export interface PaginatedRacesResult {
 }
 
 /**
+ * Default cap applied to the non-paginated race listing.
+ * Kept high enough to cover every known consumer, low enough to keep the
+ * payload bounded as the table grows.
+ */
+export const DEFAULT_RACES_LIMIT = 200;
+
+/** Hard ceiling a caller-supplied limit is clamped to. */
+export const MAX_RACES_LIMIT = 500;
+
+/**
+ * Number of most-recent races scanned when looking for a race with the same
+ * competitor line-up. See findSimilar() for why this is bounded.
+ */
+export const SIMILAR_RACES_SCAN_WINDOW = 500;
+
+/**
  * Race event repository with domain-specific queries
  */
 @Injectable()
@@ -23,13 +39,23 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
   }
 
   /**
-   * Find all races with results loaded
+   * Find races with results loaded, newest first.
+   *
+   * Bounded on purpose: the unbounded version hydrated the whole table
+   * (486 races / 1818 race_results) and serialised ~625 KB of JSON. Callers
+   * that need the full history must use findPaginated().
+   *
+   * @param limit - Maximum number of races to return
    */
-  async findAllWithResults(): Promise<RaceEvent[]> {
-    return this.repository.find({
-      relations: ['results'],
-      order: { date: 'DESC' },
-    });
+  async findAllWithResults(
+    limit: number = DEFAULT_RACES_LIMIT,
+  ): Promise<RaceEvent[]> {
+    return this.repository
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.results', 'res')
+      .orderBy('r.date', 'DESC')
+      .take(limit)
+      .getMany();
   }
 
   /**
@@ -73,18 +99,19 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     competitorId: string,
     limit: number = 3,
   ): Promise<RaceEvent[]> {
-    const allRaces = await this.repository.find({
-      relations: ['results'],
-      order: { date: 'DESC' },
-    });
-
-    const competitorRaces = allRaces
-      .filter((race) =>
-        race.results.some((r) => r.competitorId === competitorId),
+    // Filtering happens in SQL via EXISTS (same pattern as findPaginated),
+    // which hits IDX_race_results_competitorId. The previous implementation
+    // hydrated every race and every result to keep `limit` of them.
+    return this.repository
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.results', 'res')
+      .where(
+        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceId" = r.id AND rr."competitorId" = :competitorId)',
+        { competitorId },
       )
-      .slice(0, limit);
-
-    return competitorRaces;
+      .orderBy('r.date', 'DESC')
+      .take(limit)
+      .getMany();
   }
 
   /**
@@ -201,7 +228,7 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
       // EXISTS is also a hash semi-join in Postgres, so performance is
       // equal or better than IN (SELECT ...).
       qb.andWhere(
-        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceEventId" = r.id AND rr."competitorId" = :competitorId)',
+        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceId" = r.id AND rr."competitorId" = :competitorId)',
         { competitorId },
       );
     }
@@ -222,7 +249,7 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     if (dateTo) countQb.andWhere('r.date <= :dateTo', { dateTo });
     if (competitorId) {
       countQb.andWhere(
-        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceEventId" = r.id AND rr."competitorId" = :competitorId)',
+        'EXISTS (SELECT 1 FROM race_results rr WHERE rr."raceId" = r.id AND rr."competitorId" = :competitorId)',
         { competitorId },
       );
     }
@@ -258,14 +285,25 @@ export class RaceEventRepository extends BaseRepository<RaceEvent> {
     // Extract competitor IDs from reference race
     const refCompetitorIds = refRace.results.map((r) => r.competitorId).sort();
 
-    // Get all races
-    const allRaces = await this.repository.find({
-      relations: ['results'],
-      order: { date: 'DESC' },
-    });
+    // A race is "similar" when its competitor set is exactly equal to the
+    // reference set. Expressing set equality in SQL means a GROUP BY +
+    // HAVING with both a count check and a containment check, which is a lot
+    // of machinery for a feature that only ever returns the 3 most recent
+    // matches. Instead the scan window is bounded: only the last
+    // SIMILAR_RACES_SCAN_WINDOW races are hydrated, and the set comparison
+    // stays in JavaScript. Any real match is by definition recent (the same
+    // line-up implies the same group of players), so the practical result is
+    // unchanged while the worst case stops growing with the table.
+    // Trade-off: a matching race older than the window is no longer found.
+    const candidateRaces = await this.repository
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.results', 'res')
+      .orderBy('r.date', 'DESC')
+      .take(SIMILAR_RACES_SCAN_WINDOW)
+      .getMany();
 
     // Find races with same competitors
-    const similarRaces = allRaces
+    const similarRaces = candidateRaces
       .filter((race) => {
         if (race.id === raceId) return false; // exclude reference race
         const raceCompetitorIds = race.results

@@ -176,11 +176,14 @@ export class StreakWarningService {
       playStreak: { atRisk: false, currentStreak: 0, missedBusinessDays: 0 },
     };
 
-    // --- Participation streak ---
-    const streak = await this.userStreakRepository.findOne({
-      where: { userId },
-    });
+    // The streak row and the user row are independent; the competitor lookup
+    // below needs user.competitorId, so it stays sequential.
+    const [streak, user] = await Promise.all([
+      this.userStreakRepository.findOne({ where: { userId } }),
+      this.userRepository.findOne({ where: { id: userId } }),
+    ]);
 
+    // --- Participation streak ---
     if (streak) {
       const currentStreak = Math.max(
         streak.currentMonthlyStreak,
@@ -210,8 +213,6 @@ export class StreakWarningService {
     }
 
     // --- Play streak ---
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
     if (user?.competitorId) {
       const competitor = await this.competitorRepository.findOne({
         where: { id: user.competitorId },

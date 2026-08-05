@@ -330,28 +330,29 @@ export class AchievementCalculatorService {
    * @returns User statistics
    */
   private async getUserStats(userId: string): Promise<UserStats> {
-    const userStreak = await this.userStreakRepository.findOne({
-      where: { userId },
-    });
+    // The streak row and the user row are independent lookups; the competitor
+    // and ping-pong rows both hang off user.competitorId, so they wait for the
+    // user but not for each other.
+    const [userStreak, user] = await Promise.all([
+      this.userStreakRepository.findOne({ where: { userId } }),
+      this.userRepository.findOne({ where: { id: userId } }),
+    ]);
 
-    // Load competitor stats if the user is linked to one
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    let isCompetitor = false;
     let competitor: Competitor | null = null;
-
-    if (user?.competitorId) {
-      competitor = await this.competitorRepository.findOne({
-        where: { id: user.competitorId },
-      });
-      isCompetitor = !!competitor;
-    }
-
     let pingpongPlayer: PingpongPlayer | null = null;
+
     if (user?.competitorId) {
-      pingpongPlayer = await this.pingpongPlayerRepository.findOne({
-        where: { competitorId: user.competitorId },
-      });
+      [competitor, pingpongPlayer] = await Promise.all([
+        this.competitorRepository.findOne({
+          where: { id: user.competitorId },
+        }),
+        this.pingpongPlayerRepository.findOne({
+          where: { competitorId: user.competitorId },
+        }),
+      ]);
     }
+
+    const isCompetitor = !!competitor;
 
     // Only replay the match log for someone who actually has one. For the
     // rest — every Mario Kart-only player — this stays zero without a query.
@@ -395,6 +396,17 @@ export class AchievementCalculatorService {
   }
 
   /**
+   * Public read of the aggregated stats.
+   *
+   * Same data as the private getUserStats, exposed so a caller scoring many
+   * achievements at once can load it once and pass it back in, instead of
+   * reaching through the bracket-access escape hatch.
+   */
+  async loadUserStats(userId: string): Promise<UserStats> {
+    return await this.getUserStats(userId);
+  }
+
+  /**
    * Get user's unlocked achievements
    *
    * @param userId - User ID
@@ -413,31 +425,44 @@ export class AchievementCalculatorService {
    *
    * @param userId - User ID
    * @param achievementId - Achievement ID
+   * @param preloaded - Data the caller already holds. A caller looping over
+   *   every achievement has the achievement row, the unlocked flag and the
+   *   user's stats in hand already; passing them avoids re-reading all three
+   *   per iteration. Omit any field to have it loaded as before.
    * @returns Progress percentage (0-100)
    */
   async getAchievementProgress(
     userId: string,
     achievementId: string,
+    preloaded?: {
+      achievement?: Achievement;
+      isUnlocked?: boolean;
+      userStats?: UserStats;
+    },
   ): Promise<number> {
-    const achievement = await this.achievementRepository.findOne({
-      where: { id: achievementId },
-    });
+    const achievement =
+      preloaded?.achievement ??
+      (await this.achievementRepository.findOne({
+        where: { id: achievementId },
+      }));
 
     if (!achievement) {
       return 0;
     }
 
     // Check if already unlocked
-    const unlocked = await this.userAchievementRepository.findOne({
-      where: { userId, achievementId },
-    });
+    const unlocked =
+      preloaded?.isUnlocked ??
+      !!(await this.userAchievementRepository.findOne({
+        where: { userId, achievementId },
+      }));
 
     if (unlocked) {
       return 100;
     }
 
     // Get user stats and calculate progress
-    const userStats = await this.getUserStats(userId);
+    const userStats = preloaded?.userStats ?? (await this.getUserStats(userId));
     const actualValue = this.getMetricValue(
       userStats,
       achievement.condition.metric,
