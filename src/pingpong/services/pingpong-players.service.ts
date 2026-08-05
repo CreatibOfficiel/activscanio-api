@@ -70,6 +70,12 @@ export class PingpongPlayersService {
    * nobody is enrolled, so a form listing only enrolled players shows an
    * empty search box with no explanation and no way forward. Enrolment then
    * happens on the first recorded match.
+   *
+   * Returned unordered, on purpose. The form ranks by `lastMatchAt` to put
+   * the regulars first, but it also excludes whoever holds the other side
+   * and re-ranks on every keystroke of its search — so any order chosen here
+   * would be discarded there. Sorting stays next to the filtering that
+   * depends on it rather than being split across the wire.
    */
   async getSelectableOpponents(): Promise<
     {
@@ -79,6 +85,16 @@ export class PingpongPlayersService {
       profilePictureUrl: string;
       /** The ping-pong player id, or null for someone not yet enrolled. */
       playerId: string | null;
+      /**
+       * When they last played, for the entry form's ordering — the same few
+       * colleagues play repeatedly, so the picker floats them to the top.
+       *
+       * Null covers two cases the caller must not conflate with "played long
+       * ago": someone with no `pingpong_players` row at all, and the brief
+       * window between enrolment and their first recorded match. Ordering is
+       * left to the caller; see the note above the method.
+       */
+      lastMatchAt: Date | null;
     }[]
   > {
     const [competitors, players] = await Promise.all([
@@ -90,13 +106,18 @@ export class PingpongPlayersService {
       players.map((player) => [player.competitorId, player]),
     );
 
-    return competitors.map((competitor) => ({
-      competitorId: competitor.id,
-      firstName: competitor.firstName,
-      lastName: competitor.lastName,
-      profilePictureUrl: competitor.profilePictureUrl,
-      playerId: playerByCompetitor.get(competitor.id)?.id ?? null,
-    }));
+    return competitors.map((competitor) => {
+      const player = playerByCompetitor.get(competitor.id);
+
+      return {
+        competitorId: competitor.id,
+        firstName: competitor.firstName,
+        lastName: competitor.lastName,
+        profilePictureUrl: competitor.profilePictureUrl,
+        playerId: player?.id ?? null,
+        lastMatchAt: player?.lastMatchAt ?? null,
+      };
+    });
   }
 
   /**

@@ -185,6 +185,87 @@ export class PingpongController {
     return matches.map(sanitizeMatch);
   }
 
+  /**
+   * The same matches, one page at a time.
+   *
+   * A sibling endpoint rather than an envelope bolted onto `GET
+   * /pingpong/matches`. That one returns a bare array and its callers index
+   * straight into it; wrapping it in `{ data, meta }` would break each of
+   * them at once, for no gain to the ones that only ever wanted the newest
+   * few. The old endpoint keeps its shape and its 200-row ceiling; this one
+   * is what the history scrolls.
+   *
+   * Keyset, not OFFSET, and the difference is not theoretical here. Matches
+   * are recorded from a phone beside the table while the history is open on
+   * someone else's, so rows arrive mid-scroll. An OFFSET window shifts by one
+   * every time that happens and the reader silently sees a match twice, or
+   * never sees it at all. A keyset cursor names a position in the ordering
+   * rather than a count from the top, so an insert above it changes nothing
+   * below.
+   *
+   * The cursor is composite — `playedAt|id` — because `playedAt` is not
+   * unique. It is caller-supplied (`dto.playedAt ?? new Date()`), so an
+   * evening of matches keyed in afterwards carries one identical timestamp
+   * across every row. A cursor on the timestamp alone would resume strictly
+   * below it and skip every match tied with the last one on the page. The id
+   * breaks the tie, and `@Index(['playedAt'])` plus the primary key make the
+   * comparison cheap. This mirrors `findPaginated` on the races repository,
+   * which solved the same problem with the same `date|id` shape.
+   */
+  @Public()
+  @Get('matches/paginated')
+  @ApiOperation({ summary: 'Recent matches, paginated by keyset cursor' })
+  async getMatchesPaginated(
+    @Query('limit') limit = '20',
+    @Query('cursor') cursor?: string,
+  ) {
+    // Bounded regardless of what the caller asks for. Lifting the cap on the
+    // history is the point of this endpoint; letting one request pull all of
+    // it is not.
+    const pageSize = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+
+    const qb = this.matchRepository
+      .createQueryBuilder('m')
+      .leftJoinAndSelect('m.playerA', 'playerA')
+      .leftJoinAndSelect('playerA.competitor', 'playerACompetitor')
+      .leftJoinAndSelect('m.playerB', 'playerB')
+      .leftJoinAndSelect('playerB.competitor', 'playerBCompetitor')
+      .orderBy('m.playedAt', 'DESC')
+      .addOrderBy('m.id', 'DESC');
+
+    if (cursor) {
+      // Split on the FIRST separator only: an ISO timestamp contains no '|',
+      // but splitting greedily would still mangle an id that somehow did.
+      const separator = cursor.indexOf('|');
+      const cursorDate = cursor.slice(0, separator);
+      const cursorId = cursor.slice(separator + 1);
+
+      qb.andWhere(
+        '(m."playedAt" < :cursorDate OR (m."playedAt" = :cursorDate AND m.id < :cursorId))',
+        { cursorDate: new Date(cursorDate), cursorId },
+      );
+    }
+
+    // One row more than the page. Its presence is the answer to "is there
+    // more", which is cheaper than a second COUNT over the whole table.
+    const rows = await qb.take(pageSize + 1).getMany();
+
+    const hasMore = rows.length > pageSize;
+    // Drop the probe before it reaches anyone: it belongs to the next page.
+    const page = hasMore ? rows.slice(0, pageSize) : rows;
+
+    const last = page[page.length - 1];
+    // Built from the last row KEPT, never the probe — a cursor taken from
+    // the dropped row would skip it on the next request.
+    const nextCursor =
+      hasMore && last ? `${last.playedAt.toISOString()}|${last.id}` : null;
+
+    return {
+      data: page.map(sanitizeMatch),
+      meta: { hasMore, nextCursor, limit: pageSize },
+    };
+  }
+
   @Post('matches')
   @ApiOperation({ summary: 'Record a match' })
   @ApiResponse({ status: 400, description: 'Impossible score' })

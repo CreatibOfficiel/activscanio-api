@@ -18,7 +18,7 @@ import { PingpongEloSnapshot } from '../entities/pingpong-elo-snapshot.entity';
  */
 describe('PingpongController — matches', () => {
   let controller: PingpongController;
-  let matchRepository: { find: jest.Mock };
+  let matchRepository: { find: jest.Mock; createQueryBuilder: jest.Mock };
   let playersService: { getPlayerByCompetitorId: jest.Mock };
 
   /** A player row as the relation loader returns it, competitor included. */
@@ -73,7 +73,10 @@ describe('PingpongController — matches', () => {
   }
 
   beforeEach(async () => {
-    matchRepository = { find: jest.fn().mockResolvedValue([matchRow()]) };
+    matchRepository = {
+      find: jest.fn().mockResolvedValue([matchRow()]),
+      createQueryBuilder: jest.fn(),
+    };
     playersService = {
       getPlayerByCompetitorId: jest.fn().mockResolvedValue({ id: 'p1' }),
     };
@@ -223,6 +226,181 @@ describe('PingpongController — matches', () => {
       expect(match.playerA).not.toHaveProperty('rating');
       expect(match.playerA).not.toHaveProperty('rd');
       expect(match.playerA).not.toHaveProperty('currentStreak');
+    });
+  });
+
+  /**
+   * The paginated sibling.
+   *
+   * A separate endpoint rather than a new shape on `GET /pingpong/matches`,
+   * because that one returns a bare array and its callers — including the
+   * tests above, which destructure it — would all break on an envelope.
+   *
+   * The cursor is composite, `playedAt|id`, and that is not decoration.
+   * `playedAt` is caller-supplied (`dto.playedAt ?? new Date()`), so an
+   * evening's matches keyed in afterwards all share one timestamp. A cursor
+   * on the timestamp alone would skip every match tied with the last one on
+   * the page.
+   */
+  describe('GET /pingpong/matches/paginated', () => {
+    /** The chainable QueryBuilder keyset pagination needs. */
+    function queryBuilderReturning(rows: PingpongMatch[]) {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      matchRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
+      return qb;
+    }
+
+    it('wraps the rows in an envelope rather than returning a bare array', async () => {
+      queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      const page = await controller.getMatchesPaginated('20');
+
+      expect(Array.isArray(page)).toBe(false);
+      expect(page.data).toHaveLength(1);
+      expect(page.meta).toEqual(
+        expect.objectContaining({ hasMore: false, nextCursor: null }),
+      );
+    });
+
+    it('names both players, exactly as the unpaginated endpoint does', async () => {
+      queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      const page = await controller.getMatchesPaginated('20');
+
+      expect(page.data[0].playerA).toEqual(
+        expect.objectContaining({ firstName: 'Marc' }),
+      );
+      expect(page.data[0].playerB).toEqual(
+        expect.objectContaining({ firstName: 'Léa' }),
+      );
+    });
+
+    /**
+     * The over-fetch. Asking for limit+1 is how "is there a next page"
+     * is answered without a second COUNT query.
+     */
+    it('reports hasMore and drops the probe row when a page is full', async () => {
+      queryBuilderReturning([
+        matchRow({ id: 'm1' }),
+        matchRow({ id: 'm2' }),
+        matchRow({ id: 'm3' }),
+      ]);
+
+      const page = await controller.getMatchesPaginated('2');
+
+      expect(page.data).toHaveLength(2);
+      expect(page.meta.hasMore).toBe(true);
+    });
+
+    it('takes one more row than the page size, to detect the next page', async () => {
+      const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      await controller.getMatchesPaginated('20');
+
+      expect(qb.take).toHaveBeenCalledWith(21);
+    });
+
+    /**
+     * The mutation this guards: emit the cursor from the wrong row (the
+     * dropped probe, or the first of the page) and page two either skips a
+     * match or repeats the whole of page one.
+     */
+    it('emits a composite cursor built from the last row it kept', async () => {
+      queryBuilderReturning([
+        matchRow({ id: 'm1', playedAt: new Date('2026-03-14T12:00:00Z') }),
+        matchRow({ id: 'm2', playedAt: new Date('2026-03-13T09:00:00Z') }),
+        matchRow({ id: 'm3', playedAt: new Date('2026-03-12T08:00:00Z') }),
+      ]);
+
+      const page = await controller.getMatchesPaginated('2');
+
+      expect(page.meta.nextCursor).toBe(
+        `${new Date('2026-03-13T09:00:00Z').toISOString()}|m2`,
+      );
+    });
+
+    it('stops paging with a null cursor on the last page', async () => {
+      queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      const page = await controller.getMatchesPaginated('20');
+
+      expect(page.meta.nextCursor).toBeNull();
+      expect(page.meta.hasMore).toBe(false);
+    });
+
+    /**
+     * Keyset, not OFFSET. A tie on `playedAt` must fall through to the id,
+     * or the rows sharing the last page's timestamp are skipped entirely.
+     */
+    it('compares the id as a tiebreak when playedAt is equal', async () => {
+      const qb = queryBuilderReturning([matchRow({ id: 'm9' })]);
+
+      await controller.getMatchesPaginated(
+        '20',
+        `${new Date('2026-03-13T09:00:00Z').toISOString()}|m2`,
+      );
+
+      const [sql, params] = qb.andWhere.mock.calls[0] as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(sql).toContain('OR');
+      expect(sql).toContain('cursorId');
+      expect(params).toEqual(expect.objectContaining({ cursorId: 'm2' }));
+    });
+
+    it('asks for no cursor filter on the first page', async () => {
+      const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      await controller.getMatchesPaginated('20');
+
+      expect(qb.andWhere).not.toHaveBeenCalled();
+    });
+
+    it('orders newest first, with the id breaking ties', async () => {
+      const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      await controller.getMatchesPaginated('20');
+
+      expect(qb.orderBy).toHaveBeenCalledWith('m.playedAt', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('m.id', 'DESC');
+    });
+
+    /**
+     * The page size is still bounded. The point of the change is to remove
+     * the ceiling on the HISTORY, not to let one request ask for all of it.
+     */
+    it('caps an oversized page size', async () => {
+      const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      await controller.getMatchesPaginated('5000');
+
+      expect(qb.take).toHaveBeenCalledWith(101);
+    });
+
+    it('falls back to a sane page size when the limit is junk', async () => {
+      const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+      await controller.getMatchesPaginated('not-a-number');
+
+      expect(qb.take).toHaveBeenCalledWith(21);
+    });
+
+    it('returns an empty page rather than throwing when nothing matches', async () => {
+      queryBuilderReturning([]);
+
+      const page = await controller.getMatchesPaginated('20');
+
+      expect(page.data).toEqual([]);
+      expect(page.meta.hasMore).toBe(false);
+      expect(page.meta.nextCursor).toBeNull();
     });
   });
 
