@@ -12,8 +12,9 @@ import {
   PingpongSetScore,
 } from '../entities/pingpong-match.entity';
 import { PingpongRatingService } from './pingpong-rating.service';
-import { computePairWeight } from '../utils/pairing-weight';
+import { buildPairKey, MATCH_WEIGHT } from '../utils/pairing-weight';
 import { validateMatchSets } from '../utils/pingpong-classification';
+import { applyMatchOutcome } from '../utils/apply-match-outcome';
 
 export interface RecordMatchDto {
   playerAId: string;
@@ -38,13 +39,13 @@ export class PingpongMatchService {
    * Order matters and is deliberate:
    *   1. validate the sets — reject before touching anything
    *   2. load both players and lock them
-   *   3. count this pair's matches this ISO week → anti-farming weight
-   *   4. compute the new ratings (the 250-point freeze lives in the rating service)
-   *   5. persist the match and both players together
+   *   3. compute the new ratings (Glicko-2, in the rating service)
+   *   4. persist the match and both players together
    *
-   * Steps 3 and 4 are separate on purpose: the pairing weight is a property of
-   * the schedule, the freeze is a property of the ratings. Mixing them would
-   * make either one impossible to reason about alone.
+   * Every match now counts fully. The per-ISO-week pairing weight that used to
+   * sit between steps 2 and 3 is gone — see utils/pairing-weight.ts for why.
+   * `pairKey`, `isoYear` and `isoWeek` are still written: they are the
+   * historical record, and head-to-head lookups read the pair key.
    */
   async recordMatch(dto: RecordMatchDto): Promise<PingpongMatch> {
     if (dto.playerAId === dto.playerBId) {
@@ -59,7 +60,7 @@ export class PingpongMatchService {
     const playedAt = dto.playedAt ?? new Date();
     const isoWeek = getISOWeek(playedAt);
     const isoYear = getISOWeekYear(playedAt);
-    const pairKey = this.buildPairKey(dto.playerAId, dto.playerBId);
+    const pairKey = buildPairKey(dto.playerAId, dto.playerBId);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -81,10 +82,7 @@ export class PingpongMatchService {
         throw new NotFoundException('Player not found');
       }
 
-      const priorMeetings = await queryRunner.manager.count(PingpongMatch, {
-        where: { pairKey, isoYear, isoWeek },
-      });
-      const weight = computePairWeight(priorMeetings);
+      const weight = MATCH_WEIGHT;
 
       const rated = this.ratingService.calculateMatchRating({
         playerA: { rating: playerA.rating, rd: playerA.rd, vol: playerA.vol },
@@ -120,13 +118,13 @@ export class PingpongMatchService {
 
       await queryRunner.manager.save(PingpongMatch, match);
 
-      this.applyOutcome(playerA, rated.playerA, weight, {
+      applyMatchOutcome(playerA, rated.playerA, weight, {
         won: validation.winner === 'A',
         setsWon: validation.setsA,
         setsLost: validation.setsB,
         playedAt,
       });
-      this.applyOutcome(playerB, rated.playerB, weight, {
+      applyMatchOutcome(playerB, rated.playerB, weight, {
         won: validation.winner === 'B',
         setsWon: validation.setsB,
         setsLost: validation.setsA,
@@ -148,50 +146,6 @@ export class PingpongMatchService {
       throw error;
     } finally {
       await queryRunner.release();
-    }
-  }
-
-  /**
-   * Canonical pair identifier, so a pair reads the same whichever side each
-   * player took. Without it, counting a pair's weekly meetings needs an
-   * unindexable bidirectional OR.
-   */
-  private buildPairKey(idA: string, idB: string): string {
-    return idA < idB ? `${idA}:${idB}` : `${idB}:${idA}`;
-  }
-
-  private applyOutcome(
-    player: PingpongPlayer,
-    rated: { rating: number; rd: number; vol: number },
-    weight: number,
-    outcome: {
-      won: boolean;
-      setsWon: number;
-      setsLost: number;
-      playedAt: Date;
-    },
-  ): void {
-    player.rating = rated.rating;
-    player.rd = rated.rd;
-    player.vol = rated.vol;
-
-    // Every match counts towards the displayed total, even at zero weight.
-    // Only the weighted count moves calibration, so farming the same opponent
-    // inflates the stats without shortening the road to a confirmed rating.
-    player.matchCount += 1;
-    player.weightedMatchCount += weight;
-
-    player.setsWon += outcome.setsWon;
-    player.setsLost += outcome.setsLost;
-    player.lastMatchAt = outcome.playedAt;
-
-    if (outcome.won) {
-      player.wins += 1;
-      player.currentStreak += 1;
-      player.bestStreak = Math.max(player.bestStreak, player.currentStreak);
-    } else {
-      player.losses += 1;
-      player.currentStreak = 0;
     }
   }
 }

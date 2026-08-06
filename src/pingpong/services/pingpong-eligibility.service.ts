@@ -76,10 +76,10 @@ export class PingpongEligibilityService {
       const counts = this.countByOpponent(player.id, matches);
 
       await this.playerRepository.update(player.id, {
-        // The only gate: enough weighted matches for the rating to mean
-        // something. Reads the WEIGHTED count on purpose — farming one
-        // opponent inflates the raw count but not this one, so it cannot buy
-        // a way out of calibration.
+        // The only gate: enough matches for the rating to mean something.
+        // Still reads weightedMatchCount, which now tracks matchCount exactly
+        // since every match weighs 1 — the column stays as the historical
+        // record of what the old pairing rule applied.
         isRankingEligible: player.weightedMatchCount >= PROVISIONAL_MIN_MATCHES,
         distinctOpponents21d: counts.length,
         diversityScore21d: shannonDiversity(counts),

@@ -4,6 +4,8 @@ import { PingpongController } from '../pingpong.controller';
 import { PingpongPlayersService } from '../services/pingpong-players.service';
 import { PingpongMatchService } from '../services/pingpong-match.service';
 import { PingpongBestWinService } from '../services/pingpong-best-win.service';
+import { PingpongRecomputeService } from '../services/pingpong-recompute.service';
+import { ConfigService } from '@nestjs/config';
 import { PingpongMatch } from '../entities/pingpong-match.entity';
 import { PingpongPlayer } from '../entities/pingpong-player.entity';
 import { PingpongEloSnapshot } from '../entities/pingpong-elo-snapshot.entity';
@@ -69,7 +71,7 @@ describe('PingpongController — matches', () => {
       rdBAfter: 58,
       createdAt: new Date('2026-03-14T12:00:00Z'),
       ...overrides,
-    } as PingpongMatch;
+    };
   }
 
   beforeEach(async () => {
@@ -87,6 +89,8 @@ describe('PingpongController — matches', () => {
         { provide: PingpongPlayersService, useValue: playersService },
         { provide: PingpongMatchService, useValue: {} },
         { provide: PingpongBestWinService, useValue: {} },
+        { provide: PingpongRecomputeService, useValue: {} },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
         {
           provide: getRepositoryToken(PingpongMatch),
           useValue: matchRepository,
@@ -106,7 +110,7 @@ describe('PingpongController — matches', () => {
         'playerA.competitor',
         'playerB',
         'playerB.competitor',
-      ]) as unknown as string[],
+      ]),
     }) as object;
 
   describe('GET /pingpong/matches', () => {

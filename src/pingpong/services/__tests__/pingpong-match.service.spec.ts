@@ -176,50 +176,37 @@ describe('PingpongMatchService', () => {
     });
   });
 
-  describe('anti-farming weight', () => {
-    it('gives full weight to a pair meeting for the first time this week', async () => {
-      manager.count.mockResolvedValue(0);
+  describe('match weight', () => {
+    it('gives every match full weight, whatever the pair has already played', async () => {
+      // The per-ISO-week pairing rule is gone. Whatever a COUNT of prior
+      // meetings would have returned, the weight is 1.
+      for (const priorMeetings of [0, 3, 6, 20]) {
+        manager.count.mockResolvedValue(priorMeetings);
 
-      const match = await service.recordMatch({
+        const match = await service.recordMatch({
+          playerAId: PLAYER_A,
+          playerBId: PLAYER_B,
+          sets: straightWin,
+        });
+
+        expect(match.appliedWeight).toBe(1);
+        expect(match.ratingAAfter).not.toBe(match.ratingABefore);
+      }
+    });
+
+    it('does not query the database for the pair’s weekly meetings at all', async () => {
+      // The COUNT existed only to feed the weight. Leaving it in place would
+      // be a query per match for a number nothing reads.
+      await service.recordMatch({
         playerAId: PLAYER_A,
         playerBId: PLAYER_B,
         sets: straightWin,
       });
 
-      expect(match.appliedWeight).toBe(1);
+      expect(manager.count).not.toHaveBeenCalled();
     });
 
-    it('halves the weight on the fourth meeting of the week', async () => {
-      manager.count.mockResolvedValue(3);
-
-      const match = await service.recordMatch({
-        playerAId: PLAYER_A,
-        playerBId: PLAYER_B,
-        sets: straightWin,
-      });
-
-      expect(match.appliedWeight).toBe(0.5);
-    });
-
-    it('zeroes the weight from the seventh meeting', async () => {
-      manager.count.mockResolvedValue(6);
-
-      const match = await service.recordMatch({
-        playerAId: PLAYER_A,
-        playerBId: PLAYER_B,
-        sets: straightWin,
-      });
-
-      expect(match.appliedWeight).toBe(0);
-      // Ratings untouched, but the match still happened.
-      expect(match.ratingAAfter).toBe(match.ratingABefore);
-    });
-
-    it('still counts a zero-weight match in matchCount but not in weightedMatchCount', async () => {
-      // This is the whole point of keeping two counters: farming inflates the
-      // visible stats but never shortens calibration.
-      manager.count.mockResolvedValue(6);
-
+    it('keeps matchCount and weightedMatchCount in step', async () => {
       await service.recordMatch({
         playerAId: PLAYER_A,
         playerBId: PLAYER_B,
@@ -239,8 +226,21 @@ describe('PingpongMatchService', () => {
       expect(saved.length).toBeGreaterThan(0);
       for (const p of saved) {
         expect(p.matchCount).toBe(1);
-        expect(p.weightedMatchCount).toBe(0);
+        expect(p.weightedMatchCount).toBe(1);
       }
+    });
+
+    it('still records the ISO week and pair key for the historical record', async () => {
+      const match = await service.recordMatch({
+        playerAId: PLAYER_A,
+        playerBId: PLAYER_B,
+        sets: straightWin,
+        playedAt: new Date('2026-08-03T12:00:00Z'),
+      });
+
+      expect(match.isoYear).toBe(2026);
+      expect(match.isoWeek).toBe(32);
+      expect(match.pairKey).toBeTruthy();
     });
 
     it('builds a pair key that is stable whichever side each player takes', async () => {

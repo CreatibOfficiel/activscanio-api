@@ -8,31 +8,70 @@ import { Glicko2 } from 'glicko2';
  * its own constants. The two scales are never mixed: a 1700 at the table and
  * a 1700 on the track measure different things, over different populations.
  *
- * Two parameters differ from Mario Kart, and both are on purpose:
- * - TAU 0.35 instead of 0.5. Table tennis is far more deterministic than a
- *   kart race with blue shells, so a surprising result is more informative
- *   and the system should trust it more.
- * - MIN_RD 50 instead of 30. Office players improve fast over a few months;
- *   a floor that is too low freezes a rating that should still be moving.
+ * Two parameters differ from Mario Kart, and both are on purpose. Both are
+ * tuned for the size of this league — eight people playing about one match
+ * each per week — and both should be revisited if it ever reaches roughly ten
+ * games per player per rating period.
  */
 @Injectable()
 export class PingpongRatingService {
-  private readonly TAU = 0.35;
+  /**
+   * Volatility constraint. 0.2, the smallest value Glickman names.
+   *
+   * From the Glicko-2 paper, verbatim: "If the application of Glicko-2 is
+   * expected to involve extremely improbable collections of game outcomes,
+   * then τ should be set to a small value, even as small as, say, τ = 0.2."
+   *
+   * That is this league exactly. At roughly one match per player per week
+   * across eight people, the volatility estimator is being fit to single
+   * outcomes rather than to a period's worth of them, and a larger τ lets it
+   * chase noise: one surprising Tuesday reads as a player whose true strength
+   * is swinging. Was 0.35, on the reasoning that table tennis is more
+   * deterministic than a kart race — true, but it argues for trusting the
+   * RATING more, not for letting the VOLATILITY move more.
+   *
+   * Revisit at ~10 games per player per rating period.
+   */
+  private readonly TAU = 0.2;
   private readonly DEFAULT_RATING = 1500;
   private readonly DEFAULT_RD = 350;
   private readonly DEFAULT_VOL = 0.06;
-  private readonly MIN_RD = 50;
 
   /**
-   * Rating gap beyond which a match carries no rating signal.
+   * Deviation floor. Not part of the `glicko2` package — this codebase adds it.
    *
-   * Mirrors what real federations do: USATT stops awarding points past 238,
-   * the German TTR past 224. Without it, beating a much weaker opponent fifty
-   * times still adds up, because Glicko-2's diminishing returns never quite
-   * reach zero.
+   * A deviation of 50 asserts a ±100 confidence interval on a player's true
+   * strength. After eight matches inside an eight-person pool, that is a claim
+   * the data does not support: nobody here has played enough, against enough
+   * different people, to be known that precisely. 75 is the honest floor.
+   *
+   * Revisit at ~10 games per player per rating period.
    */
-  private readonly FREEZE_GAP = 250;
+  private readonly MIN_RD = 75;
 
+  /**
+   * There is deliberately no rating freeze here.
+   *
+   * An earlier version pinned BOTH ratings whenever the gap exceeded 250,
+   * citing USATT (238) and the German TTR (224). Both citations were checked
+   * against the primary sources and both say the opposite: they cap only the
+   * FAVOURITE's gain. USATT's own table awards the upset winner 50 points —
+   * the largest value anywhere in it — in the very row where the favourite
+   * gets 0. Freezing symmetrically inverted both precedents. The TTR's 224
+   * turned out not to be a rule at all, but an integer-rounding artifact that
+   * disappears at a different K. Glicko-2's paper contains no gap cutoff of
+   * any kind.
+   *
+   * The cost was not theoretical: 7 of 15 recorded matches were silenced,
+   * including a 2-0 win across a 442-point gap — a result Glicko puts at
+   * roughly 10% likelihood, and so the single most informative match in the
+   * dataset. It moved nothing.
+   *
+   * The anti-farming intent the freeze was reaching for is already served,
+   * and served better, by the per-ISO-week pairing weight upstream (see
+   * utils/pairing-weight.ts): it caps how much one pair can contribute in a
+   * week without discarding the signal from a genuine upset.
+   */
   calculateMatchRating(input: PingpongRatingInput): PingpongRatingOutput {
     const { playerA, playerB, winner, weight } = input;
 
@@ -55,23 +94,21 @@ export class PingpongRatingService {
 
     glicko.updateRatings([[a, b, winner === 'A' ? 1 : 0]]);
 
-    const ratingFrozen =
-      Math.abs(playerA.rating - playerB.rating) > this.FREEZE_GAP;
-
     return {
       playerA: this.blend(
         playerA,
         { rating: a.getRating(), rd: a.getRd(), vol: a.getVol() },
         weight,
-        ratingFrozen,
       ),
       playerB: this.blend(
         playerB,
         { rating: b.getRating(), rd: b.getRd(), vol: b.getVol() },
         weight,
-        ratingFrozen,
       ),
-      ratingFrozen,
+      // Always false now that the freeze is gone. Kept on the output — and on
+      // the match column — because rows written under the old rule are a
+      // record of what actually happened, and dropping it destroys that.
+      ratingFrozen: false,
     };
   }
 
@@ -97,21 +134,16 @@ export class PingpongRatingService {
    * including the iterative volatility step), we let the library take a full
    * step and scale the move. At weight 1 this is exact Glicko-2; at weight 0
    * nothing happens; in between it is monotonic and continuous.
-   *
-   * When the rating is frozen, only the deviation and volatility move: the
-   * match said nothing about relative strength, but it did say something about
-   * how confident we are.
    */
   private blend(
     before: PingpongRating,
     after: PingpongRating,
     weight: number,
-    ratingFrozen: boolean,
   ): PingpongRating {
     const lerp = (from: number, to: number) => from + weight * (to - from);
 
     return {
-      rating: ratingFrozen ? before.rating : lerp(before.rating, after.rating),
+      rating: lerp(before.rating, after.rating),
       rd: Math.max(this.MIN_RD, lerp(before.rd, after.rd)),
       vol: lerp(before.vol, after.vol),
     };
@@ -136,6 +168,10 @@ export interface PingpongRatingInput {
 export interface PingpongRatingOutput {
   playerA: PingpongRating;
   playerB: PingpongRating;
-  /** True when the rating gap exceeded FREEZE_GAP and ratings were pinned. */
+  /**
+   * Always false. The rating freeze was removed; the field stays so the match
+   * column keeps a single writer, and so rows recorded under the old rule
+   * remain distinguishable from rows written since.
+   */
   ratingFrozen: boolean;
 }

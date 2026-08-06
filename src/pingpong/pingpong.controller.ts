@@ -1,11 +1,24 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { MoreThanOrEqual, Repository } from 'typeorm';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { PingpongPlayersService } from './services/pingpong-players.service';
 import { PingpongMatchService } from './services/pingpong-match.service';
 import { PingpongBestWinService } from './services/pingpong-best-win.service';
+import {
+  PingpongRecomputeService,
+  RecomputeReport,
+} from './services/pingpong-recompute.service';
 import { PingpongMatch } from './entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from './entities/pingpong-elo-snapshot.entity';
 import { EnrolPlayerDto, RecordMatchDto } from './dtos/record-match.dto';
@@ -18,6 +31,8 @@ export class PingpongController {
     private readonly playersService: PingpongPlayersService,
     private readonly matchService: PingpongMatchService,
     private readonly bestWinService: PingpongBestWinService,
+    private readonly recomputeService: PingpongRecomputeService,
+    private readonly configService: ConfigService,
     @InjectRepository(PingpongMatch)
     private readonly matchRepository: Repository<PingpongMatch>,
     @InjectRepository(PingpongEloSnapshot)
@@ -292,5 +307,44 @@ export class PingpongController {
   @ApiOperation({ summary: 'Head-to-head record between two players' })
   async getHeadToHead(@Param('idA') idA: string, @Param('idB') idB: string) {
     return this.playersService.getHeadToHead(idA, idB);
+  }
+
+  /**
+   * Replay the whole match history and rewrite every rating.
+   *
+   * A one-shot repair, not routine maintenance: the rating freeze was removed,
+   * so ratings on record were produced by a rule that no longer exists, and
+   * each match row's stored before/after columns contradict them.
+   *
+   * `@Public()` with an ADMIN_SECRET query parameter, mirroring
+   * `POST /achievements/admin/seed-and-backfill` — this runs from a terminal
+   * with no Clerk session to present. The secret is compared only after
+   * confirming one is configured, so an environment that never set it refuses
+   * everything rather than accepting an empty string.
+   *
+   * Start with `?dryRun=true`. It computes the full before/after table inside
+   * a transaction and rolls back, so the numbers can be read before anything
+   * is committed.
+   */
+  @Public()
+  @Post('admin/recompute')
+  @ApiOperation({ summary: 'Replay all matches and rewrite every rating' })
+  @ApiQuery({ name: 'secret', required: true, type: String })
+  @ApiQuery({ name: 'dryRun', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Recompute report' })
+  @ApiResponse({ status: 403, description: 'Invalid admin secret' })
+  async recomputeRatings(
+    @Query('secret') secret: string,
+    @Query('dryRun') dryRun?: string,
+  ): Promise<RecomputeReport> {
+    const adminSecret = this.configService.get<string>('ADMIN_SECRET');
+    if (!adminSecret || secret !== adminSecret) {
+      throw new ForbiddenException('Invalid admin secret');
+    }
+
+    // Only the exact string 'true' writes nothing. Any other value falls
+    // through to a real run, which is the documented default — the caller
+    // asking for a dry run has to say so unambiguously.
+    return this.recomputeService.recompute({ dryRun: dryRun === 'true' });
   }
 }

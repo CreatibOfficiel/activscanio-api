@@ -6,10 +6,22 @@
  * deviation floor sits higher because skill drifts faster over months.
  */
 
-/** Weighted matches needed to leave calibration. */
-export const PROVISIONAL_MIN_MATCHES = 8;
-/** Deviation above which a rating is still considered unsettled. */
-export const PROVISIONAL_MAX_RD = 150;
+/**
+ * Matches needed to leave calibration. Was 8.
+ *
+ * Measured against the real league, the old gate admitted nobody: of eight
+ * players, only Charles had reached 8 matches, and his deviation was 183 —
+ * over the old 150 ceiling. The leaderboard read "0 joueur classé, 7 en
+ * calibrage". A ranking nobody can enter is not a ranking, and a gate that
+ * excludes 100% of the population is measuring the schedule, not the players.
+ *
+ * Five and 200 together admit 2 of the 8 on today's data. That is still tight;
+ * the better end state is showing everyone with an uncertainty tag rather than
+ * gating at all, but that is a display decision, not this file's.
+ */
+export const PROVISIONAL_MIN_MATCHES = 5;
+/** Deviation above which a rating is still considered unsettled. Was 150. */
+export const PROVISIONAL_MAX_RD = 200;
 /** Days without a match before a player drops out of the ranked table. */
 export const INACTIVE_THRESHOLD_DAYS = 14;
 /** Days without a match before a player is hidden entirely. */

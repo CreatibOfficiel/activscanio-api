@@ -1,27 +1,33 @@
-import { computePairWeight } from '../pairing-weight';
+import { buildPairKey, MATCH_WEIGHT } from '../pairing-weight';
 import { shannonDiversity } from '../diversity';
 import {
   classifyPingpongPlayer,
   isValidSetScore,
   validateMatchSets,
+  PROVISIONAL_MIN_MATCHES,
+  PROVISIONAL_MAX_RD,
 } from '../pingpong-classification';
 
-describe('computePairWeight', () => {
-  it('gives full weight to the first three matches of a pair in a week', () => {
-    expect(computePairWeight(0)).toBe(1);
-    expect(computePairWeight(1)).toBe(1);
-    expect(computePairWeight(2)).toBe(1);
+describe('match weight', () => {
+  it('counts every match fully', () => {
+    // The per-ISO-week pairing weight is gone. It used to halve a pair's
+    // fourth match of the week and discard the seventh, which at ~4 matches a
+    // week across 8 people threw away ordinary play.
+    expect(MATCH_WEIGHT).toBe(1);
+  });
+});
+
+describe('buildPairKey', () => {
+  it('reads the same whichever side each player took', () => {
+    expect(buildPairKey('aaa', 'bbb')).toBe(buildPairKey('bbb', 'aaa'));
   });
 
-  it('halves the weight for the next three', () => {
-    expect(computePairWeight(3)).toBe(0.5);
-    expect(computePairWeight(4)).toBe(0.5);
-    expect(computePairWeight(5)).toBe(0.5);
+  it('orders the two ids canonically', () => {
+    expect(buildPairKey('bbb', 'aaa')).toBe('aaa:bbb');
   });
 
-  it('drops to zero from the seventh match onwards', () => {
-    expect(computePairWeight(6)).toBe(0);
-    expect(computePairWeight(20)).toBe(0);
+  it('separates the two ids so distinct pairs cannot collide', () => {
+    expect(buildPairKey('a', 'bc')).not.toBe(buildPairKey('ab', 'c'));
   });
 });
 
@@ -169,6 +175,20 @@ describe('validateMatchSets', () => {
   });
 });
 
+describe('calibration thresholds', () => {
+  it('requires five matches, not eight', () => {
+    // Loosened from 8 because at 8 nobody in an 8-person league that plays
+    // ~1 match/player/week ever qualifies.
+    expect(PROVISIONAL_MIN_MATCHES).toBe(5);
+  });
+
+  it('tolerates a deviation up to 200, not 150', () => {
+    // Loosened from 150 for the same reason: Charles had played 8 matches and
+    // still sat at RD 183.
+    expect(PROVISIONAL_MAX_RD).toBe(200);
+  });
+});
+
 describe('classifyPingpongPlayer', () => {
   const now = new Date('2026-07-31T12:00:00Z');
   const daysAgo = (n: number) =>
@@ -180,21 +200,40 @@ describe('classifyPingpongPlayer', () => {
     expect(c.confirmed).toBe(false);
   });
 
-  it('keeps a player provisional below eight weighted matches', () => {
-    // This is the anti-farming subtlety: raw match count is irrelevant here.
-    const c = classifyPingpongPlayer(7.5, 40, daysAgo(1), now);
+  it('keeps a player provisional below five matches', () => {
+    const c = classifyPingpongPlayer(4, 40, daysAgo(1), now);
     expect(c.provisional).toBe(true);
   });
 
-  it('confirms a player past eight weighted matches with a settled deviation', () => {
-    const c = classifyPingpongPlayer(8, 120, daysAgo(1), now);
+  it('confirms a player at five matches with a settled deviation', () => {
+    const c = classifyPingpongPlayer(5, 120, daysAgo(1), now);
     expect(c.provisional).toBe(false);
     expect(c.confirmed).toBe(true);
   });
 
-  it('keeps a player provisional while the deviation stays high', () => {
-    const c = classifyPingpongPlayer(20, 151, daysAgo(1), now);
+  it('keeps a player provisional while the deviation stays above 200', () => {
+    const c = classifyPingpongPlayer(20, 201, daysAgo(1), now);
     expect(c.provisional).toBe(true);
+  });
+
+  it('confirms a player at exactly the deviation ceiling', () => {
+    const c = classifyPingpongPlayer(20, 200, daysAgo(1), now);
+    expect(c.provisional).toBe(false);
+  });
+
+  /**
+   * The gate this loosening exists to fix.
+   *
+   * At 8 matches and RD ≤ 150, zero of the eight real players qualified —
+   * Charles, the only one with 8 matches, sat at RD 183. The production
+   * leaderboard read "0 joueur classé, 7 en calibrage". A ranking nobody can
+   * enter is not a ranking.
+   */
+  it('admits the player the old 8-match / RD-150 gate excluded', () => {
+    const charles = classifyPingpongPlayer(8, 183, daysAgo(1), now);
+
+    expect(charles.provisional).toBe(false);
+    expect(charles.confirmed).toBe(true);
   });
 
   it('marks a player inactive after fourteen days', () => {

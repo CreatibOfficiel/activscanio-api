@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PingpongController } from './pingpong.controller';
 import { PingpongPlayer } from './entities/pingpong-player.entity';
@@ -13,6 +14,7 @@ import { PingpongHighlightStatsService } from './services/pingpong-highlight-sta
 import { PingpongBestWinService } from './services/pingpong-best-win.service';
 import { PingpongDecayService } from './services/pingpong-decay.service';
 import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.service';
+import { PingpongRecomputeService } from './services/pingpong-recompute.service';
 
 /**
  * Ping-pong module.
@@ -23,6 +25,11 @@ import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.s
  */
 @Module({
   imports: [
+    // The admin recompute endpoint reads ADMIN_SECRET. ConfigModule is global
+    // in this app, but importing it here keeps the module self-sufficient —
+    // the module spec compiles it in isolation, and that is the test that
+    // catches a missing provider before a deploy does.
+    ConfigModule,
     TypeOrmModule.forFeature([
       PingpongPlayer,
       PingpongMatch,
@@ -40,6 +47,9 @@ import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.s
     PingpongBestWinService,
     PingpongDecayService,
     PingpongRankSnapshotService,
+    // One-shot historical repair, driven by an admin endpoint. Not exported:
+    // nothing outside this module should be able to rewrite every rating.
+    PingpongRecomputeService,
   ],
   exports: [
     PingpongRatingService,

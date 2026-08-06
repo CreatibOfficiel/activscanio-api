@@ -4,6 +4,8 @@ import { PingpongController } from '../pingpong.controller';
 import { PingpongPlayersService } from '../services/pingpong-players.service';
 import { PingpongMatchService } from '../services/pingpong-match.service';
 import { PingpongBestWinService } from '../services/pingpong-best-win.service';
+import { PingpongRecomputeService } from '../services/pingpong-recompute.service';
+import { ConfigService } from '@nestjs/config';
 import { PingpongMatch } from '../entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from '../entities/pingpong-elo-snapshot.entity';
 
@@ -37,6 +39,8 @@ describe('PingpongController — history window', () => {
         },
         { provide: PingpongMatchService, useValue: {} },
         { provide: PingpongBestWinService, useValue: {} },
+        { provide: PingpongRecomputeService, useValue: {} },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: getRepositoryToken(PingpongMatch), useValue: {} },
         {
           provide: getRepositoryToken(PingpongEloSnapshot),

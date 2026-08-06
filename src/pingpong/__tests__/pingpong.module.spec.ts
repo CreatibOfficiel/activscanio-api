@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PingpongModule } from '../pingpong.module';
+import { PingpongController } from '../pingpong.controller';
 import { PingpongPlayer } from '../entities/pingpong-player.entity';
 import { PingpongMatch } from '../entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from '../entities/pingpong-elo-snapshot.entity';
@@ -14,6 +15,7 @@ import { PingpongPlayersService } from '../services/pingpong-players.service';
 import { PingpongRatingService } from '../services/pingpong-rating.service';
 import { PingpongMatchService } from '../services/pingpong-match.service';
 import { PingpongRankSnapshotService } from '../services/pingpong-rank-snapshot.service';
+import { PingpongRecomputeService } from '../services/pingpong-recompute.service';
 
 /**
  * Module wiring.
@@ -77,9 +79,19 @@ describe('PingpongModule', () => {
       PingpongHighlightStatsService,
       PingpongDecayService,
       PingpongRankSnapshotService,
+      PingpongRecomputeService,
     ]) {
       expect(module.get(service)).toBeDefined();
     }
+  });
+
+  it('resolves the controller, which needs ConfigService for the admin guard', async () => {
+    // The recompute endpoint reads ADMIN_SECRET off ConfigService. A
+    // controller dependency the module does not supply fails at boot, not at
+    // compile time — the same failure mode PingpongDecayService shipped with.
+    const module = await compileModule();
+
+    expect(module.get(PingpongController)).toBeDefined();
   });
 
   it('exports the services injected from outside the module', () => {
