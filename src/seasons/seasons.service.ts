@@ -23,6 +23,24 @@ type RawNamedCount<K extends string> = {
   competitorName: string;
 } & Record<K, string | number>;
 
+/**
+ * One archived standing, joined to its season and carrying the ELO change
+ * against that same competitor's previous archived season.
+ *
+ * Numerics arrive as strings through the driver (see `RawNamedCount`), and
+ * `eloDelta` is additionally null on a competitor's first archived season,
+ * where `LAG` has nothing to look back at.
+ */
+interface RawSeasonStanding {
+  seasonId: string;
+  seasonNumber: string | number;
+  competitorName: string;
+  rank: string | number | null;
+  finalRating: string | number;
+  totalRaces: string | number;
+  eloDelta: string | number | null;
+}
+
 /** One row of the perfect-race aggregate. */
 interface RawBestScorer {
   competitorName: string;
@@ -34,8 +52,98 @@ export interface SeasonHighlights {
   longestWinStreak: { competitorName: string; streak: number } | null;
   mostRaces: { competitorName: string; count: number } | null;
   bestRaceScorers:
-    | { competitorName: string; maxScore: number; perfectCount: number }[]
-    | null;
+    { competitorName: string; maxScore: number; perfectCount: number }[] | null;
+}
+
+/**
+ * One superlative on a season card.
+ *
+ * `names` is a LIST because ties are real in this data — season 2 has Don
+ * Joran and Léo Mibord both on 34 races, and picking one of them by sort
+ * order would invent a winner the season did not have.
+ */
+export interface SeasonSuperlative {
+  names: string[];
+  value: number;
+}
+
+/**
+ * A season plus the four figures the archive screen puts on its card.
+ *
+ * Every one is derived at read time from `archived_competitor_rankings`
+ * rather than stored, so the six seasons already in production get them
+ * without a backfill.
+ */
+export interface SeasonWithHighlights {
+  season: SeasonArchive;
+  /** Rank 1 that season. Null if nobody was confirmed enough to hold it. */
+  winner: { name: string; rating: number } | null;
+  mostActive: SeasonSuperlative | null;
+  /**
+   * ELO gained/lost against the SAME competitor's previous archived season.
+   *
+   * Null for the first archived season of all — there is no earlier row to
+   * subtract, and a "+0" there would read as a player who went nowhere
+   * rather than one we cannot measure.
+   */
+  biggestClimb: SeasonSuperlative | null;
+  biggestDrop: SeasonSuperlative | null;
+}
+
+/** Headline figures across every archived season. */
+export interface SeasonsOverview {
+  seasonCount: number;
+  totalRaces: number;
+  avgRacesPerSeason: number;
+  totalPingpongMatches: number;
+  avgPingpongMatchesPerSeason: number;
+  /**
+   * Seasons that actually had ping-pong. The sport arrived mid-life, so
+   * averaging its matches over ALL seasons would divide by a run of seasons
+   * where it did not exist and understate it.
+   */
+  pingpongSeasonCount: number;
+  mostTitles: SeasonSuperlative | null;
+  busiestSeason: { seasonName: string; totalRaces: number } | null;
+  mostRacesInOneSeason: SeasonSuperlative | null;
+  bestClimbEver: (SeasonSuperlative & { seasonName: string }) | null;
+}
+
+/**
+ * The extreme of `value` over `items`, with EVERY name that reaches it.
+ *
+ * Ties are collected rather than broken. Season 2 ends with Don Joran and
+ * Léo Mibord on 34 races each; showing one of them because they sorted first
+ * would state a fact the season does not contain.
+ *
+ * `floor` drops results that fail to beat a threshold — used for the ELO
+ * superlatives, where a "biggest climb" of -12 is not a climb and a card
+ * saying so is worse than a card saying nothing.
+ */
+function topBy<T extends { competitorName: string }>(
+  items: T[],
+  value: (item: T) => number,
+  direction: 'max' | 'min',
+  floor?: number,
+): SeasonSuperlative | null {
+  if (items.length === 0) return null;
+
+  const best = items.reduce((acc, item) => {
+    const v = value(item);
+    return direction === 'max' ? Math.max(acc, v) : Math.min(acc, v);
+  }, value(items[0]));
+
+  if (floor !== undefined) {
+    if (direction === 'max' && best <= floor) return null;
+    if (direction === 'min' && best >= floor) return null;
+  }
+
+  return {
+    names: items
+      .filter((item) => value(item) === best)
+      .map((i) => i.competitorName),
+    value: Math.round(best),
+  };
 }
 
 @Injectable()
@@ -362,6 +470,170 @@ export class SeasonsService {
     return await this.seasonArchiveRepository.find({
       order: { year: 'DESC', seasonNumber: 'DESC' },
     });
+  }
+
+  /**
+   * Every archived season with its card figures, plus the overall totals.
+   *
+   * ONE query for the per-competitor rows, not one per season. The archive
+   * screen is a TV view that rotates on a timer and will hold ~40 seasons; a
+   * request per card would be 40 round trips on every rotation.
+   *
+   * The ELO delta is a window function over each competitor's own archived
+   * history (`LAG` partitioned by competitor, ordered by season). That is
+   * what makes the figure available for seasons archived long before this
+   * feature existed: nothing new is stored, it is subtracted at read time.
+   *
+   * `totalRaces > 0` filters the delta candidates. Competitors who sat a
+   * season out are archived anyway, carrying an unchanged rating, so they
+   * land on a delta of exactly 0 and would otherwise crowd the middle of the
+   * ranking with people who never played.
+   */
+  async getSeasonsOverview(): Promise<{
+    seasons: SeasonWithHighlights[];
+    overview: SeasonsOverview;
+  }> {
+    const seasons = await this.getAllSeasons();
+    if (seasons.length === 0) {
+      return {
+        seasons: [],
+        overview: {
+          seasonCount: 0,
+          totalRaces: 0,
+          avgRacesPerSeason: 0,
+          totalPingpongMatches: 0,
+          avgPingpongMatchesPerSeason: 0,
+          pingpongSeasonCount: 0,
+          mostTitles: null,
+          busiestSeason: null,
+          mostRacesInOneSeason: null,
+          bestClimbEver: null,
+        },
+      };
+    }
+
+    const rows: RawSeasonStanding[] = await this
+      .archivedCompetitorRankingRepository.query(`
+      SELECT
+        a.id                AS "seasonId",
+        a."seasonNumber"    AS "seasonNumber",
+        r."competitorName"  AS "competitorName",
+        r.rank              AS "rank",
+        r."finalRating"     AS "finalRating",
+        r."totalRaces"      AS "totalRaces",
+        r."finalRating" - LAG(r."finalRating") OVER (
+          PARTITION BY r."competitorId"
+          ORDER BY a.year, a."seasonNumber"
+        ) AS "eloDelta"
+      FROM archived_competitor_rankings r
+      JOIN season_archives a ON a.id = r."seasonArchiveId"
+      ORDER BY a.year, a."seasonNumber"
+    `);
+
+    const bySeason = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const list = bySeason.get(row.seasonId);
+      if (list) list.push(row);
+      else bySeason.set(row.seasonId, [row]);
+    }
+
+    const withHighlights: SeasonWithHighlights[] = seasons.map((season) => {
+      const seasonRows = bySeason.get(season.id) ?? [];
+      const champion = seasonRows.find((r) => Number(r.rank) === 1);
+      const played = seasonRows.filter((r) => Number(r.totalRaces) > 0);
+      const measurable = played.filter((r) => r.eloDelta !== null);
+
+      return {
+        season,
+        winner: champion
+          ? {
+              name: champion.competitorName,
+              rating: Math.round(Number(champion.finalRating)),
+            }
+          : null,
+        mostActive: topBy(played, (r) => Number(r.totalRaces), 'max'),
+        biggestClimb: topBy(measurable, (r) => Number(r.eloDelta), 'max', 0),
+        biggestDrop: topBy(measurable, (r) => Number(r.eloDelta), 'min', 0),
+      };
+    });
+
+    const totalRaces = seasons.reduce((sum, s) => sum + (s.totalRaces ?? 0), 0);
+    // Seasons predating ping-pong carry no column at all, which is not a
+    // zero — see the entity. Only the ones that have it are averaged.
+    const pingpongSeasons = seasons.filter(
+      (s) =>
+        s.totalPingpongMatches !== null && s.totalPingpongMatches !== undefined,
+    );
+    const totalPingpongMatches = pingpongSeasons.reduce(
+      (sum, s) => sum + (s.totalPingpongMatches ?? 0),
+      0,
+    );
+
+    const titleCounts = new Map<string, number>();
+    for (const { winner } of withHighlights) {
+      if (!winner) continue;
+      titleCounts.set(winner.name, (titleCounts.get(winner.name) ?? 0) + 1);
+    }
+
+    const busiest = seasons.reduce((best, s) =>
+      (s.totalRaces ?? 0) > (best.totalRaces ?? 0) ? s : best,
+    );
+
+    const allPlayed = rows.filter((r) => Number(r.totalRaces) > 0);
+    const climbRows = allPlayed.filter((r) => r.eloDelta !== null);
+    const bestClimbRow = climbRows.reduce(
+      (best, r) =>
+        best === null || Number(r.eloDelta) > Number(best.eloDelta) ? r : best,
+      null as RawSeasonStanding | null,
+    );
+    const bestClimbSeason = bestClimbRow
+      ? seasons.find((s) => s.id === bestClimbRow.seasonId)
+      : undefined;
+
+    return {
+      seasons: withHighlights,
+      overview: {
+        seasonCount: seasons.length,
+        totalRaces,
+        avgRacesPerSeason: Math.round(totalRaces / seasons.length),
+        totalPingpongMatches,
+        avgPingpongMatchesPerSeason: pingpongSeasons.length
+          ? Math.round(totalPingpongMatches / pingpongSeasons.length)
+          : 0,
+        pingpongSeasonCount: pingpongSeasons.length,
+        mostTitles: topBy(
+          [...titleCounts].map(([competitorName, count]) => ({
+            competitorName,
+            count,
+          })),
+          (r) => r.count,
+          'max',
+        ),
+        busiestSeason: {
+          seasonName: busiest.seasonName ?? `Saison ${busiest.seasonNumber}`,
+          totalRaces: busiest.totalRaces ?? 0,
+        },
+        mostRacesInOneSeason: topBy(
+          allPlayed,
+          (r) => Number(r.totalRaces),
+          'max',
+        ),
+        bestClimbEver:
+          bestClimbRow && Number(bestClimbRow.eloDelta) > 0
+            ? {
+                names: climbRows
+                  .filter(
+                    (r) => Number(r.eloDelta) === Number(bestClimbRow.eloDelta),
+                  )
+                  .map((r) => r.competitorName),
+                value: Math.round(Number(bestClimbRow.eloDelta)),
+                seasonName:
+                  bestClimbSeason?.seasonName ??
+                  `Saison ${bestClimbSeason?.seasonNumber ?? '?'}`,
+              }
+            : null,
+      },
+    };
   }
 
   /**

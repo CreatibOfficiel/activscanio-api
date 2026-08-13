@@ -21,6 +21,23 @@ export class SeasonsController {
   }
 
   /**
+   * GET /seasons/overview
+   * Every season with its card highlights, plus the headline totals.
+   *
+   * DECLARED BEFORE `:year/:month`. Nest matches routes in declaration order,
+   * and "overview" is a perfectly good `:year` — registered after, this would
+   * be swallowed by the param route and answer 404 for a season numbered
+   * "undefined".
+   */
+  @Public()
+  @Get('overview')
+  @ApiOperation({ summary: 'All seasons with highlights and aggregate stats' })
+  @ApiResponse({ status: 200, description: 'Seasons plus overview figures' })
+  async getSeasonsOverview() {
+    return await this.seasonsService.getSeasonsOverview();
+  }
+
+  /**
    * GET /seasons/:year/:season
    * Get specific season (route param is called "month" for backward compat but accepts seasonNumber 1-13)
    */
