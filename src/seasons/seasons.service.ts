@@ -76,6 +76,14 @@ export interface SeasonSuperlative {
  */
 export interface SeasonWithHighlights {
   season: SeasonArchive;
+  /**
+   * The season is still being played, so every figure is provisional.
+   *
+   * Absent on archived seasons. The board reads it to badge the card and to
+   * stop presenting a leader as a winner — nobody has won a season that has
+   * not finished.
+   */
+  inProgress?: boolean;
   /** Rank 1 that season. Null if nobody was confirmed enough to hold it. */
   winner: { name: string; rating: number } | null;
   mostActive: SeasonSuperlative | null;
@@ -494,9 +502,14 @@ export class SeasonsService {
     overview: SeasonsOverview;
   }> {
     const seasons = await this.getAllSeasons();
+    // The season being played is shown too — it is why "where is July?" gets
+    // asked of a board that is in fact complete. Fetched even with no
+    // archives at all, so the very first season is visible while it runs.
+    const current = await this.getCurrentSeason();
+
     if (seasons.length === 0) {
       return {
-        seasons: [],
+        seasons: current ? [current] : [],
         overview: {
           seasonCount: 0,
           totalRaces: 0,
@@ -591,7 +604,14 @@ export class SeasonsService {
       : undefined;
 
     return {
-      seasons: withHighlights,
+      // The live season leads: newest first, and it is the newest there is.
+      //
+      // It is prepended HERE rather than folded into `withHighlights`,
+      // because every figure below is deliberately archive-only. A season in
+      // flight has no champion, so counting its leader as a title would hand
+      // someone a trophy for a race still being run, and averaging its
+      // part-played race count would drag "courses / saison" down all month.
+      seasons: current ? [current, ...withHighlights] : withHighlights,
       overview: {
         seasonCount: seasons.length,
         totalRaces,
@@ -633,6 +653,95 @@ export class SeasonsService {
               }
             : null,
       },
+    };
+  }
+
+  /**
+   * The season being played right now, in the shape the archive cards use.
+   *
+   * NOT AN ARCHIVE. It is assembled from the live `competitors` table, which
+   * is exactly what `archiveSeason` will snapshot when the season closes, so
+   * the card shows the same figures it will keep afterwards.
+   *
+   * The season's own race and ping-pong counts are counted over its date
+   * range rather than read from a column, because no row exists for it yet.
+   *
+   * `currentMonthRaceCount` is the per-season counter — it is reset at every
+   * transition — so it is the right field for "most active THIS season".
+   * `raceCount` is the lifetime total and would rank the veterans.
+   *
+   * There is no ELO movement here. The comparison the archived cards make is
+   * against the competitor's previous ARCHIVED rating, and the live rating is
+   * mid-flight: it has already absorbed the soft reset applied at the start
+   * of the season, so subtracting last season's final would report the reset
+   * as if it were the player's own doing.
+   */
+  private async getCurrentSeason(): Promise<SeasonWithHighlights | null> {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const weekNumber = WeekUtils.getISOWeek(now);
+    const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
+    const weeks = SeasonUtils.getSeasonWeeks(seasonNumber);
+    const startDate = WeekUtils.getMondayOfWeek(year, weeks.start);
+    const endDate = WeekUtils.getSundayOfWeek(year, weeks.end);
+
+    // Already archived — the season closed and the cron has run. Nothing to
+    // add, and adding it would duplicate the card.
+    const existing = await this.seasonArchiveRepository.findOne({
+      where: { seasonNumber, year },
+    });
+    if (existing) return null;
+
+    const competitors = await this.competitorRepository.find();
+    const played = competitors.filter((c) => c.currentMonthRaceCount > 0);
+
+    const [totalRaces, totalPingpongMatches] = await Promise.all([
+      this.seasonArchiveRepository.manager.count(RaceEvent, {
+        where: { date: Between(startDate, endDate) },
+      }),
+      this.seasonArchiveRepository.manager.count(PingpongMatch, {
+        where: { playedAt: Between(startDate, endDate) },
+      }),
+    ]);
+
+    // The live leader, by the same conservative score the boards rank on.
+    // Provisional players are excluded for the same reason they carry no
+    // rank in an archive: a rating with a wide RD is not a standing.
+    const ranked = played
+      .filter((c) => c.raceCount >= 5 && c.rd <= 150)
+      .sort((a, b) => b.rating - 2 * b.rd - (a.rating - 2 * a.rd));
+    const leader = ranked[0];
+
+    const namedCounts = played.map((c) => ({
+      competitorName: `${c.firstName} ${c.lastName}`,
+      count: c.currentMonthRaceCount,
+    }));
+
+    return {
+      season: {
+        id: `current-${year}-${seasonNumber}`,
+        month: seasonNumber,
+        seasonNumber,
+        year,
+        seasonName: this.getSeasonName(seasonNumber, year),
+        startDate,
+        endDate,
+        totalCompetitors: played.length,
+        totalRaces,
+        totalPingpongMatches,
+      } as SeasonArchive,
+      inProgress: true,
+      winner: leader
+        ? {
+            name: `${leader.firstName} ${leader.lastName}`,
+            rating: Math.round(leader.rating),
+          }
+        : null,
+      mostActive: topBy(namedCounts, (r) => r.count, 'max'),
+      // See the doc comment: the live rating already carries this season's
+      // soft reset, so a delta against last season's final would be noise.
+      biggestClimb: null,
+      biggestDrop: null,
     };
   }
 

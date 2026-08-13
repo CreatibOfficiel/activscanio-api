@@ -24,15 +24,23 @@ describe('SeasonsService — overview', () => {
   let service: SeasonsService;
 
   const query = jest.fn();
+  const count = jest.fn();
+  const competitorFind = jest.fn();
 
   const seasonArchiveRepository = {
     find: jest.fn(),
     findOne: jest.fn(),
-    manager: { connection: { createQueryRunner: jest.fn() } },
+    manager: { connection: { createQueryRunner: jest.fn() }, count },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // Default: the running season is already archived, so `getCurrentSeason`
+    // bows out and the tests below see archives only. The live-season block
+    // overrides this.
+    seasonArchiveRepository.findOne.mockResolvedValue({ id: 'already' });
+    competitorFind.mockResolvedValue([]);
+    count.mockResolvedValue(0);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -51,7 +59,7 @@ describe('SeasonsService — overview', () => {
         },
         {
           provide: getRepositoryToken(Competitor),
-          useValue: { find: jest.fn() },
+          useValue: { find: competitorFind },
         },
       ],
     }).compile();
@@ -294,6 +302,154 @@ describe('SeasonsService — overview', () => {
       names: ['Charles'],
       value: 415,
       seasonName: 'Saison 6 - 2026',
+    });
+  });
+
+  describe('the season in progress', () => {
+    /** A live competitor row, as `competitors` holds it mid-season. */
+    function competitor(over: Record<string, unknown>) {
+      return {
+        firstName: 'Yann',
+        lastName: 'Ó hAnnaidh',
+        rating: 1700,
+        rd: 54,
+        raceCount: 40,
+        currentMonthRaceCount: 12,
+        ...over,
+      };
+    }
+
+    beforeEach(() => {
+      // Nothing archived for the running season yet.
+      seasonArchiveRepository.findOne.mockResolvedValue(null);
+    });
+
+    it('prepends the running season, badged as in progress', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([
+        season({ id: 's1', seasonNumber: 1 }),
+      ]);
+      query.mockResolvedValue([standing({})]);
+      competitorFind.mockResolvedValue([competitor({})]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons).toHaveLength(2);
+      expect(seasons[0].inProgress).toBe(true);
+      // Newest first, and the running one is the newest there is.
+      expect(seasons[1].inProgress).toBeUndefined();
+    });
+
+    it('names the live leader by conservative score', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([standing({})]);
+      competitorFind.mockResolvedValue([
+        // Higher raw rating, but a wide RD puts them behind on rating − 2×RD.
+        competitor({
+          firstName: 'Gros',
+          lastName: 'RD',
+          rating: 1750,
+          rd: 140,
+        }),
+        competitor({ firstName: 'Yann', lastName: 'Ó', rating: 1700, rd: 54 }),
+      ]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].winner).toEqual({ name: 'Yann Ó', rating: 1700 });
+    });
+
+    it('excludes provisional players from the live lead', async () => {
+      // Same rule the archives apply: a rating with a wide RD is not a
+      // standing, so it cannot be a lead.
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([standing({})]);
+      competitorFind.mockResolvedValue([
+        competitor({ firstName: 'Neuf', raceCount: 2, rating: 1900, rd: 300 }),
+      ]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].winner).toBeNull();
+    });
+
+    it('ranks live activity on the per-season counter', async () => {
+      // `currentMonthRaceCount` resets each transition; `raceCount` is the
+      // lifetime total and would just rank the veterans.
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([standing({})]);
+      competitorFind.mockResolvedValue([
+        competitor({
+          firstName: 'Vétéran',
+          raceCount: 900,
+          currentMonthRaceCount: 3,
+        }),
+        competitor({
+          firstName: 'Assidu',
+          raceCount: 20,
+          currentMonthRaceCount: 50,
+        }),
+      ]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].mostActive?.names).toEqual(['Assidu Ó hAnnaidh']);
+      expect(seasons[0].mostActive?.value).toBe(50);
+    });
+
+    it('reports no ELO movement while the season runs', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([standing({})]);
+      competitorFind.mockResolvedValue([competitor({})]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].biggestClimb).toBeNull();
+      expect(seasons[0].biggestDrop).toBeNull();
+    });
+
+    it('keeps the running season out of every aggregate', async () => {
+      // This is the whole reason it is prepended rather than folded in. Its
+      // leader is not a champion, and its part-played race count would drag
+      // the per-season average down for the whole month.
+      seasonArchiveRepository.find.mockResolvedValue([
+        season({ id: 's1', seasonNumber: 1, totalRaces: 100 }),
+      ]);
+      query.mockResolvedValue([
+        standing({ competitorName: 'Don Joran', rank: 1 }),
+      ]);
+      competitorFind.mockResolvedValue([competitor({ firstName: 'Yann' })]);
+      count.mockResolvedValue(5);
+
+      const { overview } = await service.getSeasonsOverview();
+
+      expect(overview.seasonCount).toBe(1);
+      expect(overview.totalRaces).toBe(100);
+      expect(overview.avgRacesPerSeason).toBe(100);
+      expect(overview.mostTitles).toEqual({ names: ['Don Joran'], value: 1 });
+    });
+
+    it('shows the running season even with nothing archived yet', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([]);
+      competitorFind.mockResolvedValue([competitor({})]);
+
+      const { seasons, overview } = await service.getSeasonsOverview();
+
+      expect(seasons).toHaveLength(1);
+      expect(seasons[0].inProgress).toBe(true);
+      expect(overview.seasonCount).toBe(0);
+    });
+
+    it('omits it once the season has been archived', async () => {
+      // The cron has run: the card exists as an archive and adding a live
+      // one would show the same season twice.
+      seasonArchiveRepository.findOne.mockResolvedValue({ id: 'archived' });
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([standing({})]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons).toHaveLength(1);
+      expect(seasons[0].inProgress).toBeUndefined();
     });
   });
 
