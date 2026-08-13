@@ -24,13 +24,19 @@ describe('SeasonsService — overview', () => {
   let service: SeasonsService;
 
   const query = jest.fn();
+  const pingpongQuery = jest.fn();
   const count = jest.fn();
+  const managerFind = jest.fn();
   const competitorFind = jest.fn();
 
   const seasonArchiveRepository = {
     find: jest.fn(),
     findOne: jest.fn(),
-    manager: { connection: { createQueryRunner: jest.fn() }, count },
+    manager: {
+      connection: { createQueryRunner: jest.fn() },
+      count,
+      find: managerFind,
+    },
   };
 
   beforeEach(async () => {
@@ -41,6 +47,10 @@ describe('SeasonsService — overview', () => {
     seasonArchiveRepository.findOne.mockResolvedValue({ id: 'already' });
     competitorFind.mockResolvedValue([]);
     count.mockResolvedValue(0);
+    // No archived season carries ping-pong standings — production's state
+    // today, the sport having started in season 7.
+    pingpongQuery.mockResolvedValue([]);
+    managerFind.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,7 +65,7 @@ describe('SeasonsService — overview', () => {
         },
         {
           provide: getRepositoryToken(ArchivedPingpongRanking),
-          useValue: { find: jest.fn() },
+          useValue: { find: jest.fn(), query: pingpongQuery },
         },
         {
           provide: getRepositoryToken(Competitor),
@@ -299,6 +309,123 @@ describe('SeasonsService — overview', () => {
       seasonName: 'Saison 1 - 2026',
       totalRaces: 111,
     });
+  });
+
+  describe('per-sport highlights', () => {
+    it('leaves the ping-pong block null when a season archived none', async () => {
+      // Production today. The card drops the column rather than printing
+      // four dashes for a sport that did not exist yet.
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([standing({ competitorName: 'Don', rank: 1 })]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].sports.pingpong).toBeNull();
+      expect(seasons[0].sports.mariokart.winner?.name).toBe('Don');
+    });
+
+    it('builds both blocks from their own standings', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's7' })]);
+      query.mockResolvedValue([
+        standing({
+          seasonId: 's7',
+          competitorName: 'Don Joran',
+          rank: 1,
+          finalRating: '1729',
+          finalRd: '50',
+          totalRaces: '34',
+        }),
+      ]);
+      pingpongQuery.mockResolvedValue([
+        standing({
+          seasonId: 's7',
+          competitorName: 'Théo Maitrot',
+          rank: 1,
+          finalRating: '1600',
+          finalRd: '60',
+          totalRaces: '12',
+        }),
+      ]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].sports.mariokart.winner).toEqual({
+        name: 'Don Joran',
+        rating: 1629,
+      });
+      expect(seasons[0].sports.pingpong?.winner).toEqual({
+        name: 'Théo Maitrot',
+        rating: 1480,
+      });
+      expect(seasons[0].sports.pingpong?.mostActive).toEqual({
+        names: ['Théo Maitrot'],
+        value: 12,
+      });
+    });
+
+    it('keeps Mario Kart at the top level for older readers', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+      query.mockResolvedValue([
+        standing({ competitorName: 'Don', rank: 1, totalRaces: '34' }),
+      ]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].winner).toEqual(seasons[0].sports.mariokart.winner);
+      expect(seasons[0].mostActive).toEqual(
+        seasons[0].sports.mariokart.mostActive,
+      );
+    });
+
+    it('collects ties on the ping-pong side too', async () => {
+      seasonArchiveRepository.find.mockResolvedValue([season({ id: 's7' })]);
+      query.mockResolvedValue([standing({ seasonId: 's7' })]);
+      pingpongQuery.mockResolvedValue([
+        standing({ seasonId: 's7', competitorName: 'Lisa', totalRaces: '12' }),
+        standing({ seasonId: 's7', competitorName: 'Karen', totalRaces: '12' }),
+      ]);
+
+      const { seasons } = await service.getSeasonsOverview();
+
+      expect(seasons[0].sports.pingpong?.mostActive).toEqual({
+        names: ['Lisa', 'Karen'],
+        value: 12,
+      });
+    });
+  });
+
+  it('names the busiest ping-pong season once one has matches', async () => {
+    seasonArchiveRepository.find.mockResolvedValue([
+      season({ id: 's7', seasonNumber: 7, totalPingpongMatches: 26 }),
+      season({
+        id: 's8',
+        seasonNumber: 8,
+        seasonName: 'Saison 8 - 2026',
+        totalPingpongMatches: 40,
+      }),
+    ]);
+    query.mockResolvedValue([standing({})]);
+
+    const { overview } = await service.getSeasonsOverview();
+
+    expect(overview.busiestPingpongSeason).toEqual({
+      seasonName: 'Saison 8 - 2026',
+      totalMatches: 40,
+    });
+  });
+
+  it('reports no busiest ping-pong season while every archive sits at zero', async () => {
+    // Production today: the sport started in season 7, still being played,
+    // so every closed season has 0. "Most intense: 0 matchs" would describe
+    // a sport that had not started rather than a quiet season.
+    seasonArchiveRepository.find.mockResolvedValue([
+      season({ id: 's1', seasonNumber: 1, totalPingpongMatches: 0 }),
+    ]);
+    query.mockResolvedValue([standing({})]);
+
+    const { overview } = await service.getSeasonsOverview();
+
+    expect(overview.busiestPingpongSeason).toBeNull();
   });
 
   it('names the best climb ever and the season it happened in', async () => {

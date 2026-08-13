@@ -87,6 +87,27 @@ export interface SeasonSuperlative {
  * rather than stored, so the six seasons already in production get them
  * without a backfill.
  */
+/**
+ * One sport's four figures for a season.
+ *
+ * The same shape for Mario Kart and ping-pong so the card can render them as
+ * two columns of one table rather than two bespoke blocks.
+ */
+export interface SportHighlights {
+  /** Rank 1 that season. Null if nobody was confirmed enough to hold it. */
+  winner: { name: string; rating: number } | null;
+  mostActive: SeasonSuperlative | null;
+  /**
+   * Rating gained/lost against the SAME player's previous archived season.
+   *
+   * Null for the first archived season of all — there is no earlier row to
+   * subtract, and a "+0" there would read as a player who went nowhere
+   * rather than one we cannot measure.
+   */
+  biggestClimb: SeasonSuperlative | null;
+  biggestDrop: SeasonSuperlative | null;
+}
+
 export interface SeasonWithHighlights {
   season: SeasonArchive;
   /**
@@ -97,18 +118,26 @@ export interface SeasonWithHighlights {
    * not finished.
    */
   inProgress?: boolean;
-  /** Rank 1 that season. Null if nobody was confirmed enough to hold it. */
+  /** Mario Kart. Kept at the top level as well — see the fields below. */
   winner: { name: string; rating: number } | null;
   mostActive: SeasonSuperlative | null;
-  /**
-   * ELO gained/lost against the SAME competitor's previous archived season.
-   *
-   * Null for the first archived season of all — there is no earlier row to
-   * subtract, and a "+0" there would read as a player who went nowhere
-   * rather than one we cannot measure.
-   */
   biggestClimb: SeasonSuperlative | null;
   biggestDrop: SeasonSuperlative | null;
+  /**
+   * The same four figures, per sport, for the card's two-column table.
+   *
+   * `pingpong` is NULL when the season archived no ping-pong standing at
+   * all — which is every closed season today, the sport having started in
+   * season 7. The card drops the column rather than printing four dashes
+   * for a sport that did not exist yet.
+   *
+   * The Mario Kart figures are duplicated at the top level rather than
+   * moved, so nothing reading the older shape breaks.
+   */
+  sports: {
+    mariokart: SportHighlights;
+    pingpong: SportHighlights | null;
+  };
 }
 
 /** Headline figures across every archived season. */
@@ -126,6 +155,15 @@ export interface SeasonsOverview {
   pingpongSeasonCount: number;
   mostTitles: SeasonSuperlative | null;
   busiestSeason: { seasonName: string; totalRaces: number } | null;
+  /**
+   * The season with the most ping-pong matches.
+   *
+   * Null while no ARCHIVED season has any — the sport started in season 7,
+   * which is still being played, so every closed season sits at 0. A "most
+   * intense" of zero is not a fact worth a tile; the board omits it until
+   * there is one, rather than showing a permanent dash.
+   */
+  busiestPingpongSeason: { seasonName: string; totalMatches: number } | null;
   mostRacesInOneSeason: SeasonSuperlative | null;
   bestClimbEver: (SeasonSuperlative & { seasonName: string }) | null;
 }
@@ -164,6 +202,40 @@ function topBy<T extends { competitorName: string }>(
       .filter((item) => value(item) === best)
       .map((i) => i.competitorName),
     value: Math.round(best),
+  };
+}
+
+/**
+ * One sport's figures for one season, from its archived standings.
+ *
+ * Shared by both sports so they cannot drift apart. Ties keep every name —
+ * `topBy` collects them — which is the behaviour season 2 needs on the Mario
+ * Kart side and ping-pong will need the moment two players finish level.
+ *
+ * `totalRaces > 0` filters the ELO candidates: someone archived without
+ * playing carries an unchanged rating and lands on a delta of exactly 0,
+ * which means "did not play", not "held steady".
+ */
+function highlightsFor(seasonRows: RawSeasonStanding[]): SportHighlights {
+  const champion = seasonRows.find((r) => Number(r.rank) === 1);
+  const played = seasonRows.filter((r) => Number(r.totalRaces) > 0);
+  const measurable = played.filter((r) => r.eloDelta !== null);
+
+  return {
+    winner: champion
+      ? {
+          name: champion.competitorName,
+          rating: Math.round(
+            conservativeScore(
+              Number(champion.finalRating),
+              Number(champion.finalRd),
+            ),
+          ),
+        }
+      : null,
+    mostActive: topBy(played, (r) => Number(r.totalRaces), 'max'),
+    biggestClimb: topBy(measurable, (r) => Number(r.eloDelta), 'max', 0),
+    biggestDrop: topBy(measurable, (r) => Number(r.eloDelta), 'min', 0),
   };
 }
 
@@ -532,6 +604,7 @@ export class SeasonsService {
           pingpongSeasonCount: 0,
           mostTitles: null,
           busiestSeason: null,
+          busiestPingpongSeason: null,
           mostRacesInOneSeason: null,
           bestClimbEver: null,
         },
@@ -557,6 +630,34 @@ export class SeasonsService {
       ORDER BY a.year, a."seasonNumber"
     `);
 
+    // The same shape for ping-pong. Columns are named to match so one
+    // helper can build a `SportHighlights` from either sport's rows.
+    const pingpongRows: RawSeasonStanding[] = await this
+      .archivedPingpongRankingRepository.query(`
+      SELECT
+        a.id              AS "seasonId",
+        a."seasonNumber"  AS "seasonNumber",
+        p."playerName"    AS "competitorName",
+        p.rank            AS "rank",
+        p."finalRating"   AS "finalRating",
+        p."finalRd"       AS "finalRd",
+        p."totalMatches"  AS "totalRaces",
+        p."finalRating" - LAG(p."finalRating") OVER (
+          PARTITION BY p."playerId"
+          ORDER BY a.year, a."seasonNumber"
+        ) AS "eloDelta"
+      FROM archived_pingpong_rankings p
+      JOIN season_archives a ON a.id = p."seasonArchiveId"
+      ORDER BY a.year, a."seasonNumber"
+    `);
+
+    const pingpongBySeason = new Map<string, RawSeasonStanding[]>();
+    for (const row of pingpongRows) {
+      const list = pingpongBySeason.get(row.seasonId);
+      if (list) list.push(row);
+      else pingpongBySeason.set(row.seasonId, [row]);
+    }
+
     const bySeason = new Map<string, typeof rows>();
     for (const row of rows) {
       const list = bySeason.get(row.seasonId);
@@ -565,29 +666,21 @@ export class SeasonsService {
     }
 
     const withHighlights: SeasonWithHighlights[] = seasons.map((season) => {
-      const seasonRows = bySeason.get(season.id) ?? [];
-      const champion = seasonRows.find((r) => Number(r.rank) === 1);
-      const played = seasonRows.filter((r) => Number(r.totalRaces) > 0);
-      const measurable = played.filter((r) => r.eloDelta !== null);
+      const mariokart = highlightsFor(bySeason.get(season.id) ?? []);
+      // Null, not an empty block: a season that archived no ping-pong
+      // standing at all predates the sport, and the card drops the column
+      // rather than showing four dashes for something that did not exist.
+      const pingpongSeasonRows = pingpongBySeason.get(season.id) ?? [];
+      const pingpong = pingpongSeasonRows.length
+        ? highlightsFor(pingpongSeasonRows)
+        : null;
 
       return {
         season,
-        // The conservative score, not the raw rating — see the helper. This
-        // is the number that player carried on the board all season.
-        winner: champion
-          ? {
-              name: champion.competitorName,
-              rating: Math.round(
-                conservativeScore(
-                  Number(champion.finalRating),
-                  Number(champion.finalRd),
-                ),
-              ),
-            }
-          : null,
-        mostActive: topBy(played, (r) => Number(r.totalRaces), 'max'),
-        biggestClimb: topBy(measurable, (r) => Number(r.eloDelta), 'max', 0),
-        biggestDrop: topBy(measurable, (r) => Number(r.eloDelta), 'min', 0),
+        // Mario Kart stays at the top level too, so anything reading the
+        // older shape keeps working.
+        ...mariokart,
+        sports: { mariokart, pingpong },
       };
     });
 
@@ -611,6 +704,18 @@ export class SeasonsService {
 
     const busiest = seasons.reduce((best, s) =>
       (s.totalRaces ?? 0) > (best.totalRaces ?? 0) ? s : best,
+    );
+
+    // Only meaningful once a closed season actually recorded matches. Every
+    // archived season sits at 0 today — ping-pong started in season 7, which
+    // is still running — and "most intense: 0 matches" is not a fact.
+    const busiestPingpong = pingpongSeasons.reduce(
+      (best, s) =>
+        best === null ||
+        (s.totalPingpongMatches ?? 0) > (best.totalPingpongMatches ?? 0)
+          ? s
+          : best,
+      null as SeasonArchive | null,
     );
 
     const allPlayed = rows.filter((r) => Number(r.totalRaces) > 0);
@@ -654,6 +759,16 @@ export class SeasonsService {
           seasonName: busiest.seasonName ?? `Saison ${busiest.seasonNumber}`,
           totalRaces: busiest.totalRaces ?? 0,
         },
+        // Null while every archived season sits at 0 — see the interface.
+        busiestPingpongSeason:
+          busiestPingpong && (busiestPingpong.totalPingpongMatches ?? 0) > 0
+            ? {
+                seasonName:
+                  busiestPingpong.seasonName ??
+                  `Saison ${busiestPingpong.seasonNumber}`,
+                totalMatches: busiestPingpong.totalPingpongMatches ?? 0,
+              }
+            : null,
         mostRacesInOneSeason: topBy(
           allPlayed,
           (r) => Number(r.totalRaces),
@@ -741,6 +856,70 @@ export class SeasonsService {
       count: c.currentMonthRaceCount,
     }));
 
+    // Ping-pong's live standing, by the same rules. `matchCount` is a
+    // LIFETIME counter — the sport has never been through a season
+    // transition, so there is no per-season equivalent to reset — which is
+    // why the column only appears once matches exist at all.
+    const pingpongPlayers = await this.seasonArchiveRepository.manager.find(
+      PingpongPlayer,
+      { relations: ['competitor'] },
+    );
+    const pingpongPlayed = pingpongPlayers.filter((p) => p.matchCount > 0);
+    const pingpongName = (p: PingpongPlayer) =>
+      p.competitor
+        ? `${p.competitor.firstName} ${p.competitor.lastName}`
+        : 'Joueur inconnu';
+
+    const pingpongRanked = pingpongPlayed
+      .filter((p) => p.matchCount >= 5 && p.rd <= 150)
+      .sort(
+        (a, b) =>
+          conservativeScore(b.rating, b.rd) - conservativeScore(a.rating, a.rd),
+      );
+    const pingpongLeader = pingpongRanked[0];
+
+    const liveMariokart: SportHighlights = {
+      // Sorted on the conservative score, so displayed on it too — showing
+      // the raw rating here would rank by one number and print another.
+      winner: leader
+        ? {
+            name: `${leader.firstName} ${leader.lastName}`,
+            rating: Math.round(conservativeScore(leader.rating, leader.rd)),
+          }
+        : null,
+      mostActive: topBy(namedCounts, (r) => r.count, 'max'),
+      // The live rating already carries this season's soft reset, so a delta
+      // against last season's final would report the reset as the player's
+      // own doing.
+      biggestClimb: null,
+      biggestDrop: null,
+    };
+
+    const livePingpong: SportHighlights | null = pingpongPlayed.length
+      ? {
+          winner: pingpongLeader
+            ? {
+                name: pingpongName(pingpongLeader),
+                rating: Math.round(
+                  conservativeScore(pingpongLeader.rating, pingpongLeader.rd),
+                ),
+              }
+            : null,
+          mostActive: topBy(
+            pingpongPlayed.map((p) => ({
+              competitorName: pingpongName(p),
+              count: p.matchCount,
+            })),
+            (r) => r.count,
+            'max',
+          ),
+          // Same reason as Mario Kart below: mid-season ratings have no
+          // archived baseline to measure against.
+          biggestClimb: null,
+          biggestDrop: null,
+        }
+      : null;
+
     return {
       season: {
         id: `current-${year}-${seasonNumber}`,
@@ -755,19 +934,8 @@ export class SeasonsService {
         totalPingpongMatches,
       } as SeasonArchive,
       inProgress: true,
-      // Sorted on the conservative score, so displayed on it too — showing
-      // the raw rating here would rank by one number and print another.
-      winner: leader
-        ? {
-            name: `${leader.firstName} ${leader.lastName}`,
-            rating: Math.round(conservativeScore(leader.rating, leader.rd)),
-          }
-        : null,
-      mostActive: topBy(namedCounts, (r) => r.count, 'max'),
-      // See the doc comment: the live rating already carries this season's
-      // soft reset, so a delta against last season's final would be noise.
-      biggestClimb: null,
-      biggestDrop: null,
+      ...liveMariokart,
+      sports: { mariokart: liveMariokart, pingpong: livePingpong },
     };
   }
 
