@@ -37,8 +37,21 @@ interface RawSeasonStanding {
   competitorName: string;
   rank: string | number | null;
   finalRating: string | number;
+  finalRd: string | number;
   totalRaces: string | number;
   eloDelta: string | number | null;
+}
+
+/**
+ * The score the boards actually rank and display: rating − 2×RD.
+ *
+ * The raw rating is not what anyone sees anywhere else in the app — the
+ * leaderboard, the TV boards and the ping-pong podium all show this. A
+ * season card showing the raw figure reports a number for its winner that
+ * differs from the one that same player carried on the board all season.
+ */
+function conservativeScore(rating: number, rd: number): number {
+  return rating - 2 * rd;
 }
 
 /** One row of the perfect-race aggregate. */
@@ -533,6 +546,7 @@ export class SeasonsService {
         r."competitorName"  AS "competitorName",
         r.rank              AS "rank",
         r."finalRating"     AS "finalRating",
+        r."finalRd"         AS "finalRd",
         r."totalRaces"      AS "totalRaces",
         r."finalRating" - LAG(r."finalRating") OVER (
           PARTITION BY r."competitorId"
@@ -558,10 +572,17 @@ export class SeasonsService {
 
       return {
         season,
+        // The conservative score, not the raw rating — see the helper. This
+        // is the number that player carried on the board all season.
         winner: champion
           ? {
               name: champion.competitorName,
-              rating: Math.round(Number(champion.finalRating)),
+              rating: Math.round(
+                conservativeScore(
+                  Number(champion.finalRating),
+                  Number(champion.finalRd),
+                ),
+              ),
             }
           : null,
         mostActive: topBy(played, (r) => Number(r.totalRaces), 'max'),
@@ -709,7 +730,10 @@ export class SeasonsService {
     // rank in an archive: a rating with a wide RD is not a standing.
     const ranked = played
       .filter((c) => c.raceCount >= 5 && c.rd <= 150)
-      .sort((a, b) => b.rating - 2 * b.rd - (a.rating - 2 * a.rd));
+      .sort(
+        (a, b) =>
+          conservativeScore(b.rating, b.rd) - conservativeScore(a.rating, a.rd),
+      );
     const leader = ranked[0];
 
     const namedCounts = played.map((c) => ({
@@ -731,10 +755,12 @@ export class SeasonsService {
         totalPingpongMatches,
       } as SeasonArchive,
       inProgress: true,
+      // Sorted on the conservative score, so displayed on it too — showing
+      // the raw rating here would rank by one number and print another.
       winner: leader
         ? {
             name: `${leader.firstName} ${leader.lastName}`,
-            rating: Math.round(leader.rating),
+            rating: Math.round(conservativeScore(leader.rating, leader.rd)),
           }
         : null,
       mostActive: topBy(namedCounts, (r) => r.count, 'max'),

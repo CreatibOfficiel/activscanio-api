@@ -89,6 +89,7 @@ describe('SeasonsService — overview', () => {
       competitorName: 'Someone',
       rank: null,
       finalRating: '1500',
+      finalRd: '50',
       totalRaces: '10',
       eloDelta: null,
       ...over,
@@ -114,19 +115,43 @@ describe('SeasonsService — overview', () => {
         competitorName: 'Don Joran',
         rank: 1,
         finalRating: '1729.4',
+        finalRd: '50.7',
         totalRaces: '34',
       }),
       standing({
         competitorName: 'Léo Mibord',
         rank: 2,
         finalRating: '1657',
+        finalRd: '51',
         totalRaces: '34',
       }),
     ]);
 
     const { seasons } = await service.getSeasonsOverview();
 
-    expect(seasons[0].winner).toEqual({ name: 'Don Joran', rating: 1729 });
+    // The CONSERVATIVE score, 1729.4 − 2×50.7, not the raw rating. Every
+    // other board in the app shows this one, so a card showing 1729 would
+    // report a number that player never carried on the leaderboard.
+    expect(seasons[0].winner).toEqual({ name: 'Don Joran', rating: 1628 });
+  });
+
+  it('shows the same score the leaderboard shows, not the raw rating', async () => {
+    // A wide RD is exactly where the two numbers diverge, and it is the
+    // case that made the bug visible: the card printed a rating nobody had
+    // ever seen next to that player's name.
+    seasonArchiveRepository.find.mockResolvedValue([season({ id: 's1' })]);
+    query.mockResolvedValue([
+      standing({
+        competitorName: 'Incertain',
+        rank: 1,
+        finalRating: '1800',
+        finalRd: '140',
+      }),
+    ]);
+
+    const { seasons } = await service.getSeasonsOverview();
+
+    expect(seasons[0].winner?.rating).toBe(1520);
   });
 
   it('keeps every name when a superlative ties', async () => {
@@ -355,7 +380,10 @@ describe('SeasonsService — overview', () => {
 
       const { seasons } = await service.getSeasonsOverview();
 
-      expect(seasons[0].winner).toEqual({ name: 'Yann Ó', rating: 1700 });
+      // 1700 − 2×54. Ranked on the conservative score, so displayed on it
+      // too: sorting by one number and printing another is how the raw
+      // rating leaked onto the card in the first place.
+      expect(seasons[0].winner).toEqual({ name: 'Yann Ó', rating: 1592 });
     });
 
     it('excludes provisional players from the live lead', async () => {
