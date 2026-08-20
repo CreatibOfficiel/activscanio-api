@@ -306,12 +306,11 @@ export class RacesService {
       case 'today':
         dateFrom = todayStart;
         break;
-      case 'week': {
-        const weekStart = new Date(todayStart);
-        weekStart.setDate(weekStart.getDate() - 7);
-        dateFrom = weekStart;
+      case 'week':
+        // Current calendar week (Monday 00:00 -> now), matching the weekly
+        // Monday->Sunday cycle used everywhere else in the app.
+        dateFrom = WeekUtils.getMondayOfDate(now);
         break;
-      }
       case 'season': {
         const weekNumber = WeekUtils.getISOWeek(now);
         const year = now.getFullYear();

@@ -30,6 +30,24 @@ export class WeekUtils {
   }
 
   /**
+   * Get the Monday (00:00:00.000) of the calendar week containing a date.
+   *
+   * Computed directly from the date rather than via getISOWeek + getMondayOfWeek,
+   * which would break on weeks straddling a year boundary (a late-December date
+   * can belong to ISO week 1 of the following year).
+   */
+  static getMondayOfDate(date: Date): Date {
+    const dayNr = (date.getDay() + 6) % 7; // Monday = 0
+    const monday = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate() - dayNr,
+    );
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+
+  /**
    * Get the Sunday of a given week
    */
   static getSundayOfWeek(year: number, week: number): Date {
