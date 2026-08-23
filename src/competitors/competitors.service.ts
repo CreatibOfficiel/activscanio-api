@@ -11,6 +11,7 @@ import { CompetitorEloSnapshotRepository } from './repositories/competitor-elo-s
 import { RaceResultRepository } from '../races/repositories/race-result.repository';
 import { RatingCalculationService } from '../rating/rating-calculation.service';
 import { UploadService } from '../upload/upload.service';
+import { UpdatePlayerLifecycleDto } from './dtos/update-player-lifecycle.dto';
 import {
   CompetitorNotFoundException,
   EntityNotFoundException,
@@ -39,6 +40,25 @@ export class CompetitorsService {
 
   findAll(): Promise<Competitor[]> {
     return this.competitorRepository.findAllWithCharacterVariants();
+  }
+
+  findAllIncludingAlumni(): Promise<Competitor[]> {
+    return this.competitorRepository.findAllIncludingAlumni();
+  }
+
+  findActiveByIds(ids: string[]): Promise<Competitor[]> {
+    return this.competitorRepository.findActiveByIds(ids);
+  }
+
+  async updateLifecycle(id: string, dto: UpdatePlayerLifecycleDto): Promise<Competitor> {
+    const competitor = await this.competitorRepository.findOneWithRelations(id);
+    if (!competitor) throw new CompetitorNotFoundException(id);
+    if ('leftAt' in dto) competitor.leftAt = dto.leftAt ?? null;
+    if ('keepAnniversaryReminder' in dto) {
+      competitor.keepAnniversaryReminder = dto.keepAnniversaryReminder!;
+    }
+    if ('contactUrl' in dto) competitor.contactUrl = dto.contactUrl || null;
+    return this.competitorRepository.save(competitor);
   }
 
   async findOne(id: string): Promise<Competitor | null> {
@@ -86,11 +106,20 @@ export class CompetitorsService {
                 'CharacterVariant',
                 characterVariantId,
               );
-            if (variant.competitor && variant.competitor.id !== competitor.id) {
+            if (
+              variant.competitor &&
+              variant.competitor.id !== competitor.id &&
+              !(variant.competitor.leftAt &&
+                variant.competitor.leftAt <= new Date().toISOString().slice(0, 10))
+            ) {
               throw new ValidationException(
                 'characterVariantId',
                 `Already linked to competitor ${variant.competitor.id}`,
               );
+            }
+            if (variant.competitor && variant.competitor.id !== competitor.id) {
+              variant.competitor.characterVariant = null;
+              await em.save(variant.competitor);
             }
             variant.competitor = competitor;
             competitor.characterVariant = variant;

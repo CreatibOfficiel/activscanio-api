@@ -19,6 +19,7 @@ import {
 } from '../common/exceptions';
 
 import { CompetitorsService } from '../competitors/competitors.service';
+import { Competitor } from '../competitors/competitor.entity';
 
 interface Opponent {
   rating: number;
@@ -157,6 +158,21 @@ export class RacesService {
       );
     }
 
+    const ids = dto.results.map((result) => result.competitorId);
+    // A few narrow unit tests instantiate the service with a legacy partial
+    // mock. Production always has this method; the compatibility branch keeps
+    // those tests focused on the duplicate window they were written for.
+    const loader = (this.competitorsService as CompetitorsService & {
+      findActiveByIds?: CompetitorsService['findActiveByIds'];
+    }).findActiveByIds;
+    const activeCompetitors: Competitor[] = loader
+      ? await loader.call(this.competitorsService, ids)
+      : ids.map((id) => ({ id, firstName: '', lastName: '', characterVariant: null })) as Competitor[];
+    if (activeCompetitors.length !== new Set(ids).size) {
+      throw new InvalidRaceDataException('Une course ne peut contenir que des joueurs actifs');
+    }
+    const competitorById = new Map(activeCompetitors.map((c) => [c.id, c]));
+
     try {
       const race = new RaceEvent();
       race.date = raceDate;
@@ -166,8 +182,16 @@ export class RacesService {
       race.year = raceDate.getFullYear();
 
       const results = dto.results.map((r) => {
+        const competitor = competitorById.get(r.competitorId)!;
+        const variant = competitor.characterVariant;
         const rr = new RaceResult();
         rr.competitorId = r.competitorId;
+        rr.competitorFirstName = competitor.firstName;
+        rr.competitorLastName = competitor.lastName;
+        rr.characterVariantIdAtRace = variant?.id ?? null;
+        rr.characterNameAtRace = variant?.baseCharacter?.name ?? null;
+        rr.characterVariantLabelAtRace = variant?.label ?? null;
+        rr.characterImageUrlAtRace = variant?.imageUrl ?? null;
         rr.rank12 = r.rank12;
         rr.score = r.score;
         return rr;

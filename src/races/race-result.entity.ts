@@ -9,6 +9,24 @@ export class RaceResult {
   @Column()
   competitorId: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  competitorFirstName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  competitorLastName: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  characterVariantIdAtRace: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  characterNameAtRace: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  characterVariantLabelAtRace: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  characterImageUrlAtRace: string | null;
+
   @Column()
   rank12: number;
 

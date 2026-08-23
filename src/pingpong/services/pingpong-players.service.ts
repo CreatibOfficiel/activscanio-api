@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Raw, Repository } from 'typeorm';
 import { PingpongPlayer } from '../entities/pingpong-player.entity';
 import { PingpongMatch } from '../entities/pingpong-match.entity';
 import { Competitor } from '../../competitors/competitor.entity';
@@ -98,7 +98,12 @@ export class PingpongPlayersService {
     }[]
   > {
     const [competitors, players] = await Promise.all([
-      this.competitorRepository.find(),
+      this.competitorRepository.find({
+        where: [
+          { leftAt: IsNull() },
+          { leftAt: Raw((alias) => `${alias} > CURRENT_DATE`) },
+        ],
+      }),
       this.playerRepository.find(),
     ]);
 
@@ -130,6 +135,13 @@ export class PingpongPlayersService {
    * conflict for a match they genuinely played.
    */
   async ensureEnrolled(competitorId: string): Promise<PingpongPlayer> {
+    const competitor = await this.competitorRepository.findOne({
+      where: { id: competitorId },
+    });
+    if (!competitor) throw new NotFoundException('Competitor not found');
+    if (competitor.leftAt && competitor.leftAt <= new Date().toISOString().slice(0, 10)) {
+      throw new ConflictException('Un ancien joueur ne peut pas jouer de nouveau match');
+    }
     const existing = await this.playerRepository.findOne({
       where: { competitorId },
     });
@@ -145,6 +157,9 @@ export class PingpongPlayersService {
     });
     if (!competitor) {
       throw new NotFoundException('Competitor not found');
+    }
+    if (competitor.leftAt && competitor.leftAt <= new Date().toISOString().slice(0, 10)) {
+      throw new ConflictException('Un ancien joueur ne peut pas être inscrit');
     }
 
     const existing = await this.playerRepository.findOne({
@@ -175,6 +190,10 @@ export class PingpongPlayersService {
   ): Promise<RankedPingpongPlayer[]> {
     const players = await this.playerRepository.find({
       relations: ['competitor'],
+      where: [
+        { competitor: { leftAt: IsNull() } },
+        { competitor: { leftAt: Raw((alias) => `${alias} > CURRENT_DATE`) } },
+      ],
     });
 
     const enriched = players.map((player) => this.toRanked(player, now));

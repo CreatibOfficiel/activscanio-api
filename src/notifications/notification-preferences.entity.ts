@@ -38,6 +38,9 @@ export class NotificationPreferences {
   @Column({ type: 'boolean', default: true })
   enableInApp: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  showAlumniReminders: boolean;
+
   @Column({
     type: 'jsonb',
     default: {

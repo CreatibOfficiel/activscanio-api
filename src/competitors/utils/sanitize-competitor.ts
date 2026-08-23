@@ -3,6 +3,7 @@ import {
   classifyCompetitor,
   calculateConservativeScore,
 } from './competitor-classification';
+import { isAlumni } from './player-lifecycle';
 
 export const sanitizeCompetitor = (c: Competitor) => {
   const { provisional, inactive } = classifyCompetitor(
@@ -16,6 +17,10 @@ export const sanitizeCompetitor = (c: Competitor) => {
     firstName: c.firstName,
     lastName: c.lastName,
     profilePictureUrl: c.profilePictureUrl,
+    leftAt: c.leftAt,
+    status: isAlumni(c.leftAt) ? 'alumni' : 'active',
+    keepAnniversaryReminder: c.keepAnniversaryReminder,
+    contactUrl: c.contactUrl,
     rating: c.rating,
     rd: c.rd,
     vol: c.vol,

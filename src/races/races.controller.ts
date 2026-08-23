@@ -11,6 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { RacesService } from './races.service';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateRaceDto } from './dtos/create-race.dto';
 import {
   DEFAULT_RACES_LIMIT,
@@ -45,6 +46,7 @@ export class RacesController {
   // `limit` may raise or lower it, clamped to MAX_RACES_LIMIT. Consumers that
   // need the full history should use GET /races/paginated.
   @Get()
+  @Public()
   async findAll(
     @Query('recent') recent: string,
     @Query('limit') limitStr?: string,

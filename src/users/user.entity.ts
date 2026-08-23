@@ -58,6 +58,9 @@ export class User {
   })
   role: UserRole;
 
+  @Column({ type: 'boolean', default: false })
+  isAdmin: boolean;
+
   /**
    * Which leaderboards and entry forms this user sees.
    *

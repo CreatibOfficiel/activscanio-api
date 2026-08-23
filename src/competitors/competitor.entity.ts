@@ -15,6 +15,15 @@ export class Competitor {
   @Column()
   profilePictureUrl: string;
 
+  @Column({ type: 'date', nullable: true })
+  leftAt: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  keepAnniversaryReminder: boolean;
+
+  @Column({ type: 'varchar', length: 2048, nullable: true })
+  contactUrl: string | null;
+
   /**
    * Glicko-2 rating value.
    * Default: 1500 (typical starting rating)
@@ -121,4 +130,11 @@ export class Competitor {
     nullable: true,
   })
   characterVariant: CharacterVariant | null;
+
+  get status(): 'active' | 'alumni' {
+    if (!this.leftAt) return 'active';
+    return this.leftAt <= new Date().toISOString().slice(0, 10)
+      ? 'alumni'
+      : 'active';
+  }
 }

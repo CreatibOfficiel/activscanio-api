@@ -5,6 +5,8 @@ import { Competitor } from './competitor.entity';
 import { CompetitorEloSnapshot } from './entities/competitor-elo-snapshot.entity';
 import { CompetitorsService } from './competitors.service';
 import { CompetitorsController } from './competitors.controller';
+import { AdminCompetitorsController } from './admin-competitors.controller';
+import { AdminGuard } from '../auth/admin.guard';
 import { CompetitorRepository } from './repositories/competitor.repository';
 import { CompetitorEloSnapshotRepository } from './repositories/competitor-elo-snapshot.repository';
 import { RaceResult } from '../races/race-result.entity';
@@ -26,12 +28,13 @@ import { UsersModule } from 'src/users/users.module';
     RatingModule,
     UsersModule,
   ],
-  controllers: [CompetitorsController],
+  controllers: [CompetitorsController, AdminCompetitorsController],
   providers: [
     CompetitorsService,
     CompetitorRepository,
     CompetitorEloSnapshotRepository,
     RaceResultRepository,
+    AdminGuard,
   ],
   exports: [
     CompetitorsService,

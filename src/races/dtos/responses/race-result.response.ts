@@ -13,6 +13,24 @@ export class RaceResultResponse {
   competitorId: string;
 
   @Expose()
+  competitorFirstName: string | null;
+
+  @Expose()
+  competitorLastName: string | null;
+
+  @Expose()
+  characterVariantIdAtRace: string | null;
+
+  @Expose()
+  characterNameAtRace: string | null;
+
+  @Expose()
+  characterVariantLabelAtRace: string | null;
+
+  @Expose()
+  characterImageUrlAtRace: string | null;
+
+  @Expose()
   @Type(() => CompetitorResponse)
   competitor?: CompetitorResponse;
 

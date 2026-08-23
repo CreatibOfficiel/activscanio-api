@@ -26,6 +26,10 @@ export class NotificationCategoriesDto {
 export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
+  showAlumniReminders?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   enablePush?: boolean;
 
   @IsOptional()

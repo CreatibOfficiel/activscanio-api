@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Raw, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Competitor } from '../competitor.entity';
 import { BaseRepository } from '../../common/repositories/base.repository';
@@ -41,7 +41,15 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
    */
   async findAllWithCharacterVariants(): Promise<Competitor[]> {
     return this.repository.find({
+      where: [{ leftAt: IsNull() }, { leftAt: Raw((alias) => `${alias} > CURRENT_DATE`) }],
       relations: ['characterVariant', 'characterVariant.baseCharacter'],
+    });
+  }
+
+  async findAllIncludingAlumni(): Promise<Competitor[]> {
+    return this.repository.find({
+      relations: ['characterVariant', 'characterVariant.baseCharacter'],
+      order: { firstName: 'ASC', lastName: 'ASC' },
     });
   }
 
@@ -50,7 +58,10 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
    */
   async findActiveThisWeek(): Promise<Competitor[]> {
     return this.repository.find({
-      where: { isActiveThisWeek: true },
+      where: [
+        { isActiveThisWeek: true, leftAt: IsNull() },
+        { isActiveThisWeek: true, leftAt: Raw((alias) => `${alias} > CURRENT_DATE`) },
+      ],
       relations: ['characterVariant', 'characterVariant.baseCharacter'],
     });
   }
@@ -64,6 +75,16 @@ export class CompetitorRepository extends BaseRepository<Competitor> {
       where: { id: In(ids) },
       relations: ['characterVariant', 'characterVariant.baseCharacter'],
     });
+  }
+
+  async findActiveByIds(ids: string[]): Promise<Competitor[]> {
+    return this.repository
+      .createQueryBuilder('competitor')
+      .leftJoinAndSelect('competitor.characterVariant', 'variant')
+      .leftJoinAndSelect('variant.baseCharacter', 'baseCharacter')
+      .where('competitor.id IN (:...ids)', { ids })
+      .andWhere('(competitor."leftAt" IS NULL OR competitor."leftAt" > CURRENT_DATE)')
+      .getMany();
   }
 
   /**

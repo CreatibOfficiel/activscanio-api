@@ -42,6 +42,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ImageGenerationModule } from './image-generation/image-generation.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { ExportModule } from './export/export.module';
+import { AlumniModule } from './alumni/alumni.module';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { ExportModule } from './export/export.module';
     ImageGenerationModule,
     WebsocketModule,
     ExportModule,
+    AlumniModule,
   ],
   controllers: [AppController],
   providers: [

@@ -87,6 +87,9 @@ export class NotificationsService {
     if (updateDto.enableInApp !== undefined) {
       preferences.enableInApp = updateDto.enableInApp;
     }
+    if (updateDto.showAlumniReminders !== undefined) {
+      preferences.showAlumniReminders = updateDto.showAlumniReminders;
+    }
 
     return await this.notificationPreferencesRepository.save(preferences);
   }
