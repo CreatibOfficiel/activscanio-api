@@ -2,6 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BaseCharacter } from './base-character.entity';
+import { isAlumni } from '../competitors/utils/player-lifecycle';
+
+const variantIsAvailable = (competitor?: { leftAt: string | null } | null) =>
+  !competitor || isAlumni(competitor.leftAt);
 
 export interface CharacterVariantWithAvailability {
   id: string;
@@ -57,7 +61,7 @@ export class BaseCharactersService {
     // Filter available variants for each base character
     for (const baseChar of baseCharacters) {
       baseChar.variants = baseChar.variants.filter(
-        (variant) => !variant.competitor,
+        (variant) => variantIsAvailable(variant.competitor),
       );
     }
 
@@ -83,8 +87,8 @@ export class BaseCharactersService {
           id: variant.id,
           label: variant.label,
           imageUrl: variant.imageUrl,
-          isAvailable: !variant.competitor,
-          takenBy: variant.competitor
+          isAvailable: variantIsAvailable(variant.competitor),
+          takenBy: variant.competitor && !isAlumni(variant.competitor.leftAt)
             ? {
                 competitorId: variant.competitor.id,
                 firstName: variant.competitor.firstName,
@@ -125,6 +129,8 @@ export class BaseCharactersService {
       );
     }
     // Filter the variants to only include those that are available (i.e., not linked to a competitor)
-    return baseCharacter.variants.filter((variant) => !variant.competitor);
+    return baseCharacter.variants.filter((variant) =>
+      variantIsAvailable(variant.competitor),
+    );
   }
 }

@@ -14,6 +14,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { SyncClerkUserDto } from './dto/sync-clerk-user.dto';
 import { UserRepository } from './repositories/user.repository';
 import { CharacterVariant } from '../character-variants/character-variant.entity';
+import { isAlumni } from '../competitors/utils/player-lifecycle';
 import {
   UserNotFoundException,
   UserAlreadyExistsException,
@@ -248,7 +249,8 @@ export class UsersService {
       // Check if the new variant is already taken by another competitor
       if (
         newVariant.competitor &&
-        newVariant.competitor.id !== user.competitor.id
+        newVariant.competitor.id !== user.competitor.id &&
+        !isAlumni(newVariant.competitor.leftAt)
       ) {
         throw new ConflictException(
           `Ce personnage est déjà pris par ${newVariant.competitor.firstName}`,
