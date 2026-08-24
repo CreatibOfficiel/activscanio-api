@@ -42,6 +42,10 @@ import { SeasonsService } from '../seasons/seasons.service';
 import { PingpongDecayService } from '../pingpong/services/pingpong-decay.service';
 import { PingpongRankSnapshotService } from '../pingpong/services/pingpong-rank-snapshot.service';
 import { PingpongEligibilityService } from '../pingpong/services/pingpong-eligibility.service';
+import {
+  PingpongSeasonResetService,
+  PingpongSeasonResetResult,
+} from '../pingpong/services/pingpong-season-reset.service';
 import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
 import { StreakTrackerService } from '../achievements/services/streak-tracker.service';
 import { StreakWarningService } from '../achievements/services/streak-warning.service';
@@ -84,6 +88,7 @@ export class TasksService {
     private readonly pingpongDecayService: PingpongDecayService,
     private readonly pingpongRankSnapshotService: PingpongRankSnapshotService,
     private readonly pingpongEligibilityService: PingpongEligibilityService,
+    private readonly pingpongSeasonResetService: PingpongSeasonResetService,
     @InjectRepository(PingpongPlayer)
     private readonly pingpongPlayerRepository: Repository<PingpongPlayer>,
     private readonly streakTrackerService: StreakTrackerService,
@@ -198,6 +203,28 @@ export class TasksService {
       this.logger.error(
         `❌ Failed to reset season stats: ${error.message}`,
         error.stack,
+      );
+    }
+
+    // 6. Reset ping-pong season stats (ELO + season match counts + streaks)
+    //    Runs last, and after the archive above, for the same reason the
+    //    Mario Kart reset does: the archive reads the values this clears.
+    try {
+      // Called directly rather than through `retryTask`, which returns void
+      // and so cannot carry the counts back. The reset is idempotent on its
+      // own (`lastSeasonResetAt`), so the catch below retries it safely.
+      const { active, inactive }: PingpongSeasonResetResult =
+        await this.pingpongSeasonResetService.resetSeasonStats();
+      this.logger.log(
+        `✅ Ping-pong season reset: ${active} active, ${inactive} inactive`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ Failed to reset ping-pong season stats: ${error.message}`,
+        error.stack,
+      );
+      await this.retryTask(() =>
+        this.pingpongSeasonResetService.resetSeasonStats(),
       );
     }
   }

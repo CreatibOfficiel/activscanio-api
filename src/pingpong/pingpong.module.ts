@@ -15,6 +15,7 @@ import { PingpongBestWinService } from './services/pingpong-best-win.service';
 import { PingpongDecayService } from './services/pingpong-decay.service';
 import { PingpongRankSnapshotService } from './services/pingpong-rank-snapshot.service';
 import { PingpongRecomputeService } from './services/pingpong-recompute.service';
+import { PingpongSeasonResetService } from './services/pingpong-season-reset.service';
 
 /**
  * Ping-pong module.
@@ -50,6 +51,7 @@ import { PingpongRecomputeService } from './services/pingpong-recompute.service'
     // One-shot historical repair, driven by an admin endpoint. Not exported:
     // nothing outside this module should be able to rewrite every rating.
     PingpongRecomputeService,
+    PingpongSeasonResetService,
   ],
   exports: [
     PingpongRatingService,
@@ -62,6 +64,7 @@ import { PingpongRecomputeService } from './services/pingpong-recompute.service'
     // no column on the player can hold.
     PingpongHighlightStatsService,
     PingpongBestWinService,
+    PingpongSeasonResetService,
   ],
 })
 export class PingpongModule {}

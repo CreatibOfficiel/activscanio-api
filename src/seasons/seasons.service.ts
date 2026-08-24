@@ -7,6 +7,10 @@ import { ArchivedPingpongRanking } from './entities/archived-pingpong-ranking.en
 import { Competitor } from '../competitors/competitor.entity';
 import { PingpongPlayer } from '../pingpong/entities/pingpong-player.entity';
 import { PingpongMatch } from '../pingpong/entities/pingpong-match.entity';
+import {
+  detectMatchHighlights,
+  UPSET_GAP,
+} from '../pingpong/utils/match-highlights';
 import { RaceEvent } from '../races/race-event.entity';
 import { SeasonUtils } from '../common/utils/season-utils';
 import { WeekUtils } from '../common/utils/week-utils';
@@ -66,6 +70,57 @@ export interface SeasonHighlights {
   mostRaces: { competitorName: string; count: number } | null;
   bestRaceScorers:
     { competitorName: string; maxScore: number; perfectCount: number }[] | null;
+  pingpong: PingpongSeasonHighlights | null;
+}
+
+/**
+ * The ping-pong half of the recap.
+ *
+ * Every figure here is computed from `pingpong_matches` filtered on
+ * `playedAt`, NEVER from `archived_pingpong_rankings`. The archive copies the
+ * player's LIFETIME counters at closing time (wins, losses, matchCount), so a
+ * season-3 row reports the totals of seasons 1+2+3. Reading it here would
+ * caption cumulative numbers as "this season" — the exact bug the reset gap
+ * creates.
+ *
+ * Null when the season predates the sport, so the recap can skip the cards
+ * entirely rather than render a row of zeroes.
+ */
+/** A pair's record inside one season window, keyed by `pairKey`. */
+interface SeasonRivalry {
+  a: string;
+  b: string;
+  matches: number;
+  winsA: number;
+  winsB: number;
+}
+
+export interface PingpongSeasonHighlights {
+  /** Most consecutive wins inside the season window. */
+  longestWinStreak: { playerName: string; streak: number } | null;
+  /** Most matches played inside the window. */
+  mostMatches: { playerName: string; count: number } | null;
+  /** Biggest rating gap overturned, when it clears the upset threshold. */
+  biggestUpset: {
+    winnerName: string;
+    loserName: string;
+    gap: number;
+  } | null;
+  /** The pair that met most often, with their head-to-head split. */
+  rivalry: {
+    playerAName: string;
+    playerBName: string;
+    matches: number;
+    winsA: number;
+    winsB: number;
+  } | null;
+  /** Feats that only exist inside a single match, counted over the window. */
+  feats: {
+    shutoutSets: number;
+    comebacks: number;
+    heists: number;
+  };
+  totalMatches: number;
 }
 
 /**
@@ -252,6 +307,10 @@ export class SeasonsService {
     private readonly archivedPingpongRankingRepository: Repository<ArchivedPingpongRanking>,
     @InjectRepository(Competitor)
     private readonly competitorRepository: Repository<Competitor>,
+    @InjectRepository(PingpongPlayer)
+    private readonly pingpongPlayerRepository: Repository<PingpongPlayer>,
+    @InjectRepository(PingpongMatch)
+    private readonly pingpongMatchRepository: Repository<PingpongMatch>,
   ) {}
 
   /**
@@ -963,10 +1022,34 @@ export class SeasonsService {
    * NULLs last on ASC by default, which is the order we want anyway.
    */
   async getPingpongRankings(seasonId: string) {
-    return this.archivedPingpongRankingRepository.find({
+    const rankings = await this.archivedPingpongRankingRepository.find({
       where: { seasonArchiveId: seasonId },
       order: { rank: 'ASC', finalRating: 'DESC' },
     });
+
+    // Same hydration as the competitor archive, one hop longer: the archive
+    // stores the ping-pong player id, and the photo lives on the competitor
+    // behind it. Without this the recap falls back to coloured initials for
+    // ping-pong while Mario Kart shows real faces in the same modal.
+    const playerIds = rankings.map((r) => r.playerId);
+    if (playerIds.length === 0)
+      return rankings.map((r) => ({
+        ...r,
+        profilePictureUrl: null as string | null,
+      }));
+
+    const players = await this.pingpongPlayerRepository.find({
+      where: { id: In(playerIds) },
+      relations: ['competitor'],
+    });
+    const pictureByPlayerId = new Map(
+      players.map((p) => [p.id, p.competitor?.profilePictureUrl ?? null]),
+    );
+
+    return rankings.map((r) => ({
+      ...r,
+      profilePictureUrl: pictureByPlayerId.get(r.playerId) ?? null,
+    }));
   }
 
   async getCompetitorRankings(seasonId: string) {
@@ -1076,10 +1159,166 @@ export class SeasonsService {
       }
     }
 
+    const pingpong = season
+      ? await this.getPingpongSeasonHighlights(season)
+      : null;
+
     return {
       longestWinStreak,
       mostRaces,
       bestRaceScorers,
+      pingpong,
+    };
+  }
+
+  /**
+   * Ping-pong highlights for one season, read from the matches themselves.
+   *
+   * One pass over the window feeds every figure. The per-match shapes
+   * (shutouts, comebacks, heists, upsets) come from `detectMatchHighlights`,
+   * the same detector the achievement engine uses at recording time, so a
+   * feat counted here and a feat that unlocked a badge can never disagree.
+   */
+  private async getPingpongSeasonHighlights(
+    season: SeasonArchive,
+  ): Promise<PingpongSeasonHighlights | null> {
+    const matches = await this.pingpongMatchRepository.find({
+      where: { playedAt: Between(season.startDate, season.endDate) },
+      relations: [
+        'playerA',
+        'playerA.competitor',
+        'playerB',
+        'playerB.competitor',
+      ],
+      order: { playedAt: 'ASC' },
+    });
+
+    if (matches.length === 0) return null;
+
+    const nameOf = (player: PingpongPlayer | null): string =>
+      player ? this.getPingpongPlayerName(player) : 'Joueur inconnu';
+
+    const matchesPlayed = new Map<string, number>();
+    const streak = new Map<string, number>();
+    const bestStreak = new Map<string, number>();
+    const names = new Map<string, string>();
+    const pairs = new Map<string, SeasonRivalry>();
+
+    let biggestUpset: PingpongSeasonHighlights['biggestUpset'] = null;
+    let shutoutSets = 0;
+    let comebacks = 0;
+    let heists = 0;
+
+    const bump = (map: Map<string, number>, key: string, by = 1) =>
+      map.set(key, (map.get(key) ?? 0) + by);
+
+    for (const match of matches) {
+      const { playerAId, playerBId, winnerId } = match;
+      names.set(playerAId, nameOf(match.playerA));
+      names.set(playerBId, nameOf(match.playerB));
+
+      bump(matchesPlayed, playerAId);
+      bump(matchesPlayed, playerBId);
+
+      // Streaks are per-season by construction: the map starts empty at the
+      // window's first match, so a run carried in from last season does not
+      // count towards this one.
+      const loserId = winnerId === playerAId ? playerBId : playerAId;
+      bump(streak, winnerId);
+      bestStreak.set(
+        winnerId,
+        Math.max(bestStreak.get(winnerId) ?? 0, streak.get(winnerId) ?? 0),
+      );
+      streak.set(loserId, 0);
+
+      const pair = pairs.get(match.pairKey) ?? {
+        a: playerAId,
+        b: playerBId,
+        matches: 0,
+        winsA: 0,
+        winsB: 0,
+      };
+      pair.matches += 1;
+      // `pairKey` is canonical, so the stored pair's A may be this row's B.
+      if (winnerId === pair.a) pair.winsA += 1;
+      else pair.winsB += 1;
+      pairs.set(match.pairKey, pair);
+
+      const winnerIsA = winnerId === playerAId;
+      const highlights = detectMatchHighlights({
+        sets: match.sets,
+        winner: winnerIsA ? 'A' : 'B',
+        selfRatingBefore: winnerIsA ? match.ratingABefore : match.ratingBBefore,
+        opponentRatingBefore: winnerIsA
+          ? match.ratingBBefore
+          : match.ratingABefore,
+      });
+
+      if (highlights.dealtShutoutSet) shutoutSets += 1;
+      if (highlights.cameBack) comebacks += 1;
+      if (highlights.isHeist) heists += 1;
+
+      if (
+        highlights.isUpset &&
+        highlights.ratingGapBeaten > (biggestUpset?.gap ?? UPSET_GAP - 1)
+      ) {
+        biggestUpset = {
+          winnerName: names.get(winnerId) ?? 'Joueur inconnu',
+          loserName: names.get(loserId) ?? 'Joueur inconnu',
+          gap: Math.round(highlights.ratingGapBeaten),
+        };
+      }
+    }
+
+    const topOf = (map: Map<string, number>) => {
+      let bestId: string | null = null;
+      let bestValue = 0;
+      for (const [id, value] of map) {
+        if (value > bestValue) {
+          bestValue = value;
+          bestId = id;
+        }
+      }
+      return bestId ? { id: bestId, value: bestValue } : null;
+    };
+
+    const topStreak = topOf(bestStreak);
+    const topMatches = topOf(matchesPlayed);
+
+    // A rivalry needs at least two meetings; a single match is not one.
+    let topPair: SeasonRivalry | null = null;
+    for (const pair of pairs.values()) {
+      if (pair.matches >= 2 && pair.matches > (topPair?.matches ?? 0)) {
+        topPair = pair;
+      }
+    }
+
+    return {
+      longestWinStreak:
+        topStreak && topStreak.value > 1
+          ? {
+              playerName: names.get(topStreak.id) ?? 'Joueur inconnu',
+              streak: topStreak.value,
+            }
+          : null,
+      mostMatches: topMatches
+        ? {
+            playerName: names.get(topMatches.id) ?? 'Joueur inconnu',
+            count: topMatches.value,
+          }
+        : null,
+      biggestUpset,
+      rivalry: topPair
+        ? {
+            playerAName: names.get(topPair.a) ?? 'Joueur inconnu',
+            playerBName: names.get(topPair.b) ?? 'Joueur inconnu',
+            matches: topPair.matches,
+            winsA: topPair.winsA,
+            winsB: topPair.winsB,
+          }
+        : null,
+      feats: { shutoutSets, comebacks, heists },
+      totalMatches: matches.length,
     };
   }
 

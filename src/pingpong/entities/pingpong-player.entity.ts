@@ -64,6 +64,20 @@ export class PingpongPlayer {
   @Column('float', { default: 0 })
   weightedMatchCount: number;
 
+  /**
+   * Matches played inside the CURRENT season.
+   *
+   * Mirrors `Competitor.currentMonthRaceCount`, and exists for the same one
+   * reason: the season reset needs to tell an active player from an absent
+   * one. Applying the rating squish to someone who never showed up is a
+   * stealth hard reset, so absent players take the deviation bump only.
+   *
+   * Reset to zero by the season transition. `matchCount` is the lifetime
+   * counter and is deliberately left alone.
+   */
+  @Column({ type: 'int', default: 0 })
+  currentSeasonMatchCount: number;
+
   /* ---- Record ---- */
 
   @Column({ type: 'int', default: 0 })
@@ -99,6 +113,18 @@ export class PingpongPlayer {
    */
   @Column({ type: 'timestamptz', nullable: true })
   lastDecayAt: Date | null;
+
+  /**
+   * When the season reset last ran for this player.
+   *
+   * The same idempotency guard `lastDecayAt` provides for the decay, and for
+   * the same reason: the reset squishes ratings toward 1500, so running it
+   * twice squishes twice. The Mario Kart reset has no such guard — a double
+   * run there is unrecoverable outside the archive rows. This side does not
+   * repeat that.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeasonResetAt: Date | null;
 
   /* ---- Ranking eligibility (anti-farming layer c) ---- */
 

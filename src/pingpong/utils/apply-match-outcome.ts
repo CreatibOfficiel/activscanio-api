@@ -15,6 +15,7 @@ export type PingpongPlayerState = Pick<
   | 'vol'
   | 'matchCount'
   | 'weightedMatchCount'
+  | 'currentSeasonMatchCount'
   | 'wins'
   | 'losses'
   | 'setsWon'
@@ -54,6 +55,10 @@ export function applyMatchOutcome(
   // inflates the stats without shortening the road to a confirmed rating.
   player.matchCount += 1;
   player.weightedMatchCount += weight;
+  // Zeroed by the season reset, which reads it to tell active players from
+  // absent ones. Incremented here so the live path and the recompute stay
+  // the single writer this function exists to be.
+  player.currentSeasonMatchCount += 1;
 
   player.setsWon += outcome.setsWon;
   player.setsLost += outcome.setsLost;

@@ -151,6 +151,12 @@ export class PingpongRecomputeService {
         vol: defaults.vol,
         matchCount: 0,
         weightedMatchCount: 0,
+        // NOT replayed, and not zeroed: this counts the current season only,
+        // while the replay walks every match ever played. Rebuilding it here
+        // would set it to the lifetime total and hand the next season reset a
+        // squish for players who have not played in months. Carried through
+        // untouched — the season transition owns this column.
+        currentSeasonMatchCount: player.currentSeasonMatchCount,
         wins: 0,
         losses: 0,
         setsWon: 0,
@@ -327,6 +333,7 @@ export class PingpongRecomputeService {
       vol: player.vol,
       matchCount: player.matchCount,
       weightedMatchCount: player.weightedMatchCount,
+      currentSeasonMatchCount: player.currentSeasonMatchCount,
       wins: player.wins,
       losses: player.losses,
       setsWon: player.setsWon,
