@@ -23,6 +23,7 @@ import { PingpongMatch } from './entities/pingpong-match.entity';
 import { PingpongEloSnapshot } from './entities/pingpong-elo-snapshot.entity';
 import { EnrolPlayerDto, RecordMatchDto } from './dtos/record-match.dto';
 import { MATCH_PLAYER_RELATIONS, sanitizeMatch } from './utils/sanitize-match';
+import { resolvePeriodRange } from '../common/utils/period-range';
 
 @ApiTags('pingpong')
 @Controller('pingpong')
@@ -233,6 +234,8 @@ export class PingpongController {
   async getMatchesPaginated(
     @Query('limit') limit = '20',
     @Query('cursor') cursor?: string,
+    @Query('playerId') playerId?: string,
+    @Query('period') period?: string,
   ) {
     // Bounded regardless of what the caller asks for. Lifting the cap on the
     // history is the point of this endpoint; letting one request pull all of
@@ -247,6 +250,30 @@ export class PingpongController {
       .leftJoinAndSelect('playerB.competitor', 'playerBCompetitor')
       .orderBy('m.playedAt', 'DESC')
       .addOrderBy('m.id', 'DESC');
+
+    // Filters, applied in SQL rather than by the caller.
+    //
+    // The history is keyset-paged twenty rows at a time, so a client-side
+    // filter would only ever narrow the page in hand: "Charles, last 7 days"
+    // over a page holding none of his matches renders an empty list next to
+    // a "load more" button, which reads as "he has not played" rather than
+    // "keep scrolling". Filtering here means a page of twenty is twenty
+    // MATCHING rows, and `hasMore` answers for the filtered set.
+    if (playerId) {
+      // Either side of the table. A filter that only matched playerA would
+      // silently drop half of someone's games.
+      qb.andWhere('(m."playerAId" = :playerId OR m."playerBId" = :playerId)', {
+        playerId,
+      });
+    }
+
+    // Same period vocabulary as the race history — 'today' | 'week' |
+    // 'season' — resolved with the same WeekUtils/SeasonUtils the races
+    // service uses, so "cette semaine" means the identical Monday on both
+    // screens. Anything else, 'all' included, applies no date filter.
+    const { dateFrom, dateTo } = resolvePeriodRange(period);
+    if (dateFrom) qb.andWhere('m."playedAt" >= :dateFrom', { dateFrom });
+    if (dateTo) qb.andWhere('m."playedAt" <= :dateTo', { dateTo });
 
     if (cursor) {
       // Split on the FIRST separator only: an ISO timestamp contains no '|',

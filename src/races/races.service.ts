@@ -11,8 +11,7 @@ import {
   RaceEventRepository,
   PaginatedRacesResult,
 } from './repositories/race-event.repository';
-import { SeasonUtils } from '../common/utils/season-utils';
-import { WeekUtils } from '../common/utils/week-utils';
+import { resolvePeriodRange } from '../common/utils/period-range';
 import {
   RaceEventNotFoundException,
   InvalidRaceDataException,
@@ -316,37 +315,9 @@ export class RacesService {
     competitorId?: string;
   }): Promise<PaginatedRacesResult> {
     const { limit, cursor, period, competitorId } = options;
-    let dateFrom: Date | undefined;
-    let dateTo: Date | undefined;
-
-    const now = new Date();
-    const todayStart = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
-
-    switch (period) {
-      case 'today':
-        dateFrom = todayStart;
-        break;
-      case 'week':
-        // Current calendar week (Monday 00:00 -> now), matching the weekly
-        // Monday->Sunday cycle used everywhere else in the app.
-        dateFrom = WeekUtils.getMondayOfDate(now);
-        break;
-      case 'season': {
-        const weekNumber = WeekUtils.getISOWeek(now);
-        const year = now.getFullYear();
-        const seasonNumber = SeasonUtils.getSeasonNumber(weekNumber, year);
-        const seasonWeeks = SeasonUtils.getSeasonWeeks(seasonNumber);
-        dateFrom = WeekUtils.getMondayOfWeek(year, seasonWeeks.start);
-        const endMonday = WeekUtils.getMondayOfWeek(year, seasonWeeks.end);
-        dateTo = new Date(endMonday.getTime() + 6 * 86400000 + 86399999); // Sunday 23:59:59
-        break;
-      }
-      // 'all' or undefined: no date filter
-    }
+    // Shared with the ping-pong match history, which offers the same period
+    // chips — "cette semaine" has to resolve to the same Monday on both.
+    const { dateFrom, dateTo } = resolvePeriodRange(period);
 
     return this.raceEventRepository.findPaginated({
       limit,

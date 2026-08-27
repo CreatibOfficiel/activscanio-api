@@ -5,6 +5,8 @@ import { SeasonArchive } from '../entities/season-archive.entity';
 import { ArchivedCompetitorRanking } from '../entities/archived-competitor-ranking.entity';
 import { ArchivedPingpongRanking } from '../entities/archived-pingpong-ranking.entity';
 import { Competitor } from '../../competitors/competitor.entity';
+import { PingpongPlayer } from '../../pingpong/entities/pingpong-player.entity';
+import { PingpongMatch } from '../../pingpong/entities/pingpong-match.entity';
 
 /**
  * The archive overview.
@@ -70,6 +72,14 @@ describe('SeasonsService — overview', () => {
         {
           provide: getRepositoryToken(Competitor),
           useValue: { find: competitorFind },
+        },
+        {
+          provide: getRepositoryToken(PingpongPlayer),
+          useValue: { find: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: getRepositoryToken(PingpongMatch),
+          useValue: { find: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();

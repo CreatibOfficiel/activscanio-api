@@ -261,6 +261,70 @@ describe('PingpongController — matches', () => {
       return qb;
     }
 
+    /**
+     * Filtering happens in SQL, not on the page that came back.
+     *
+     * The history is keyset-paged twenty rows at a time. A client-side
+     * filter would only ever narrow the page in hand, so "Marc, this week"
+     * over a page holding none of his matches would render an empty list
+     * beside a "load more" button — which reads as "he has not played"
+     * rather than "keep scrolling".
+     */
+    describe('filters', () => {
+      it('matches a player on either side of the table', async () => {
+        const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+        await controller.getMatchesPaginated('20', undefined, 'p1');
+
+        // Both sides, or half of someone's games silently disappear.
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          expect.stringContaining('playerAId'),
+          { playerId: 'p1' },
+        );
+        expect(qb.andWhere.mock.calls[0][0]).toContain('playerBId');
+      });
+
+      it('applies no filter when neither is asked for', async () => {
+        const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+        await controller.getMatchesPaginated('20');
+
+        expect(qb.andWhere).not.toHaveBeenCalled();
+      });
+
+      it('treats "all" as no date filter', async () => {
+        const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+        await controller.getMatchesPaginated('20', undefined, undefined, 'all');
+
+        expect(qb.andWhere).not.toHaveBeenCalled();
+      });
+
+      it('bounds the range for a named period', async () => {
+        const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+        await controller.getMatchesPaginated(
+          '20',
+          undefined,
+          undefined,
+          'week',
+        );
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          expect.stringContaining('playedAt'),
+          expect.objectContaining({ dateFrom: expect.any(Date) }),
+        );
+      });
+
+      it('combines a player and a period', async () => {
+        const qb = queryBuilderReturning([matchRow({ id: 'm1' })]);
+
+        await controller.getMatchesPaginated('20', undefined, 'p1', 'week');
+
+        expect(qb.andWhere).toHaveBeenCalledTimes(2);
+      });
+    });
+
     it('wraps the rows in an envelope rather than returning a bare array', async () => {
       queryBuilderReturning([matchRow({ id: 'm1' })]);
 

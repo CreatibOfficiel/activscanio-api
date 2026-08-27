@@ -121,6 +121,14 @@ describe('SeasonsService — ping-pong archiving', () => {
           provide: getRepositoryToken(Competitor),
           useValue: { find: jest.fn() },
         },
+        {
+          provide: getRepositoryToken(PingpongPlayer),
+          useValue: { find: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: getRepositoryToken(PingpongMatch),
+          useValue: { find: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 
