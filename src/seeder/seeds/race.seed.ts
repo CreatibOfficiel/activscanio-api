@@ -7,7 +7,15 @@ import { seededRandom, getScoreForRank, addDays } from '../utils/seed-helpers';
 
 const logger = new Logger('RaceSeed');
 
-const PLAYERS_PER_RACE = 4; // 4 players per race (as in Mario Kart 4-player mode)
+/**
+ * Humans per generated race.
+ *
+ * A property of this fixture, not of the game: the console now seats up to
+ * `MAX_HUMAN_PLAYERS` (see config/race-format.config.ts). Four keeps the seeded
+ * history close to how the group actually played, and the ELO warm-up below is
+ * calibrated on it.
+ */
+const PLAYERS_PER_RACE = 4;
 
 export async function seedRaces(dataSource: DataSource): Promise<RaceEvent[]> {
   const raceRepository = dataSource.getRepository(RaceEvent);

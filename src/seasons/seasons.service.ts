@@ -14,6 +14,7 @@ import {
 import { RaceEvent } from '../races/race-event.entity';
 import { SeasonUtils } from '../common/utils/season-utils';
 import { WeekUtils } from '../common/utils/week-utils';
+import { PERFECT_SCORE } from '../config/race-format.config';
 
 /**
  * A raw row holding a name and one numeric column.
@@ -1127,7 +1128,7 @@ export class SeasonsService {
       }
     }
 
-    // Best race scorers (perfect 60-point races)
+    // Best race scorers (perfect cups)
     let bestRaceScorers: SeasonHighlights['bestRaceScorers'] = null;
 
     if (season) {
@@ -1136,7 +1137,7 @@ export class SeasonsService {
         .select([
           'CONCAT(c."firstName", \' \', c."lastName") AS "competitorName"',
           'MAX(rr.score) AS "maxScore"',
-          'SUM(CASE WHEN rr.score = 60 THEN 1 ELSE 0 END) AS "perfectCount"',
+          'SUM(CASE WHEN rr.score = :perfectScore THEN 1 ELSE 0 END) AS "perfectCount"',
         ])
         .from('race_results', 'rr')
         .innerJoin('races', 'r', 'r.id = rr."raceId"')
@@ -1144,9 +1145,10 @@ export class SeasonsService {
         .where('r.date BETWEEN :startDate AND :endDate', {
           startDate: season.startDate,
           endDate: season.endDate,
+          perfectScore: PERFECT_SCORE,
         })
         .groupBy('c.id, c."firstName", c."lastName"')
-        .having('MAX(rr.score) = 60')
+        .having('MAX(rr.score) = :perfectScore')
         .orderBy('"perfectCount"', 'DESC')
         .getRawMany<RawBestScorer>();
 

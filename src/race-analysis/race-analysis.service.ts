@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OpenAIService } from 'src/openai/openai.service';
 import { CharacterVariantsService } from 'src/character-variants/character-variants.service';
+import { MAX_HUMAN_PLAYERS } from '../config/race-format.config';
 
 export interface RaceCompetitorResult {
   competitorId: string;
@@ -91,8 +92,7 @@ export class RaceAnalysisService {
       });
     }
 
-    /* 3.5 – Limit to 4 human players max (keep highest confidence) */
-    const MAX_HUMAN_PLAYERS = 4;
+    /* 3.5 – Cap at the console's human-player limit (keep highest confidence) */
     if (resultsWithConfidence.length > MAX_HUMAN_PLAYERS) {
       resultsWithConfidence.sort((a, b) => b.confidence - a.confidence);
       resultsWithConfidence.splice(MAX_HUMAN_PLAYERS);

@@ -11,6 +11,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { RaceAnalysisService } from './race-analysis.service';
 import { UploadService } from 'src/upload/upload.service';
 import * as fs from 'fs';
+import { MIN_HUMAN_PLAYERS } from '../config/race-format.config';
 
 @Controller('race-analysis')
 export class RaceAnalysisController {
@@ -32,8 +33,10 @@ export class RaceAnalysisController {
     if (!file) {
       throw new BadRequestException('Aucune image reçue');
     }
-    if (competitorIds.length < 2) {
-      throw new BadRequestException('Au moins 2 ids de joueurs sont requis');
+    if (competitorIds.length < MIN_HUMAN_PLAYERS) {
+      throw new BadRequestException(
+        `Au moins ${MIN_HUMAN_PLAYERS} ids de joueurs sont requis`,
+      );
     }
 
     const filePath = this.uploadService.getFilePath(file.filename);
